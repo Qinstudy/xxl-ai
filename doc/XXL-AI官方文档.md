@@ -959,6 +959,20 @@ xxl-ai-desk/
 - **模式隔离**：Plan 模式不装配写 / 命令工具，从工具层面限制只读；
 - **进程隔离**：渲染进程无 Node 能力，运行时进程无 Electron 能力，敏感能力（密钥、原生弹窗）留在主进程。
 
+### 6.6 安装与分发
+
+打包产物由 electron-builder 生成（mac：`dmg` + `zip`；win：`nsis`；linux：`AppImage` + `deb`），输出目录 `xxl-ai-desk/release/{version}/`。
+
+**macOS 提示「文件损坏」的临时处理**：当前 macOS 包未做代码签名与公证，在其他电脑安装时会被 Gatekeeper 打上隔离标记，提示「XXL-AI Desk 已损坏，无法打开，你应该将它移到废纸篓」。但是，实际上文件并未损坏，去除隔离标记即可：
+
+```
+# 1、把 App 拖入 /Applications（先不要双击运行）
+# 2、终端去除隔离标记（sudo 需输入密码）
+sudo xattr -rd com.apple.quarantine "/Applications/XXL-AI\ Desk.app"
+```
+
+去除后正常打开；若首次仍被拦截，进入「系统设置 → 隐私与安全性 → 仍要打开」放行一次即可。
+
 
 ## 六、版本更新日志
 
