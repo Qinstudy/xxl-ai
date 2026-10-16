@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* 文件树节点：目录懒加载可展开，文件点击选中；支持按名称关键字过滤当前已加载节点 */
 import { computed } from 'vue'
-import type { FsEntry } from '../../../../shared/ipc'
+import type { FsEntry } from '@shared/ipc'
 
 const props = defineProps<{
   entry: FsEntry

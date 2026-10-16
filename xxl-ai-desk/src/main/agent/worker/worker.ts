@@ -5,7 +5,7 @@
  */
 
 import log from 'electron-log/main'
-import { abortAgent, evictAgent, getAgent, resetAgents, runPrompt } from './host'
+import { abortAgent, evictAgent, getAgent, resetAgents, runPrompt } from './session'
 import { setRuntimePath } from './tools'
 import { clearSessionPermissions, setApprovalRequester } from './sandbox'
 import type {
@@ -14,7 +14,7 @@ import type {
   RunAgentInput,
   WorkerMessage,
   WorkerRequest
-} from '../../shared/agentProtocol'
+} from '@shared/agentProtocol'
 
 /* 与主进程通信的端口（utilityProcess 中始终存在） */
 const port = process.parentPort

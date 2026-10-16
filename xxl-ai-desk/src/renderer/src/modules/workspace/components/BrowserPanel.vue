@@ -6,8 +6,8 @@
  *   - 页面内 window.open / target=_blank 经主进程转发为新标签页。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { api } from '../../api'
-import { t } from '../../i18n'
+import { api } from '@renderer/api'
+import { t } from '@renderer/i18n'
 
 interface WebviewElement extends HTMLElement {
   loadURL(url: string): Promise<void>

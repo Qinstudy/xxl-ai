@@ -4,10 +4,10 @@
  * 选定后承载对应面板；支持放大占满正文区与收起。
  */
 import { computed, ref, watch } from 'vue'
-import { useLayoutStore } from '../../stores/layout'
-import { useSettingsStore } from '../../stores/settings'
-import { t } from '../../i18n'
-import { formatShortcut } from '../../utils/shortcut'
+import { useLayoutStore } from '@renderer/stores/layout'
+import { useSettingsStore } from '@renderer/stores/settings'
+import { t } from '@renderer/i18n'
+import { formatShortcut } from '@renderer/utils/shortcut'
 import FilePanel from './FilePanel.vue'
 import BrowserPanel from './BrowserPanel.vue'
 

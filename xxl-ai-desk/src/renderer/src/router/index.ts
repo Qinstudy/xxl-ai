@@ -10,12 +10,12 @@ const router = createRouter({
     {
       path: '/',
       name: 'chat',
-      component: () => import('../modules/chat/pages/index.vue')
+      component: () => import('@renderer/modules/chat/pages/index.vue')
     },
     {
       path: '/settings',
       name: 'settings',
-      component: () => import('../modules/settings/pages/index.vue')
+      component: () => import('@renderer/modules/settings/pages/index.vue')
     },
     {
       /* 未匹配路由兜底到对话首页 */

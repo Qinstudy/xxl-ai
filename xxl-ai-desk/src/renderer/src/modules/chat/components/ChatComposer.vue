@@ -3,11 +3,11 @@
 import { computed, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { useProjectStore } from '../stores/project'
-import { useChatStore } from '../stores/chat'
-import { useSettingsStore } from '../stores/settings'
-import { t } from '../i18n'
-import type { ChatMode } from '../../../shared/ipc'
+import { useProjectStore } from '@renderer/stores/project'
+import { useChatStore } from '@renderer/stores/chat'
+import { useSettingsStore } from '@renderer/stores/settings'
+import { t } from '@renderer/i18n'
+import type { ChatMode } from '@shared/ipc'
 
 const props = defineProps<{ streaming: boolean; disabled?: boolean }>()
 const emit = defineEmits<{ submit: [text: string, mode: ChatMode]; stop: [] }>()

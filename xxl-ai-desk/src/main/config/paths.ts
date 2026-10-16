@@ -1,7 +1,7 @@
 /*
- * 运行时数据目录管理：
- *   默认使用系统 userData 目录；可在「通用设置」中修改（写入 userData/desk-config.json）。
- *   配置独立于 SQLite（避免数据库位置自引用），修改后需重启生效。
+ * 运行时路径配置（主进程基础设施）：默认数据目录取系统 userData，可在「通用设置」中修改
+ * （写入 userData/desk-config.json）；配置独立于 SQLite（避免数据库位置自引用），修改后需重启生效。
+ * 供 db / services / agent 共同依赖，避免 db 反向依赖 services。
  */
 
 import { app } from 'electron'

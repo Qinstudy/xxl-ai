@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /* 单条消息：用户气泡 / 助手「执行过程时间线（思考 → 工具 → 正文）+ 最终答复」 */
 import { computed, ref } from 'vue'
-import { renderMarkdown } from '../composables/useMarkdown'
-import { onCodeCopyClick } from '../composables/useCodeCopy'
-import { toolArgsText, toolView } from '../composables/useToolView'
-import { useNow } from '../composables/useNow'
-import { t } from '../i18n'
-import type { ToolCallState, UiMessage } from '../types'
+import { renderMarkdown } from '@renderer/composables/useMarkdown'
+import { onCodeCopyClick } from '@renderer/composables/useCodeCopy'
+import { toolArgsText, toolView } from '@renderer/composables/useToolView'
+import { useNow } from '@renderer/composables/useNow'
+import { t } from '@renderer/i18n'
+import type { ToolCallState, UiMessage } from '@renderer/types'
 
 const props = defineProps<{ message: UiMessage }>()
 const emit = defineEmits<{ edit: [content: string]; remove: [] }>()

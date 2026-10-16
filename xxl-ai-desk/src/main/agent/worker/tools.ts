@@ -11,7 +11,7 @@ import { promises as fs } from 'fs'
 import type { Dirent } from 'fs'
 import { basename, dirname, relative, resolve, sep } from 'path'
 import { guardPath, type PathAction } from './sandbox'
-import type { ChatMode } from '../../shared/ipc'
+import type { ChatMode } from '@shared/ipc'
 
 /* 工具装配上下文 */
 export interface ToolContext {

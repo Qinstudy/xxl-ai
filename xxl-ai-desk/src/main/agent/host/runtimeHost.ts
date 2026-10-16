@@ -13,7 +13,7 @@ import type {
   RunAgentInput,
   WorkerMessage,
   WorkerRequest
-} from '../../shared/agentProtocol'
+} from '@shared/agentProtocol'
 
 /* 一次运行的回调与结算：以会话为代表，同一会话同时只允许一轮运行 */
 interface PendingRun {
@@ -32,7 +32,7 @@ function ensureWorker(): Promise<UtilityProcess> {
   if (worker && workerReady) {
     return workerReady
   }
-  const proc = utilityProcess.fork(join(__dirname, 'agent/worker.js'), [], {
+  const proc = utilityProcess.fork(join(__dirname, 'agent/worker/worker.js'), [], {
     serviceName: 'xxl-ai-desk-agent'
   })
   worker = proc

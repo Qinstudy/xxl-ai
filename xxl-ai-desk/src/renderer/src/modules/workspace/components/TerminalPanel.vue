@@ -7,8 +7,8 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicI
 import { Terminal, type ITheme } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { api } from '../api'
-import { t } from '../i18n'
+import { api } from '@renderer/api'
+import { t } from '@renderer/i18n'
 
 const props = defineProps<{ cwd?: string; title?: string; visible?: boolean }>()
 const emit = defineEmits<{ close: [] }>()

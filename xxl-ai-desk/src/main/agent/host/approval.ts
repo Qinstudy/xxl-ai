@@ -4,9 +4,9 @@
  */
 
 import { BrowserWindow } from 'electron'
-import { IPC } from '../../shared/ipc'
-import type { ApprovalChoice, ApprovalRequest } from '../../shared/agentProtocol'
-import type { ChatApprovalPrompt } from '../../shared/ipc'
+import { IPC } from '@shared/ipc'
+import type { ApprovalChoice, ApprovalRequest } from '@shared/agentProtocol'
+import type { ChatApprovalPrompt } from '@shared/ipc'
 
 /* 待响应的审批请求：requestId → resolve 回调 */
 const pending = new Map<string, (choice: ApprovalChoice) => void>()

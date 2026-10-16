@@ -1,15 +1,15 @@
 <script setup lang="ts">
 /* 应用外壳：左侧会话栏（可折叠）+ 右侧内容区 + 全局快捷键 */
 import { onBeforeUnmount, onMounted } from 'vue'
-import Sidebar from './components/Sidebar.vue'
-import ApprovalDialog from './components/ApprovalDialog.vue'
-import { useSettingsStore } from './stores/settings'
-import { useChatStore } from './stores/chat'
-import { useProjectStore } from './stores/project'
-import { useQuickAction } from './composables/useQuickAction'
-import { matchShortcut } from './utils/shortcut'
+import Sidebar from '@renderer/modules/chat/components/Sidebar.vue'
+import ApprovalDialog from '@renderer/components/ApprovalDialog.vue'
+import { useSettingsStore } from '@renderer/stores/settings'
+import { useChatStore } from '@renderer/stores/chat'
+import { useProjectStore } from '@renderer/stores/project'
+import { useQuickAction } from '@renderer/composables/useQuickAction'
+import { matchShortcut } from '@renderer/utils/shortcut'
 import { t } from './i18n'
-import type { QuickAction } from '../../shared/ipc'
+import type { QuickAction } from '@shared/ipc'
 
 const settings = useSettingsStore()
 const chat = useChatStore()

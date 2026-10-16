@@ -9,9 +9,9 @@
 import { execFile } from 'child_process'
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { delimiter, dirname, isAbsolute, join } from 'path'
-import { getDataDir } from './storageService'
+import { getDataDir } from '../config/paths'
 import { getSettings } from './settingsService'
-import type { RuntimeDetectResult, RuntimeExecInput } from '../../shared/ipc'
+import type { RuntimeDetectResult, RuntimeExecInput } from '@shared/ipc'
 
 /* Electron 内置 Node shim 所在目录：随数据目录迁移，避免污染系统 */
 export function getRuntimeBinDir(): string {

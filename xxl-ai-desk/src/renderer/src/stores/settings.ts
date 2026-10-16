@@ -3,8 +3,8 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { api } from '../api'
-import { setLanguage, t } from '../i18n'
+import { api } from '@renderer/api'
+import { setLanguage, t } from '@renderer/i18n'
 import type {
   AppSettings,
   ProviderDTO,
@@ -12,7 +12,7 @@ import type {
   RuntimeDetectResult,
   RuntimeExecInput,
   UpdateInfo
-} from '../../../shared/ipc'
+} from '@shared/ipc'
 
 export const useSettingsStore = defineStore('settings', () => {
   /* 应用设置（主题/语言/默认供应商与模型/系统提示词/快捷操作等） */

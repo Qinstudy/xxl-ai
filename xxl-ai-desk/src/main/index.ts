@@ -4,13 +4,13 @@ import { app, BrowserWindow, nativeImage, shell } from 'electron'
 import { existsSync } from 'fs'
 import { join } from 'path'
 import log from 'electron-log/main'
-import { IPC } from '../shared/ipc'
+import { IPC } from '@shared/ipc'
 import { initDatabase } from './db'
 import { registerIpc } from './ipc'
 import { ensureSeedProviders } from './services/providerService'
 import { disposeAllTerminals } from './services/terminalService'
 import { disposeAllFsWatch } from './services/fsWatchService'
-import { disposeAgentRuntime } from './agent/runtime'
+import { disposeAgentRuntime } from './agent/host/runtimeHost'
 
 /* 主窗口引用（未创建或已关闭时为 null） */
 let mainWindow: BrowserWindow | null = null

@@ -11,7 +11,7 @@
 
 import { existsSync, realpathSync } from 'fs'
 import { basename, dirname, isAbsolute, join, normalize, resolve, sep } from 'path'
-import type { ApprovalChoice, ApprovalRequest, PathAction } from '../../shared/agentProtocol'
+import type { ApprovalChoice, ApprovalRequest, PathAction } from '@shared/agentProtocol'
 
 /* 越界访问的动作类型（文案区分用） */
 export type { PathAction }

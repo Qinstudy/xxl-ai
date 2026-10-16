@@ -5,13 +5,13 @@
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { api } from '../../api'
-import { t } from '../../i18n'
-import { renderMarkdown } from '../../composables/useMarkdown'
-import { onCodeCopyClick } from '../../composables/useCodeCopy'
-import { escapeHtml, highlightCode, languageOf } from '../../composables/useHighlight'
+import { api } from '@renderer/api'
+import { t } from '@renderer/i18n'
+import { renderMarkdown } from '@renderer/composables/useMarkdown'
+import { onCodeCopyClick } from '@renderer/composables/useCodeCopy'
+import { escapeHtml, highlightCode, languageOf } from '@renderer/composables/useHighlight'
 import FileTreeNode from './FileTreeNode.vue'
-import type { FileContent, FsEntry, OpenWithApp } from '../../../../shared/ipc'
+import type { FileContent, FsEntry, OpenWithApp } from '@shared/ipc'
 
 const props = defineProps<{ root?: string; projectName?: string }>()
 

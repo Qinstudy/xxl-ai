@@ -6,8 +6,8 @@
 import type { Agent } from '@earendil-works/pi-agent-core'
 import { buildModels, type ProviderModelConfig } from './models'
 import { createBuiltinTools } from './tools'
-import type { ChatMode } from '../../shared/ipc'
-import type { HostEvent } from '../../shared/agentProtocol'
+import type { ChatMode } from '@shared/ipc'
+import type { HostEvent } from '@shared/agentProtocol'
 
 /* 创建/获取会话 Agent 所需的运行时配置 */
 export interface AgentRuntimeOptions {

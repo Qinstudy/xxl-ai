@@ -4,7 +4,7 @@
  */
 
 import type { Model, MutableModels } from '@earendil-works/pi-ai'
-import type { ProviderModelConfig } from '../../shared/agentProtocol'
+import type { ProviderModelConfig } from '@shared/agentProtocol'
 
 /* 构建 Pi Models 所需的供应商配置：统一取自运行时协议定义 */
 export type { ProviderModelConfig }

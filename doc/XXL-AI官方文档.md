@@ -932,25 +932,34 @@ xxl-ai.chat.history.limit=50        # 附加给模型的最近历史消息条数
 
 ```
 xxl-ai-desk/
-├── electron.vite.config.ts        # 三进程构建配置
+├── electron.vite.config.ts        # 三进程构建配置（主进程双入口：index + agent/worker/worker）
 ├── electron-builder.yml           # 打包配置
 └── src/
     ├── main/                      # 主进程（Node）
     │   ├── index.ts               # 入口：窗口 / 生命周期
-    │   ├── ipc.ts                 # IPC 路由（含 chat:send 编排）
-    │   ├── security.ts            # API Key 本地编解码
+    │   ├── ipc.ts                 # IPC 薄网关（仅透传 + 兜底，编排下沉 services）
+    │   ├── config/paths.ts        # 数据目录 / DB 路径解析（db 与 services 共同依赖）
     │   ├── db/                    # SQLite + Drizzle（schema / 初始化 / 迁移）
-    │   ├── agent/                 # Pi 运行时：runtime / worker / models / tools / sandbox / host
-    │   └── services/              # settings / provider / session / project / fs / watch / terminal
+    │   ├── services/              # 业务：settings/provider/project/session/chat/fs/watch/terminal/openWith/update/env/security
+    │   └── agent/                 # Pi 运行时（harness，按进程分两层）
+    │       ├── host/              # 主进程侧：runtimeHost（托管 utilityProcess）+ approval
+    │       └── worker/            # 运行时进程侧：worker/session/tools/sandbox/models
     ├── preload/index.ts           # contextBridge 暴露 window.desk
-    ├── shared/ipc.ts              # 主/预加载/渲染共享类型
-    └── renderer/src/              # 渲染进程（Vue3）
-        ├── components/            # Sidebar / MessageItem / ChatComposer / TerminalPanel / panel/*
+    ├── shared/                    # 跨进程契约（别名 @shared）
+    │   ├── ipc.ts                 # 聚合：re-export 各域契约 + IPC 常量 + DeskApi
+    │   ├── contracts/*.ts         # 按域拆分 DTO（app/provider/project/session/chat/terminal/fs/shell）
+    │   └── agentProtocol.ts       # 主进程 ⇄ 运行时进程协议
+    └── renderer/src/              # 渲染进程（Vue3，别名 @renderer）
+        ├── modules/{module}/      # 模块自包含：pages/ + components/
+        ├── components/            # 仅跨模块通用件（EmptyState / ApprovalDialog / ShortcutInput）
         ├── stores/                # settings / chat / layout / project
-        ├── modules/               # chat / settings 页面
+        ├── composables/           # 组合式函数（含响应式）
+        ├── utils/                 # 纯函数工具（无 Vue 依赖）
         ├── i18n/                  # zh / en 文案
         └── styles/                # 设计令牌与全局样式
 ```
+
+目录规范要点：**进程即目录**（`agent/host` 可用 electron、`agent/worker` 禁用）；**网关薄化**（业务编排在 `services/*`）；**契约按域** `shared/contracts/*`；**模块自包含**（渲染层模块专属组件入 `modules/{module}/components/`）；**别名优先**（`@renderer/*` / `@shared/*`，禁止 3 层以上 `../`）。
 
 ### 6.5 安全设计
 
@@ -1045,6 +1054,8 @@ docker compose down
 - 3、【新增】客户端支持自动检测新版本，并引导升级；
 
 ### v1.2.0 Release Notes[ING]
+- 1、【优化】Desk版本代码重构，落地进程即目录、网关薄化、契约按域、模块自包含、别名优先等规范化改造；
+
 - 1、【TODO】Docker Compose升级：升级 Redis、Milvus 至最新LTS版本；
 - 2、【TODO】云版：OpenAPI：针对搭建的Agent提供OpenAPI接口能力，通过agentId + accessToken访问，便于集成到第三方系统应用（提供内置Agent对话能力，可用于功能调试或快速集成应用）。
 - 3、【TODO】云版：Memory：支持跨会话记忆、记忆内容主动沉淀更新、上下文检索及注入等。

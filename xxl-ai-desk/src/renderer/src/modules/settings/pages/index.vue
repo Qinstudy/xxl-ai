@@ -3,19 +3,19 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useSettingsStore } from '../../../stores/settings'
-import { useLayoutStore } from '../../../stores/layout'
-import { t } from '../../../i18n'
-import ShortcutInput from '../../../components/ShortcutInput.vue'
-import { DEFAULT_SHORTCUTS } from '../../../../../shared/ipc'
-import logo from '../../../assets/icon.png'
+import { useSettingsStore } from '@renderer/stores/settings'
+import { useLayoutStore } from '@renderer/stores/layout'
+import { t } from '@renderer/i18n'
+import ShortcutInput from '@renderer/components/ShortcutInput.vue'
+import { DEFAULT_SHORTCUTS } from '@shared/ipc'
+import logo from '@renderer/assets/icon.png'
 import type {
   AppSettings,
   ProviderDTO,
   QuickAction,
   RuntimeDetectResult,
   ShortcutMap
-} from '../../../../../shared/ipc'
+} from '@shared/ipc'
 
 const route = useRoute()
 const router = useRouter()
