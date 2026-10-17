@@ -232,13 +232,10 @@ public class ChatStreamTool implements SmartLifecycle {
     }
 
     /**
-     * 初始化任务消费组（幂等）：stream 缺失时先落一条 bootstrap 记录（消费端跳过），BUSYGROUP 视为正常
+     * 初始化任务消费组（幂等）：createGroup 自带 MKSTREAM，流缺失时自动建流；组已存在时以 BUSYGROUP 收敛
      */
     private void initGroup() {
         try {
-            if (Boolean.FALSE.equals(stringRedisTemplate.hasKey(TASK_STREAM))) {
-                stringRedisTemplate.opsForStream().add(TASK_STREAM, Map.of("bootstrap", "1"));
-            }
             stringRedisTemplate.opsForStream().createGroup(TASK_STREAM, ReadOffset.from("0"), GROUP);
         } catch (Exception e) {
             // BUSYGROUP：消费组已存在，正常（Spring 包装后该标识可能仅在 cause 链中）
@@ -370,7 +367,13 @@ public class ChatStreamTool implements SmartLifecycle {
                     }
                 }
             } catch (Throwable e) {
-                logger.warn("Chat worker 消费异常, consumer={}, err={}", consumer, e.getMessage());
+                // 自愈：Redis 数据被清空（flush/重启/误删）会导致任务流与消费组丢失，此时自动重建任务流与消费组，避免 XREADGROUP 持续 NOGROUP 报错
+                if (Boolean.FALSE.equals(stringRedisTemplate.hasKey(TASK_STREAM))) {
+                    logger.warn("Chat 任务流/消费组缺失，自动重建消费组...");
+                    initGroup();
+                } else {
+                    logger.warn("Chat worker 消费异常, consumer={}, err={}", consumer, e.getMessage());
+                }
                 sleepQuietly(1000);
             }
         }
