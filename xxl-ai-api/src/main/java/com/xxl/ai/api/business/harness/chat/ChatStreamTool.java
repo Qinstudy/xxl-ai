@@ -265,11 +265,11 @@ public class ChatStreamTool implements SmartLifecycle {
     /**
      * 投递生成任务 【1/3 - submit task-{msgId}】`
      */
-    public void submit(long msgId, String uuid, long sessionId, String content) {
+    public void submit(long msgId, long agentId, long sessionId, String content) {
         stringRedisTemplate.opsForStream().add(
                 StreamRecords.mapBacked(Map.of(
                                 "msgId", String.valueOf(msgId),
-                                "uuid", uuid,
+                                "agentId", String.valueOf(agentId),
                                 "sessionId", String.valueOf(sessionId),
                                 "content", content))
                         .withStreamKey(TASK_STREAM),
@@ -397,7 +397,7 @@ public class ChatStreamTool implements SmartLifecycle {
             return;
         }
         long sessionId = parseLong(fields.get("sessionId"));
-        String uuid = str(fields.get("uuid"));
+        long agentId = parseLong(fields.get("agentId"));
         String content = str(fields.get("content"));
 
         // 增量本地累积 + 写入结果流，供失败时回填部分内容
@@ -414,7 +414,7 @@ public class ChatStreamTool implements SmartLifecycle {
             appendResult(msgId, EVENT_MESSAGE, delta);
         };
         try {
-            saveAssistant(msgId, sessionId, generate(msgId, uuid, sessionId, content, onThinking, onContent), SessionConstant.MSG_STATUS_DONE);
+            saveAssistant(msgId, sessionId, generate(msgId, agentId, sessionId, content, onThinking, onContent), SessionConstant.MSG_STATUS_DONE);
         } catch (Exception e) {
             logger.warn("Chat 生成失败, msgId={}, err={}", msgId, e.getMessage());
             appendResult(msgId, EVENT_ERROR, e.getMessage());
@@ -552,12 +552,12 @@ public class ChatStreamTool implements SmartLifecycle {
      *
      * 历史仅取当前助手占位（msgId）之前最近 historyLimit 条，跳过未完成的助手占位，并移除末尾当前提问（由 LLM 工具另行追加）。
      */
-    private LlmChatTool.ChatText generate(long msgId, String uuid, long sessionId, String content,
+    private LlmChatTool.ChatText generate(long msgId, long agentId, long sessionId, String content,
                               java.util.function.Consumer<String> onThinking, java.util.function.Consumer<String> onContent) throws Exception {
 
         // 1、解析模型运行时：
-        // 生成发生在 worker 节点，需以 uuid 重新校验 Agent 可用性（请求节点与 worker 可能不同）
-        Agent agent = chatService.requireReadyAgent(uuid);
+        // 生成发生在 worker 节点，需以 agent_id 重新校验 Agent 可用性（请求节点与 worker 可能不同）
+        Agent agent = chatService.requireReadyAgentById(agentId);
         Response<SupplierRuntime> runtimeResp = supplierService.loadRuntime(agent.getSpaceId(),
                 agent.getModelSupplierId(), agent.getModelId());
         if (!runtimeResp.isSuccess()) {

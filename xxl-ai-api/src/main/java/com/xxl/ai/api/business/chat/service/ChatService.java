@@ -27,6 +27,13 @@ public interface ChatService {
     Agent requireReadyAgent(String uuid);
 
     /**
+     * 按 Agent ID 校验并返回可用 Agent（worker 生成侧使用）。
+     *
+     * uuid 仅用于 C 端投放入口，系统内部流转一律使用 agent_id。
+     */
+    Agent requireReadyAgentById(long agentId);
+
+    /**
      * 发起流式对话：校验会话 → 落库用户消息与助手占位 → 投递任务 → 打开 SSE 连接
      */
     SseEmitter send(String uuid, String visitorId, long sessionId, String content);

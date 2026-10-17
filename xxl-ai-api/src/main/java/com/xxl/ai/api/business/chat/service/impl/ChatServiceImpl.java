@@ -54,7 +54,21 @@ public class ChatServiceImpl implements ChatService {
         if (StringTool.isBlank(uuid)) {
             throw new IllegalArgumentException("访问地址无效");
         }
-        Agent agent = agentMapper.loadByUuid(uuid);
+        return checkReady(agentMapper.loadByUuid(uuid));
+    }
+
+    /**
+     * 按 Agent ID 校验并返回可用 Agent（worker 生成侧使用）
+     */
+    @Override
+    public Agent requireReadyAgentById(long agentId) {
+        return checkReady(agentMapper.load(agentId));
+    }
+
+    /**
+     * 可用性校验：存在且已发布，否则抛 IllegalArgumentException
+     */
+    private Agent checkReady(Agent agent) {
         if (agent == null) {
             throw new IllegalArgumentException("Agent 不存在或已删除");
         }
@@ -76,7 +90,8 @@ public class ChatServiceImpl implements ChatService {
             Agent agent = requireReadyAgent(uuid);
             Session session = sessionService.require(agent.getId(), sessionId);
             long msgId = sessionService.openRound(session, content);
-            chatStreamTool.submit(msgId, uuid, sessionId, content);
+            // 任务队列属系统内部流转，使用 agent_id（uuid 仅用于 C 端投放入口）
+            chatStreamTool.submit(msgId, agent.getId(), sessionId, content);
             return chatStreamTool.open(msgId, null);
         } catch (Exception e) {
             logger.warn("Agent 对话提交失败, uuid={}, err={}", uuid, e.getMessage());

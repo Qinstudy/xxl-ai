@@ -120,7 +120,7 @@ public class MemoryTool {
 
         // 单轮流式对话聚合为完整文本（不注入工具/Advisor，不对外回调）
         LlmChatTool.ChatText chatText = llmChatTool.chat(runtime, systemPrompt, new ArrayList<>(), new ArrayList<>(),
-                userPrompt, null, null, "xxl-ai-memory-" + agent.getUuid(), null, null);
+                userPrompt, null, null, "xxl-ai-session-memory-" + agent.getId(), null, null);
         String content = chatText == null ? null : chatText.getContent();
         return limitLength(normalizeMarkdown(content), limit);
     }
