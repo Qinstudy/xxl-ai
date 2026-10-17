@@ -824,7 +824,7 @@ SSE 事件协议（`ChatStreamTool` 的 `EVENT_*` 常量）：
 
 - `POST /chat/send?uuid&visitorId&convId&content`：落库用户消息 + 助手占位后投递任务并转发；
 - `POST /chat/resume?msgId&lastEventId`：从结果流 `lastEventId` 之后继续转发，不重新生成；
-- `xxl_ai_chat_msg.status`（0-生成中、1-完成、2-失败）：发送即落助手占位；刷新后前端发现 `status=0` 即按 msgId 自动续传，生成结果不丢失。
+- `xxl_ai_session_msg.status`（0-生成中、1-完成、2-失败）：发送即落助手占位；刷新后前端发现 `status=0` 即按 msgId 自动续传，生成结果不丢失。
 
 集群与可靠性：
 
@@ -860,7 +860,7 @@ xxl-ai.chat.history.limit=50        # 附加给模型的最近历史消息条数
 | 知识库 | `xxl_ai_knowledge_base`、`xxl_ai_knowledge_doc` | 知识库、文档（向量化状态） |
 | MCP | `xxl_ai_mcp` | MCP 服务配置 |
 | SKILL | `xxl_ai_skill`、`xxl_ai_skill_file` | 技能、技能文件树 |
-| Agent | `xxl_ai_agent`、`xxl_ai_chat_conv`、`xxl_ai_chat_msg` | Agent、对话、消息 |
+| Agent | `xxl_ai_agent`、`xxl_ai_session`、`xxl_ai_session_msg` | Agent、对话、消息 |
 
 **空间隔离**：除平台表外，业务表均带 `space_id`；管理端当前空间由请求头 `xxl-space-id` 传入，后端按空间过滤；管理员可见全部空间，普通用户按 `xxl_ai_user_space` 授权。公开对话端以 Agent 的 `uuid` + 访客 `visitorId` 隔离会话。所有关联均为应用层维护（无数据库外键）。
 
@@ -1055,13 +1055,15 @@ docker compose down
 
 ### v1.2.0 Release Notes[ING]
 - 1、【优化】Desk版本代码重构，落地进程即目录、网关薄化、契约按域、模块自包含、别名优先等规范化改造；
+- 2、【升级】Docker Compose升级：升级 Redis、Milvus 至最新LTS版本；
+- 3、【重构】会话模块重构（云版）：会话管理独立入口，支持跨Agent会话检索；C端会话交互与会话管理逻辑拆分，子模块更KISS、可维护性提升；
 
-- 1、【TODO】Docker Compose升级：升级 Redis、Milvus 至最新LTS版本；
-- 2、【TODO】云版：OpenAPI：针对搭建的Agent提供OpenAPI接口能力，通过agentId + accessToken访问，便于集成到第三方系统应用（提供内置Agent对话能力，可用于功能调试或快速集成应用）。
-- 3、【TODO】云版：Memory：支持跨会话记忆、记忆内容主动沉淀更新、上下文检索及注入等。
-- 4、【TODO】云版：可观测：支持Agent可观测，包括Session对话、工具/知识/记忆等Trace明细可观测等。
-- 5、【TODO】Desk版本：支持SKILL/MCP工具；
-- 6、【TODO】Desk版本：支持浏览器工具操作；
+- 【TODO】云版：OpenAPI：针对搭建的Agent提供OpenAPI接口能力，通过agentId + accessToken访问，便于集成到第三方系统应用（提供内置Agent对话能力，可用于功能调试或快速集成应用）。
+- 【TODO】云版：Memory：支持跨会话记忆、记忆内容主动沉淀更新、上下文检索及注入等。
+- 【TODO】云版：可观测：支持Agent可观测，包括Session对话、工具/知识/记忆等Trace明细可观测等。
+- 【TODO】Desk版本：UI升级，左侧操作栏；
+- 【TODO】Desk版本：支持SKILL/MCP工具；
+- 【TODO】Desk版本：支持浏览器工具操作；
 
 
 ### TODO LIST

@@ -6,8 +6,8 @@ import com.xxl.ai.api.business.agent.model.adaptor.AgentAdaptor;
 import com.xxl.ai.api.business.agent.model.dto.AgentDTO;
 import com.xxl.ai.api.business.agent.model.entity.Agent;
 import com.xxl.ai.api.business.agent.service.AgentService;
-import com.xxl.ai.api.business.chat.service.ChatService;
 import com.xxl.ai.api.business.harness.skill.SkillToolFactory;
+import com.xxl.ai.api.business.session.service.SessionService;
 import com.xxl.tool.core.CollectionTool;
 import com.xxl.tool.core.StringTool;
 import com.xxl.tool.response.PageModel;
@@ -32,7 +32,7 @@ public class AgentServiceImpl implements AgentService {
     @Resource
     private AgentMapper agentMapper;
     @Resource
-    private ChatService chatService;
+    private SessionService sessionService;
     @Resource
     private SkillToolFactory skillToolFactory;
 
@@ -62,6 +62,14 @@ public class AgentServiceImpl implements AgentService {
     public Response<Agent> load(long id) {
         Agent agent = agentMapper.load(id);
         return agent != null ? Response.ofSuccess(agent) : Response.ofFail("Agent 不存在");
+    }
+
+    /**
+     * 查询空间下全部 Agent（轻量列表，供下拉选择）
+     */
+    @Override
+    public List<Agent> loadAll(long spaceId) {
+        return agentMapper.listBySpace(spaceId);
     }
 
     /**
@@ -104,7 +112,7 @@ public class AgentServiceImpl implements AgentService {
             return Response.ofFail();
         }
         // 同步级联清理对话与消息，与 Agent 删除同事务，避免异步清理带来的不一致
-        chatService.purgeByAgentUuids(agentUuids);
+        sessionService.purgeByAgentUuids(agentUuids);
         // 清理已删除 Agent 的运行时沙箱（skill 物化目录等），避免残留
         for (Long id : ids) {
             if (id != null && id > 0) {

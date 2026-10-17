@@ -494,8 +494,8 @@
     "chat": {
       "newChat": "New Chat",
       "newChatAlready": "Already in a new conversation",
-      "noConv": "No conversations",
-      "selectConv": "Select or create a conversation",
+      "noSession": "No conversations",
+      "selectSession": "Select or create a conversation",
       "inputPlaceholder": "Type your message, Enter to send",
       "enterTip": "Enter to send, Shift+Enter for a new line",
       "visitor": "Visitor",
@@ -507,7 +507,7 @@
       "sendFail": "Send failed, please retry later",
       "refresh": "Click to refresh",
       "questionRequired": "Please enter your question",
-      "deleteConvConfirm": "Delete conversation 「{0}」?",
+      "deleteSessionConfirm": "Delete conversation 「{0}」?",
       "thinking": "Deep Think",
       "hideThinking": "Hide Think",
       "thinkingStreaming": "Thinking",
@@ -516,15 +516,16 @@
       "expandMenu": "Expand sidebar",
       "copyCode": "Copy code",
       "copySuccess": "Copied",
-      "conv": "Agent Chats",
-      "convListTitle": "Conversation List",
-      "convDetail": "Conversation Detail",
-      "viewDetail": "View Conversation Detail",
-      "backAgent": "Back to Agent",
-      "convTitle": "Title",
-      "visitorId": "Visitor ID",
       "roleUser": "User",
       "roleAssistant": "Assistant"
+    },
+    "session": {
+      "manage": "Session Manage",
+      "agent": "Agent",
+      "sessionTitle": "Title",
+      "visitorId": "Visitor ID",
+      "detail": "Session Detail",
+      "viewDetail": "View Detail"
     }
   }
 }

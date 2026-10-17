@@ -1,5 +1,5 @@
 import { request } from '@/utils/request'
-import type { AgentMsgShareItem, ConvMsgTrendItem, DashboardStats } from '../types'
+import type { AgentMsgShareItem, SessionMsgTrendItem, DashboardStats } from '../types'
 import type { Response } from '@/types'
 
 /**
@@ -23,9 +23,9 @@ export function getStats(): Promise<Response<DashboardStats>> {
  * @param days 统计天数。
  * @returns 每日会话消息量列表。
  */
-export function getConvMsgTrend(days: number): Promise<Response<ConvMsgTrendItem[]>> {
+export function getSessionMsgTrend(days: number): Promise<Response<SessionMsgTrendItem[]>> {
   return request({
-    url: '/dashboard/convMsgTrend',
+    url: '/dashboard/sessionMsgTrend',
     method: 'get',
     params: { days }
   })
@@ -36,9 +36,9 @@ export function getConvMsgTrend(days: number): Promise<Response<ConvMsgTrendItem
  * @param days 统计天数。
  * @returns 各 Agent 会话消息量列表。
  */
-export function getConvMsgShare(days: number): Promise<Response<AgentMsgShareItem[]>> {
+export function getSessionMsgShare(days: number): Promise<Response<AgentMsgShareItem[]>> {
   return request({
-    url: '/dashboard/convMsgShare',
+    url: '/dashboard/sessionMsgShare',
     method: 'get',
     params: { days }
   })

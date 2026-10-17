@@ -1,44 +1,47 @@
 /**
- * 对话模块 接口封装
- *      - 公开对话页：免登录，按发布 URL 直接访问；
- *      - 管理端：按 Agent 查看访客对话列表与消息明细。
+ * 对话模块 接口封装（C端公开对话：免登录，按发布 URL 直接访问）
+ *      - 会话元数据（创建/列表/改名/删除、消息列表）与对话流式入口均收敛在 /chat 下；
+ *      - 管理端对话查询见 session 模块接口。
  */
 import { request } from '@/utils/request'
 import type { Response } from '@/types'
-import type { AgentChatInfo, ChatConv, ChatMsg } from '../types'
+import type { AgentChatInfo } from '../types'
+import type { Session, SessionMsg } from '@/modules/business/session/types'
 
 const BASE = import.meta.env.VITE_APP_BASE_API ?? ''
 
-// ==================== 公开对话页 ====================
+// ==================== 会话元数据 ====================
+
+/** 创建对话 */
+export function createSession(uuid: string, visitorId: string): Promise<Response<Session>> {
+  return request({ url: '/chat/session/create', method: 'get', params: { uuid, visitorId } })
+}
+
+/** 对话列表（按访客隔离） */
+export function listSession(uuid: string, visitorId: string): Promise<Response<Session[]>> {
+  return request({ url: '/chat/session/list', method: 'get', params: { uuid, visitorId } })
+}
+
+/** 修改对话标题 */
+export function renameSession(sessionId: number, title: string): Promise<Response<string>> {
+  return request({ url: '/chat/session/rename', method: 'get', params: { sessionId, title } })
+}
+
+/** 删除对话 */
+export function deleteSession(sessionId: number): Promise<Response<string>> {
+  return request({ url: '/chat/session/delete', method: 'get', params: { sessionId } })
+}
+
+/** 消息列表（公开访问，按对话ID） */
+export function listMsg(sessionId: number): Promise<Response<SessionMsg[]>> {
+  return request({ url: '/chat/session/msgList', method: 'get', params: { sessionId } })
+}
+
+// ==================== 对话流式（运行时） ====================
 
 /** Load Agent 基础信息 */
 export function loadAgentInfo(uuid: string): Promise<Response<AgentChatInfo>> {
   return request({ url: '/chat/load', method: 'get', params: { uuid } })
-}
-
-/** 创建对话 */
-export function createConv(uuid: string, visitorId: string): Promise<Response<ChatConv>> {
-  return request({ url: '/chat/convCreate', method: 'get', params: { uuid, visitorId } })
-}
-
-/** 对话列表 */
-export function listConv(uuid: string, visitorId: string): Promise<Response<ChatConv[]>> {
-  return request({ url: '/chat/convList', method: 'get', params: { uuid, visitorId } })
-}
-
-/** 消息列表 */
-export function listMsg(convId: number): Promise<Response<ChatMsg[]>> {
-  return request({ url: '/chat/msgList', method: 'get', params: { convId } })
-}
-
-/** 删除对话 */
-export function deleteConv(convId: number): Promise<Response<string>> {
-  return request({ url: '/chat/convDelete', method: 'get', params: { convId } })
-}
-
-/** 修改对话标题 */
-export function renameConv(convId: number, title: string): Promise<Response<string>> {
-  return request({ url: '/chat/convRename', method: 'get', params: { convId, title } })
 }
 
 /**
@@ -48,13 +51,13 @@ export function renameConv(convId: number, title: string): Promise<Response<stri
 export async function sendStream(
   uuid: string,
   visitorId: string,
-  convId: number,
+  sessionId: number,
   content: string
 ): Promise<ReadableStreamDefaultReader<Uint8Array> | null> {
   const response = await fetch(`${BASE}/chat/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ uuid, visitorId, convId, content })
+    body: JSON.stringify({ uuid, visitorId, sessionId, content })
   })
   if (!response.ok || !response.body) {
     throw new Error(`请求失败，HTTP ${response.status}`)

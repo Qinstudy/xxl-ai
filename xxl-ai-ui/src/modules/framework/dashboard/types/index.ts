@@ -16,7 +16,7 @@ export interface DashboardStats {
 }
 
 /** 会话消息趋势单日数据点 */
-export interface ConvMsgTrendItem {
+export interface SessionMsgTrendItem {
   /** 日期（YYYY-MM-DD） */
   date: string
   /** 当日消息量 */

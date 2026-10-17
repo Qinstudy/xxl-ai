@@ -66,7 +66,7 @@
 
 <script setup lang="ts">
 defineOptions({ name: 'Index' })
-import { getConvMsgShare, getConvMsgTrend, getStats } from '../api'
+import { getSessionMsgShare, getSessionMsgTrend, getStats } from '../api'
 import { parseTime } from '@/utils/common'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
@@ -151,7 +151,7 @@ function loadStats() {
  */
 function loadTrendChart() {
   const days = chartDays.value
-  getConvMsgTrend(days).then((res) => {
+  getSessionMsgTrend(days).then((res) => {
     // 后端返回 [{date: '2026-07-11', count: 3}, ...]
     const list = res.data || []
 
@@ -223,7 +223,7 @@ function loadTrendChart() {
  */
 function loadShareChart() {
   const days = chartDays.value
-  getConvMsgShare(days).then((res) => {
+  getSessionMsgShare(days).then((res) => {
     const list = res.data || []
     shareEmpty.value = list.length === 0
 

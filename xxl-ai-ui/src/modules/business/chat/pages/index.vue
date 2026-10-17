@@ -5,48 +5,48 @@
 <template>
   <div class="agent-chat-page">
     <!-- 左侧：对话列表（支持折叠/展开） -->
-    <aside class="conv-panel" :class="{ collapsed }">
-      <div class="conv-header">
+    <aside class="session-panel" :class="{ collapsed }">
+      <div class="session-header">
         <div class="agent-title" @click="handleRefresh" :title="t('business.chat.refresh')">
           <img v-if="logo" :src="logo" class="agent-logo" alt="logo" />
           <span class="agent-name">{{ agent?.name || 'Agent' }}</span>
         </div>
-        <div class="conv-actions">
+        <div class="session-actions">
           <el-button class="new-chat-btn" type="primary" plain round icon="Plus" @click="handleNewChat">
             {{ t('business.chat.newChat') }}
           </el-button>
         </div>
       </div>
-      <div class="conv-list" v-loading="convLoading">
+      <div class="session-list" v-loading="sessionLoading">
         <div
-          v-for="conv in convList"
-          :key="conv.id"
-          class="conv-item"
-          :class="{ active: conv.id === currentConvId }"
-          @click="selectConv(conv.id)"
+          v-for="session in sessionList"
+          :key="session.id"
+          class="session-item"
+          :class="{ active: session.id === currentSessionId }"
+          @click="selectSession(session.id)"
         >
-          <template v-if="editingConvId === conv.id">
+          <template v-if="editingSessionId === session.id">
             <el-input
               v-model="editingTitle"
-              class="conv-title-input"
+              class="session-title-input"
               size="small"
               maxlength="50"
               @click.stop
-              @keyup.enter="saveConvTitle(conv)"
-              @keyup.esc="cancelConvTitle"
-              @blur="saveConvTitle(conv)"
+              @keyup.enter="saveSessionTitle(session)"
+              @keyup.esc="cancelSessionTitle"
+              @blur="saveSessionTitle(session)"
             />
           </template>
           <template v-else>
-            <span class="conv-title" :title="conv.title">{{ conv.title }}</span>
-            <el-icon class="conv-edit" @click.stop="startEditConvTitle(conv)"><EditPen /></el-icon>
+            <span class="session-title" :title="session.title">{{ session.title }}</span>
+            <el-icon class="session-edit" @click.stop="startEditSessionTitle(session)"><EditPen /></el-icon>
           </template>
-          <el-icon class="conv-del" @click.stop="deleteConv(conv)"><Delete /></el-icon>
+          <el-icon class="session-del" @click.stop="deleteSession(session)"><Delete /></el-icon>
         </div>
-        <el-empty v-if="!convLoading && convList.length === 0" :description="t('business.chat.noConv')" :image-size="60" />
+        <el-empty v-if="!sessionLoading && sessionList.length === 0" :description="t('business.chat.noSession')" :image-size="60" />
       </div>
       <!-- 底部：访客信息 + 全屏切换 -->
-      <div class="conv-footer">
+      <div class="session-footer">
         <el-dropdown trigger="click" @command="handleVisitorCommand">
           <span class="visitor-trigger" :title="visitorId">
             <el-icon class="visitor-icon"><User /></el-icon>
@@ -85,7 +85,7 @@
       </div>
       <div class="chat-main">
         <div class="chat-body" ref="chatBodyRef" @scroll="handleScroll">
-          <template v-if="currentConvId">
+          <template v-if="currentSessionId">
             <div v-for="(msg, index) in messages" :key="index" class="msg-row" :class="msg.role">
               <div class="msg-avatar">
                 <el-icon v-if="msg.role === 'assistant'"><ChatDotRound /></el-icon>
@@ -139,21 +139,21 @@
               </div>
             </div>
           </div>
-          <el-empty v-else :description="t('business.chat.selectConv')" :image-size="80" />
+          <el-empty v-else :description="t('business.chat.selectSession')" :image-size="80" />
         </div>
         <!-- 回到底部按钮：用户上翻阅读时显示，点击平滑吸底并恢复自动跟随 -->
-        <button v-if="currentConvId && !nearBottom" class="scroll-to-bottom" :title="t('business.chat.scrollToBottom')" @click="goBottom">
+        <button v-if="currentSessionId && !nearBottom" class="scroll-to-bottom" :title="t('business.chat.scrollToBottom')" @click="goBottom">
           <el-icon><ArrowDown /></el-icon>
         </button>
       </div>
-      <div class="chat-input" v-if="currentConvId">
+      <div class="chat-input" v-if="currentSessionId">
         <el-input
           v-model="inputText"
           type="textarea"
           :rows="3"
           resize="none"
           :placeholder="t('business.chat.inputPlaceholder')"
-          :disabled="!currentConvId || sending"
+          :disabled="!currentSessionId || sending"
           @keydown.enter.exact.prevent="handleSend"
         />
         <div class="input-footer">
@@ -172,10 +172,11 @@ import { t } from '@/i18n'
 import logo from '@/assets/images/logo.png'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { createConv, deleteConv as removeConv, listConv, listMsg, loadAgentInfo, renameConv } from '../api'
+import { createSession, deleteSession as removeSession, listSession, listMsg, loadAgentInfo, renameSession } from '../api'
 import { useChatStream } from '../composables/useChatStream'
 import MarkdownView from '../components/MarkdownView.vue'
-import type { AgentChatInfo, ChatConv, ChatMsg as ChatMsgData } from '../types'
+import type { AgentChatInfo } from '../types'
+import type { Session, SessionMsg } from '@/modules/business/session/types'
 import { parseTime } from '@/utils/common'
 import { SvgIcon } from '@/components'
 import { useFullscreen } from '@vueuse/core'
@@ -193,14 +194,14 @@ const uuid = ref<string>(String(route.params.uuid || ''))
 const visitorId = ref<string>('')
 const agent = ref<AgentChatInfo>()
 
-const convList = ref<ChatConv[]>([])
-const convLoading = ref(false)
-const currentConvId = ref<number | undefined>(undefined)
+const sessionList = ref<Session[]>([])
+const sessionLoading = ref(false)
+const currentSessionId = ref<number | undefined>(undefined)
 /** 对话消息（含前端流式字段 showThinking） */
-interface ChatMsgItem extends ChatMsgData {
+interface SessionMsgItem extends SessionMsg {
   showThinking?: boolean
 }
-const messages = ref<ChatMsgItem[]>([])
+const messages = ref<SessionMsgItem[]>([])
 const inputText = ref('')
 const sending = ref(false)
 const chatBodyRef = ref<HTMLElement>()
@@ -212,7 +213,7 @@ const newChatInputRef = ref<any>()
 /** 左侧对话面板折叠状态 */
 const collapsed = ref(false)
 /** 对话标题编辑状态 */
-const editingConvId = ref<number | undefined>(undefined)
+const editingSessionId = ref<number | undefined>(undefined)
 const editingTitle = ref('')
 
 // --------------------------------- init ---------------------------------
@@ -240,26 +241,26 @@ async function init() {
     return
   }
   ensureVisitorId()
-  await loadConvList()
-  // 定位指定对话：优先路径参数 /chat/:uuid/:conv，其次查询参数 /chat/:uuid?convId=；合法则自动切换，否则默认进入新建对话内容
-  const convParam = Array.isArray(route.params.conv) ? route.params.conv[0] : (route.params.conv as string | undefined)
-  const queryParam = Array.isArray(route.query.convId) ? route.query.convId[0] : (route.query.convId as string | undefined)
-  const targetConvId = Number(convParam ?? queryParam)
-  if (Number.isInteger(targetConvId) && targetConvId > 0 && convList.value.some((c) => c.id === targetConvId)) {
-    selectConv(targetConvId)
+  await loadSessionList()
+  // 定位指定对话：优先路径参数 /chat/:uuid/:session，其次查询参数 /chat/:uuid?sessionId=；合法则自动切换，否则默认进入新建对话内容
+  const sessionParam = Array.isArray(route.params.session) ? route.params.session[0] : (route.params.session as string | undefined)
+  const queryParam = Array.isArray(route.query.sessionId) ? route.query.sessionId[0] : (route.query.sessionId as string | undefined)
+  const targetSessionId = Number(sessionParam ?? queryParam)
+  if (Number.isInteger(targetSessionId) && targetSessionId > 0 && sessionList.value.some((c) => c.id === targetSessionId)) {
+    selectSession(targetSessionId)
   } else {
     newChat.value = true
   }
 }
 
 /** 加载对话列表 */
-async function loadConvList() {
-  convLoading.value = true
+async function loadSessionList() {
+  sessionLoading.value = true
   try {
-    const res = await listConv(uuid.value, visitorId.value)
-    convList.value = res.data
+    const res = await listSession(uuid.value, visitorId.value)
+    sessionList.value = res.data
   } finally {
-    convLoading.value = false
+    sessionLoading.value = false
   }
 }
 
@@ -269,15 +270,15 @@ async function loadConvList() {
 function handleNewChat() {
   if (sending.value) return
   // 已在新建对话状态：提示并聚焦，不重复进入
-  if (newChat.value && !currentConvId.value) {
+  if (newChat.value && !currentSessionId.value) {
     ElMessage.warning(t('business.chat.newChatAlready'))
     newChatInputRef.value?.focus()
     return
   }
-  currentConvId.value = undefined
+  currentSessionId.value = undefined
   messages.value = []
   newChat.value = true
-  syncUrlConvId()
+  syncUrlSessionId()
   nextTick(() => newChatInputRef.value?.focus())
 }
 
@@ -291,18 +292,18 @@ function togglePanel() {
   collapsed.value = !collapsed.value
 }
 
-/** 同步 URL 中的 convId 查询参数（点击对话/新建对话/发送时体现当前会话） */
-function syncUrlConvId(convId?: number) {
-  router.replace({ path: `/chat/${uuid.value}`, query: convId ? { convId: String(convId) } : {} })
+/** 同步 URL 中的 sessionId 查询参数（点击对话/新建对话/发送时体现当前会话） */
+function syncUrlSessionId(sessionId?: number) {
+  router.replace({ path: `/chat/${uuid.value}`, query: sessionId ? { sessionId: String(sessionId) } : {} })
 }
 
 /** 选中对话：加载消息 */
-async function selectConv(convId: number) {
-  currentConvId.value = convId
+async function selectSession(sessionId: number) {
+  currentSessionId.value = sessionId
   newChat.value = false
-  syncUrlConvId(convId)
+  syncUrlSessionId(sessionId)
   messages.value = []
-  const res = await listMsg(convId)
+  const res = await listMsg(sessionId)
   messages.value = res.data.map((m) => ({ ...m, showThinking: false }))
   await scrollToBottom()
   // 存在生成中的助手消息（如刷新页面/切换对话后）：自动断点续传并展开思考区
@@ -316,7 +317,7 @@ async function selectConv(convId: number) {
 /**
  * 续传生成中的助手消息：从结果流起点重放全部增量，回填到对应消息
  */
-async function resumeGenerating(msg: ChatMsgItem) {
+async function resumeGenerating(msg: SessionMsgItem) {
   if (msg.id == null) return
   const idx = messages.value.indexOf(msg)
   sending.value = true
@@ -345,45 +346,45 @@ async function resumeGenerating(msg: ChatMsgItem) {
 // --------------------------------- 对话标题修改 ---------------------------------
 
 /** 进入标题编辑态 */
-function startEditConvTitle(conv: ChatConv) {
-  editingConvId.value = conv.id
-  editingTitle.value = conv.title || ''
+function startEditSessionTitle(session: Session) {
+  editingSessionId.value = session.id
+  editingTitle.value = session.title || ''
 }
 
 /** 保存标题（Enter / 失焦触发，最长50个字符） */
-function saveConvTitle(conv: ChatConv) {
-  if (editingConvId.value !== conv.id) return
+function saveSessionTitle(session: Session) {
+  if (editingSessionId.value !== session.id) return
   const title = editingTitle.value.trim()
-  editingConvId.value = undefined
+  editingSessionId.value = undefined
   editingTitle.value = ''
-  if (!title || title === conv.title) return
-  renameConv(conv.id, title)
+  if (!title || title === session.title) return
+  renameSession(session.id, title)
     .then(() => {
-      conv.title = title
+      session.title = title
     })
     .catch(() => {})
 }
 
 /** 取消标题编辑 */
-function cancelConvTitle() {
-  editingConvId.value = undefined
+function cancelSessionTitle() {
+  editingSessionId.value = undefined
   editingTitle.value = ''
 }
 
 /** 删除对话 */
-function deleteConv(conv: ChatConv) {
-  ElMessageBox.confirm(t('business.chat.deleteConvConfirm', [conv.title]), t('modal.title'), {
+function deleteSession(session: Session) {
+  ElMessageBox.confirm(t('business.chat.deleteSessionConfirm', [session.title]), t('modal.title'), {
     confirmButtonText: t('modal.confirmButton'),
     cancelButtonText: t('modal.cancelButton'),
     type: 'warning'
   })
     .then(async () => {
-      await removeConv(conv.id)
-      if (currentConvId.value === conv.id) {
-        currentConvId.value = undefined
+      await removeSession(session.id)
+      if (currentSessionId.value === session.id) {
+        currentSessionId.value = undefined
         messages.value = []
       }
-      loadConvList()
+      loadSessionList()
     })
     .catch(() => {})
 }
@@ -402,15 +403,15 @@ async function handleSend() {
   sending.value = true
 
   // 新建状态：首次发送才创建对话（左侧新增对话，右侧展示正文）
-  if (!currentConvId.value) {
+  if (!currentSessionId.value) {
     try {
-      const res = await createConv(uuid.value, visitorId.value)
-      const convId = res.data.id
-      currentConvId.value = convId
+      const res = await createSession(uuid.value, visitorId.value)
+      const sessionId = res.data.id
+      currentSessionId.value = sessionId
       newChat.value = false
-      syncUrlConvId(convId)
+      syncUrlSessionId(sessionId)
       // 新对话置顶（列表按 id 倒序）
-      convList.value.unshift(res.data)
+      sessionList.value.unshift(res.data)
     } catch (e) {
       ElMessage.error(t('business.chat.sendFail'))
       sending.value = false
@@ -420,10 +421,10 @@ async function handleSend() {
 
   // 本地追加用户消息
   const now = new Date().toISOString()
-  const userMsg: ChatMsgItem = { convId: currentConvId.value, role: 'user', content, showThinking: false, addTime: now }
+  const userMsg: SessionMsgItem = { sessionId: currentSessionId.value, role: 'user', content, showThinking: false, addTime: now }
   messages.value.push(userMsg)
-  const assistantMsg: ChatMsgItem = {
-    convId: currentConvId.value,
+  const assistantMsg: SessionMsgItem = {
+    sessionId: currentSessionId.value,
     role: 'assistant',
     content: '',
     reasoning: '',
@@ -435,7 +436,7 @@ async function handleSend() {
 
   try {
     await sendMessage(
-      { uuid: uuid.value, visitorId: visitorId.value, convId: currentConvId.value as number, content },
+      { uuid: uuid.value, visitorId: visitorId.value, sessionId: currentSessionId.value as number, content },
       (chunk) => {
         // 经响应式代理累加思考过程，触发视图逐段更新
         const msg = messages.value[assistantIdx]
@@ -457,11 +458,11 @@ async function handleSend() {
   } finally {
     sending.value = false
     // 首条消息后后端自动生成了对话标题（首次提问内容，超50字截断补"..."），本地同步刷新左侧标题
-    if (currentConvId.value) {
-      const conv = convList.value.find((c) => c.id === currentConvId.value)
-      if (conv) {
+    if (currentSessionId.value) {
+      const session = sessionList.value.find((c) => c.id === currentSessionId.value)
+      if (session) {
         const title = content.trim()
-        conv.title = title.length > 50 ? title.slice(0, 47) + '...' : title
+        session.title = title.length > 50 ? title.slice(0, 47) + '...' : title
       }
     }
   }
@@ -502,7 +503,7 @@ async function copyText(text: string) {
 // --------------------------------- 会话消息 ---------------------------------
 
 /** 消息发送时间（无值时返回空，悬浮时展示） */
-function timeText(msg: ChatMsgItem) {
+function timeText(msg: SessionMsgItem) {
   return msg.addTime ? parseTime(msg.addTime) || '' : ''
 }
 
@@ -582,7 +583,7 @@ onMounted(() => {
   background: #f5f6fa;
 }
 
-.conv-panel {
+.session-panel {
   width: 220px;
   flex-shrink: 0;
   height: 100%;
@@ -602,7 +603,7 @@ onMounted(() => {
   }
 }
 
-.conv-header {
+.session-header {
   padding: 14px 16px;
   border-bottom: 1px solid #f0f0f0;
   display: flex;
@@ -633,12 +634,12 @@ onMounted(() => {
 }
 
 /* 新建对话：按钮形式，水平居中于左侧面板 */
-.conv-actions {
+.session-actions {
   display: flex;
   justify-content: center;
 }
 
-.conv-actions .new-chat-btn {
+.session-actions .new-chat-btn {
   width: 100%;
   font-weight: 500;
   /* 淡色主题：常态/悬浮/按下均取浅色调，观感柔和；不描边 */
@@ -653,14 +654,14 @@ onMounted(() => {
   --el-button-active-text-color: var(--el-color-primary-light-3);
 }
 
-.conv-list {
+.session-list {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 8px;
 }
 
-.conv-item {
+.session-item {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -680,21 +681,21 @@ onMounted(() => {
   }
 }
 
-.conv-edit {
+.session-edit {
   visibility: hidden;
   cursor: pointer;
   flex-shrink: 0;
 }
 
-.conv-item:hover .conv-edit {
+.session-item:hover .session-edit {
   visibility: visible;
 }
 
-.conv-title-input {
+.session-title-input {
   flex: 1;
 }
 
-.conv-title {
+.session-title {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -702,17 +703,17 @@ onMounted(() => {
   font-size: 13px;
 }
 
-.conv-del {
+.session-del {
   visibility: hidden;
   cursor: pointer;
 }
 
-.conv-item:hover .conv-del {
+.session-item:hover .session-del {
   visibility: visible;
 }
 
 /* 左侧面板底部：访客信息 + 全屏切换 */
-.conv-footer {
+.session-footer {
   flex-shrink: 0;
   padding: 14px 16px;
   border-top: 1px solid #f0f0f0;

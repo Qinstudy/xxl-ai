@@ -1,10 +1,10 @@
 package com.xxl.ai.api.business.harness.chat;
 
 import com.xxl.ai.api.business.agent.model.entity.Agent;
-import com.xxl.ai.api.business.chat.constant.ChatConstant;
-import com.xxl.ai.api.business.chat.mapper.ChatConvMapper;
-import com.xxl.ai.api.business.chat.mapper.ChatMsgMapper;
-import com.xxl.ai.api.business.chat.model.entity.ChatMsg;
+import com.xxl.ai.api.business.session.constant.SessionConstant;
+import com.xxl.ai.api.business.session.mapper.SessionMapper;
+import com.xxl.ai.api.business.session.mapper.SessionMsgMapper;
+import com.xxl.ai.api.business.session.model.entity.SessionMsg;
 import com.xxl.ai.api.business.chat.service.ChatService;
 import com.xxl.ai.api.business.harness.llm.LlmChatTool;
 import com.xxl.ai.api.business.harness.mcp.McpToolFactory;
@@ -62,7 +62,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *    {@link #streamResult} 从结果流 XREAD 转发为 SSE；携带 lastEventId 时从断点之后重放，不重新生成。
  *
  * 【组件协作】
- *   业务：ChatService（会话校验）、ChatMsgMapper/ChatConvMapper（回填消息与对话活跃时间）；
+ *   业务：ChatService（会话校验）、SessionMsgMapper/SessionMapper（回填消息与对话活跃时间）；
  *   harness 兄弟工具：LlmChatTool（模型执行）、RagTool（RAG）、McpToolFactory/SkillToolFactory（工具装配）；
  *   存储：Redis 任务队列 xxl:ai:chat:tasks + 结果流 xxl:ai:chat:result:{msgId}。
  *
@@ -111,9 +111,9 @@ public class ChatStreamTool implements SmartLifecycle {
     @Resource
     private ChatService chatService;
     @Resource
-    private ChatMsgMapper chatMsgMapper;
+    private SessionMsgMapper sessionMsgMapper;
     @Resource
-    private ChatConvMapper chatConvMapper;
+    private SessionMapper sessionMapper;
     @Resource
     private SupplierService supplierService;
     @Resource
@@ -261,12 +261,12 @@ public class ChatStreamTool implements SmartLifecycle {
     /**
      * 投递生成任务 【1/3 - submit task-{msgId}】`
      */
-    public void submit(long msgId, String uuid, long convId, String content) {
+    public void submit(long msgId, String uuid, long sessionId, String content) {
         stringRedisTemplate.opsForStream().add(
                 StreamRecords.mapBacked(Map.of(
                                 "msgId", String.valueOf(msgId),
                                 "uuid", uuid,
-                                "convId", String.valueOf(convId),
+                                "sessionId", String.valueOf(sessionId),
                                 "content", content))
                         .withStreamKey(TASK_STREAM),
                 RedisStreamCommands.XAddOptions.maxlen(TASK_STREAM_MAXLEN).approximateTrimming(true));
@@ -392,7 +392,7 @@ public class ChatStreamTool implements SmartLifecycle {
             ackTask(record.getId());
             return;
         }
-        long convId = parseLong(fields.get("convId"));
+        long sessionId = parseLong(fields.get("sessionId"));
         String uuid = str(fields.get("uuid"));
         String content = str(fields.get("content"));
 
@@ -410,12 +410,12 @@ public class ChatStreamTool implements SmartLifecycle {
             appendResult(msgId, EVENT_MESSAGE, delta);
         };
         try {
-            saveAssistant(msgId, convId, generate(msgId, uuid, convId, content, onThinking, onContent), ChatConstant.MSG_STATUS_DONE);
+            saveAssistant(msgId, sessionId, generate(msgId, uuid, sessionId, content, onThinking, onContent), SessionConstant.MSG_STATUS_DONE);
         } catch (Exception e) {
             logger.warn("Chat 生成失败, msgId={}, err={}", msgId, e.getMessage());
             appendResult(msgId, EVENT_ERROR, e.getMessage());
             // 失败时回填已生成的部分内容（status=2），避免产出丢失
-            saveAssistant(msgId, convId, new LlmChatTool.ChatText(replyText.toString(), thinkText.toString()), ChatConstant.MSG_STATUS_FAILED);
+            saveAssistant(msgId, sessionId, new LlmChatTool.ChatText(replyText.toString(), thinkText.toString()), SessionConstant.MSG_STATUS_FAILED);
         } finally {
             appendResult(msgId, EVENT_DONE, "");
             ackTask(record.getId());
@@ -548,7 +548,7 @@ public class ChatStreamTool implements SmartLifecycle {
      *
      * 历史仅取当前助手占位（msgId）之前最近 historyLimit 条，跳过未完成的助手占位，并移除末尾当前提问（由 LLM 工具另行追加）。
      */
-    private LlmChatTool.ChatText generate(long msgId, String uuid, long convId, String content,
+    private LlmChatTool.ChatText generate(long msgId, String uuid, long sessionId, String content,
                               java.util.function.Consumer<String> onThinking, java.util.function.Consumer<String> onContent) throws Exception {
         // 生成发生在 worker 节点，需以 uuid 重新校验 Agent 可用性（请求节点与 worker 可能不同）
         Agent agent = chatService.requireReadyAgent(uuid);
@@ -563,21 +563,21 @@ public class ChatStreamTool implements SmartLifecycle {
         }
         // 历史消息（角色 / 内容 平行列表）：仅取当前助手占位之前最近的 historyLimit 条，避免上下文过长
         // 查询按 id 倒序取最近 N 条，此处按 id 升序排列还原为对话时间顺序
-        List<ChatMsg> recentMsgs = chatMsgMapper.listRecentByConvId(convId, msgId, historyLimit);
-        recentMsgs.sort(Comparator.comparingLong(ChatMsg::getId));
+        List<SessionMsg> recentMsgs = sessionMsgMapper.listRecentBySessionId(sessionId, msgId, historyLimit);
+        recentMsgs.sort(Comparator.comparingLong(SessionMsg::getId));
         List<String> roleList = new ArrayList<>();
         List<String> contentList = new ArrayList<>();
-        for (ChatMsg historyMsg : recentMsgs) {
+        for (SessionMsg historyMsg : recentMsgs) {
             // 跳过未完成的助手占位（如异常残留），避免把半截回复带入上下文
-            if (ChatConstant.ROLE_ASSISTANT.equals(historyMsg.getRole())
-                    && historyMsg.getStatus() == ChatConstant.MSG_STATUS_GENERATING) {
+            if (SessionConstant.ROLE_ASSISTANT.equals(historyMsg.getRole())
+                    && historyMsg.getStatus() == SessionConstant.MSG_STATUS_GENERATING) {
                 continue;
             }
             roleList.add(historyMsg.getRole());
             contentList.add(historyMsg.getContent());
         }
         // 末尾为本次刚落库的当前提问，移除避免重复注入
-        if (!roleList.isEmpty() && ChatConstant.ROLE_USER.equals(roleList.get(roleList.size() - 1))) {
+        if (!roleList.isEmpty() && SessionConstant.ROLE_USER.equals(roleList.get(roleList.size() - 1))) {
             roleList.remove(roleList.size() - 1);
             contentList.remove(contentList.size() - 1);
         }
@@ -596,7 +596,7 @@ public class ChatStreamTool implements SmartLifecycle {
             noticeText.append(notice);
         }
         LlmChatTool.ChatText chatText = llmChatTool.chat(runtime, systemPrompt, roleList, contentList, content, tools, advisors,
-                "xxl-ai-conv-" + convId, onThinking, onContent);
+                "xxl-ai-session-" + sessionId, onThinking, onContent);
         if (noticeText.length() > 0) {
             chatText = new LlmChatTool.ChatText(chatText.getContent(), noticeText + chatText.getThinking());
         }
@@ -656,11 +656,11 @@ public class ChatStreamTool implements SmartLifecycle {
     /**
      * 回填助手消息（占位记录）内容、思考过程与生成状态，并刷新对话活跃时间
      */
-    private void saveAssistant(long msgId, long convId, LlmChatTool.ChatText chatText, int status) {
+    private void saveAssistant(long msgId, long sessionId, LlmChatTool.ChatText chatText, int status) {
         String content = chatText == null || chatText.getContent() == null ? "" : chatText.getContent();
         String reasoning = chatText != null && StringTool.isNotBlank(chatText.getThinking()) ? chatText.getThinking() : null;
-        chatMsgMapper.updateAssistant(msgId, content, reasoning, status);
-        chatConvMapper.touch(convId);
+        sessionMsgMapper.updateAssistant(msgId, content, reasoning, status);
+        sessionMapper.touch(sessionId);
     }
 
     // ==================== 通用工具方法 ====================

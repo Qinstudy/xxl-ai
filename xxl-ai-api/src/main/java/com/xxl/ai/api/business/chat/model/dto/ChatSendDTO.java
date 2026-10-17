@@ -9,7 +9,7 @@ public class ChatSendDTO {
 
     private String uuid;        /* Agent 访问 UUID */
     private String visitorId;   /* 访客标识 */
-    private long convId;        /* 对话ID */
+    private long sessionId;     /* 对话ID */
     private String content;     /* 用户消息内容 */
 
     public String getUuid() {
@@ -28,12 +28,12 @@ public class ChatSendDTO {
         this.visitorId = visitorId;
     }
 
-    public long getConvId() {
-        return convId;
+    public long getSessionId() {
+        return sessionId;
     }
 
-    public void setConvId(long convId) {
-        this.convId = convId;
+    public void setSessionId(long sessionId) {
+        this.sessionId = sessionId;
     }
 
     public String getContent() {

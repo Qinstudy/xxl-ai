@@ -27,6 +27,11 @@ public interface AgentService {
     Response<Agent> load(long id);
 
     /**
+     * 查询空间下全部 Agent（轻量列表，供下拉选择）
+     */
+    List<Agent> loadAll(long spaceId);
+
+    /**
      * 新增 Agent
      */
     Response<String> insert(long spaceId, AgentDTO dto);

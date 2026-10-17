@@ -21,11 +21,11 @@ export function useChatStream() {
    * 发送消息并流式接收：打开流 → 解析并自动续传
    */
   async function sendMessage(
-    payload: { uuid: string; visitorId: string; convId: number; content: string },
+    payload: { uuid: string; visitorId: string; sessionId: number; content: string },
     onThinking: ChatStreamHandler,
     onContent: ChatStreamHandler
   ) {
-    const reader = await sendStream(payload.uuid, payload.visitorId, payload.convId, payload.content)
+    const reader = await sendStream(payload.uuid, payload.visitorId, payload.sessionId, payload.content)
     if (!reader) {
       throw new Error('empty stream')
     }

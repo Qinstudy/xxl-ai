@@ -169,7 +169,7 @@ CREATE TABLE IF NOT EXISTS `xxl_ai_agent` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent表';
 
 -- 10、Agent 对话表
-CREATE TABLE IF NOT EXISTS `xxl_ai_chat_conv` (
+CREATE TABLE IF NOT EXISTS `xxl_ai_session` (
     `id`            BIGINT          NOT NULL            AUTO_INCREMENT,
     `agent_uuid`    VARCHAR(32)     NOT NULL            COMMENT 'Agent访问UUID',
     `visitor_id`    VARCHAR(64)     NOT NULL            COMMENT '访客标识',
@@ -181,9 +181,9 @@ CREATE TABLE IF NOT EXISTS `xxl_ai_chat_conv` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent对话表';
 
 -- 11、Agent 消息表
-CREATE TABLE IF NOT EXISTS `xxl_ai_chat_msg` (
+CREATE TABLE IF NOT EXISTS `xxl_ai_session_msg` (
     `id`            BIGINT          NOT NULL            AUTO_INCREMENT,
-    `conv_id`       BIGINT          NOT NULL            COMMENT '对话ID',
+    `session_id`    BIGINT          NOT NULL            COMMENT '对话ID',
     `role`          VARCHAR(10)     NOT NULL            COMMENT '角色：user/assistant',
     `reasoning`     TEXT            NULL DEFAULT NULL   COMMENT '思考过程（推理模型 reasoning_content）',
     `content`       TEXT            NOT NULL            COMMENT '消息内容',
@@ -191,7 +191,7 @@ CREATE TABLE IF NOT EXISTS `xxl_ai_chat_msg` (
     `add_time`      DATETIME        NOT NULL            COMMENT '新增时间',
     `update_time`   DATETIME        NOT NULL            COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    KEY `i_conv_id` (`conv_id`)
+    KEY `i_session_id` (`session_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent消息表';
 
 

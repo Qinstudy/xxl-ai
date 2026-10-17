@@ -1,14 +1,15 @@
-package com.xxl.ai.api.business.chat.model.dto;
+package com.xxl.ai.api.business.session.model.dto;
 
 /**
- * 对话 展示DTO（管理端列表）
+ * 对话 展示DTO（管理端列表，含所属 Agent 名称）
  *
  * @author xxl-ai 2026-09-19
  */
-public class ChatConvDTO {
+public class SessionDTO {
 
     private long id;                /* 对话ID */
     private String agentUuid;       /* Agent访问UUID */
+    private String agentName;       /* Agent名称 */
     private String visitorId;       /* 访客标识 */
     private String title;           /* 对话标题 */
     private String addTime;         /* 新增时间（格式化字符串） */
@@ -28,6 +29,14 @@ public class ChatConvDTO {
 
     public void setAgentUuid(String agentUuid) {
         this.agentUuid = agentUuid;
+    }
+
+    public String getAgentName() {
+        return agentName;
+    }
+
+    public void setAgentName(String agentName) {
+        this.agentName = agentName;
     }
 
     public String getVisitorId() {

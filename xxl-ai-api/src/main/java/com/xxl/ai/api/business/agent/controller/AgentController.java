@@ -62,6 +62,20 @@ public class AgentController {
     }
 
     /**
+     * 查询空间下全部 Agent（轻量列表，供下拉选择）
+     */
+    @RequestMapping("/loadAll")
+    @XxlSso(permission = "agent:default")
+    public Response<List<Agent>> loadAll(HttpServletRequest request,
+                                         @RequestHeader(value = "xxl-space-id", required = false) Integer spaceId) {
+        Response<SpaceContext> spaceResp = spaceService.checkSpace(request, spaceId);
+        if (!spaceResp.isSuccess()) {
+            return Response.ofFail(spaceResp.getMsg());
+        }
+        return Response.ofSuccess(agentService.loadAll(spaceResp.getData().getSpaceId()));
+    }
+
+    /**
      * 新增 Agent
      */
     @RequestMapping("/insert")

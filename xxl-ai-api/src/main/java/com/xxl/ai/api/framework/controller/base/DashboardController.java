@@ -1,7 +1,7 @@
 package com.xxl.ai.api.framework.controller.base;
 
 import com.xxl.ai.api.business.agent.mapper.AgentMapper;
-import com.xxl.ai.api.business.chat.mapper.ChatMsgMapper;
+import com.xxl.ai.api.business.session.mapper.SessionMsgMapper;
 import com.xxl.ai.api.business.mcp.mapper.McpMapper;
 import com.xxl.ai.api.business.skill.mapper.SkillMapper;
 import com.xxl.ai.api.business.supplier.mapper.SupplierModelMapper;
@@ -34,7 +34,7 @@ public class DashboardController {
     @Resource
     private SupplierModelMapper supplierModelMapper;
     @Resource
-    private ChatMsgMapper chatMsgMapper;
+    private SessionMsgMapper sessionMsgMapper;
 
     /**
      * 首页统计：Agent / Skill / MCP / 供应商模型 数量
@@ -53,19 +53,19 @@ public class DashboardController {
     /**
      * Agent 会话消息趋势（近 days 天，每日消息量，折线图）
      */
-    @RequestMapping("/convMsgTrend")
+    @RequestMapping("/sessionMsgTrend")
     @XxlSso
-    public Response<List<Map<String, Object>>> convMsgTrend(@RequestParam(required = false, defaultValue = "30") int days) {
-        return Response.ofSuccess(chatMsgMapper.trendList(normalizeDays(days)));
+    public Response<List<Map<String, Object>>> sessionMsgTrend(@RequestParam(required = false, defaultValue = "30") int days) {
+        return Response.ofSuccess(sessionMsgMapper.trendList(normalizeDays(days)));
     }
 
     /**
      * Agent 会话消息占比（近 days 天，按 Agent 聚合消息量，饼图）
      */
-    @RequestMapping("/convMsgShare")
+    @RequestMapping("/sessionMsgShare")
     @XxlSso
-    public Response<List<Map<String, Object>>> convMsgShare(@RequestParam(required = false, defaultValue = "30") int days) {
-        return Response.ofSuccess(chatMsgMapper.agentShare(normalizeDays(days)));
+    public Response<List<Map<String, Object>>> sessionMsgShare(@RequestParam(required = false, defaultValue = "30") int days) {
+        return Response.ofSuccess(sessionMsgMapper.agentShare(normalizeDays(days)));
     }
 
     /**

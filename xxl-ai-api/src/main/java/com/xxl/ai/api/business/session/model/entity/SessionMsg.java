@@ -1,4 +1,4 @@
-package com.xxl.ai.api.business.chat.model.entity;
+package com.xxl.ai.api.business.session.model.entity;
 
 import java.util.Date;
 
@@ -7,10 +7,10 @@ import java.util.Date;
  *
  * @author xxl-ai 2026-09-05
  */
-public class ChatMsg {
+public class SessionMsg {
 
     private long id;            /* 消息ID */
-    private long convId;        /* 对话ID */
+    private long sessionId;     /* 对话ID */
     private String role;        /* 角色：user-用户、assistant-助手 */
     private String reasoning;   /* 思考过程（推理模型 reasoning_content） */
     private String content;     /* 消息内容 */
@@ -26,12 +26,12 @@ public class ChatMsg {
         this.id = id;
     }
 
-    public long getConvId() {
-        return convId;
+    public long getSessionId() {
+        return sessionId;
     }
 
-    public void setConvId(long convId) {
-        this.convId = convId;
+    public void setSessionId(long sessionId) {
+        this.sessionId = sessionId;
     }
 
     public String getRole() {

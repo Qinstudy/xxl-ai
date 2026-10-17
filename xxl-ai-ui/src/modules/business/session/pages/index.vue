@@ -1,31 +1,37 @@
 <!--
-  AgentConv（Agent对话管理）
-  按 Agent 查看访客对话列表（标题/访客ID 查询），点击行右侧抽屉查看消息明细
+  Session（对话管理）
+  按业务空间查看访客对话列表（Agent/标题/访客ID 过滤），点击行右侧抽屉查看消息明细
 -->
 <template>
   <div class="app-container">
     <div class="content-inner">
-      <!-- 页头：返回 + Agent 信息 -->
-      <el-row class="mb8" align="middle">
-        <el-button icon="Back" @click="goBack">{{ t('business.chat.backAgent') }}</el-button>
-        <span class="conv-header-title">{{ agentName || t('business.chat.conv') }} · {{ t('business.chat.convListTitle') }}</span>
-      </el-row>
-
       <!-- 搜索栏 -->
       <el-form :model="queryParams" ref="queryRef" :inline="true" v-show="table.showSearch">
-        <el-form-item :label="t('business.chat.convTitle')" prop="title">
+        <el-form-item :label="t('business.session.agent')" prop="agentId">
+          <el-select
+            v-model="queryParams.agentId"
+            :placeholder="t('common.selectPlaceholder')"
+            clearable
+            filterable
+            style="width: 200px"
+            @change="handleQuery"
+          >
+            <el-option v-for="a in agentOptions" :key="a.id" :label="a.name" :value="a.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('business.session.sessionTitle')" prop="title">
           <el-input
             v-model="queryParams.title"
-            :placeholder="t('common.inputPlaceholder', [t('business.chat.convTitle')])"
+            :placeholder="t('common.inputPlaceholder', [t('business.session.sessionTitle')])"
             clearable
             style="width: 200px"
             @keyup.enter="handleQuery"
           />
         </el-form-item>
-        <el-form-item :label="t('business.chat.visitorId')" prop="visitorId">
+        <el-form-item :label="t('business.session.visitorId')" prop="visitorId">
           <el-input
             v-model="queryParams.visitorId"
-            :placeholder="t('common.inputPlaceholder', [t('business.chat.visitorId')])"
+            :placeholder="t('common.inputPlaceholder', [t('business.session.visitorId')])"
             clearable
             style="width: 200px"
             @keyup.enter="handleQuery"
@@ -40,9 +46,10 @@
       <!-- 对话列表：仅点击「查看明细」查看，行点击不触发 -->
       <el-table v-loading="table.loading" :data="table.list">
         <el-table-column :label="t('common.serialNo')" align="center" type="index" min-width="70" />
-        <el-table-column :label="t('business.chat.convTitle')" align="left" prop="title" min-width="220" :show-overflow-tooltip="true" />
+        <el-table-column :label="t('business.session.agent')" align="left" prop="agentName" min-width="160" :show-overflow-tooltip="true" />
+        <el-table-column :label="t('business.session.sessionTitle')" align="left" prop="title" min-width="220" :show-overflow-tooltip="true" />
         <el-table-column
-          :label="t('business.chat.visitorId')"
+          :label="t('business.session.visitorId')"
           align="center"
           prop="visitorId"
           min-width="160"
@@ -52,8 +59,8 @@
         <el-table-column :label="t('common.updateTime')" align="center" prop="updateTime" min-width="180" />
         <el-table-column :label="t('common.operation')" align="center" min-width="120" class-name="small-padding fixed-width">
           <template #default="scope">
-            <el-button link type="primary" icon="View" @click="openDetail(scope.row)" v-hasPermi="['agent:conv']">{{
-              t('business.chat.viewDetail')
+            <el-button link type="primary" icon="View" @click="openDetail(scope.row)" v-hasPermi="['session:default']">{{
+              t('business.session.viewDetail')
             }}</el-button>
           </template>
         </el-table-column>
@@ -70,31 +77,31 @@
     </div>
 
     <!-- 对话明细抽屉 -->
-    <el-drawer v-model="drawer.visible" class="conv-detail-drawer" :title="t('business.chat.convDetail')" size="820px" append-to-body>
-      <div class="conv-detail" v-loading="drawer.loading">
+    <el-drawer v-model="drawer.visible" class="session-detail-drawer" :title="t('business.session.detail')" size="820px" append-to-body>
+      <div class="session-detail" v-loading="drawer.loading">
         <!-- 元信息卡片：标题 + 访客/时间标签 -->
-        <div class="conv-detail-meta">
+        <div class="session-detail-meta">
           <div class="meta-head">
             <span class="meta-avatar"
               ><el-icon><ChatLineSquare /></el-icon
             ></span>
-            <span class="meta-title" :title="drawer.conv.title">{{ drawer.conv.title }}</span>
+            <span class="meta-title" :title="drawer.session.title">{{ drawer.session.title }}</span>
           </div>
           <div class="meta-chips">
             <span class="meta-chip">
               <el-icon><User /></el-icon>
-              <span class="meta-chip-label">{{ t('business.chat.visitorId') }}</span>
-              <span class="meta-chip-value">{{ drawer.conv.visitorId }}</span>
+              <span class="meta-chip-label">{{ t('business.session.visitorId') }}</span>
+              <span class="meta-chip-value">{{ drawer.session.visitorId }}</span>
             </span>
             <span class="meta-chip">
               <el-icon><Clock /></el-icon>
               <span class="meta-chip-label">{{ t('common.addTime') }}</span>
-              <span class="meta-chip-value">{{ drawer.conv.addTime }}</span>
+              <span class="meta-chip-value">{{ drawer.session.addTime }}</span>
             </span>
           </div>
         </div>
 
-        <div class="conv-detail-msgs">
+        <div class="session-detail-msgs">
           <div v-for="(msg, index) in drawer.messages" :key="index" class="detail-msg" :class="msg.role">
             <div class="detail-msg-role">{{ msg.role === 'user' ? t('business.chat.roleUser') : t('business.chat.roleAssistant') }}</div>
             <div class="detail-msg-bubble">
@@ -116,17 +123,27 @@
           <el-empty v-if="!drawer.loading && drawer.messages.length === 0" :description="t('common.emptyData')" :image-size="60" />
         </div>
       </div>
+      <template #footer>
+        <Pagination
+          v-show="drawer.total > 0"
+          :total="drawer.total"
+          v-model:page="drawer.pageNum"
+          v-model:limit="drawer.pageSize"
+          @pagination="loadMessages"
+        />
+      </template>
     </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-defineOptions({ name: 'AgentConv' })
+defineOptions({ name: 'Session' })
 import { t } from '@/i18n'
-import { useRoute, useRouter } from 'vue-router'
-import { loadAgent, listConvMsg, pageConv } from '../api'
+import { useRoute } from 'vue-router'
+import { listSessionMsg, pageSession } from '../api'
+import { listAllAgent } from '@/modules/business/agent/api'
 import MarkdownView from '@/modules/business/chat/components/MarkdownView.vue'
-import type { ChatConv, ChatConvQuery, ChatMsg } from '@/modules/business/chat/types'
+import type { SessionDTO, SessionMsg, SessionQuery } from '../types'
 import { useFormReset } from '@/composables/useFormReset'
 import { usePageParams } from '@/composables/usePageParams'
 import { Pagination } from '@/components'
@@ -134,35 +151,45 @@ import type { TableState } from '@/types'
 import { ref } from 'vue'
 
 const route = useRoute()
-const router = useRouter()
 const resetForm = useFormReset()
 
 /** 对话消息（含前端折叠状态 showThinking） */
-interface ConvMsg extends ChatMsg {
+interface SessionMsgItem extends SessionMsg {
   showThinking?: boolean
 }
 
 // --------------------------------- ref data ---------------------------------
+/** 指定 Agent 时按 Agent 过滤（从 Agent 列表跳转携带），未指定为 undefined（下拉显示占位符） */
 const agentId = ref(Number(route.query.agentId) || 0)
-const agentName = ref('')
 
-const queryParams = ref<ChatConvQuery>({ pageNum: 1, pageSize: 10, title: undefined, visitorId: undefined })
+const queryParams = ref<SessionQuery>({
+  pageNum: 1,
+  pageSize: 10,
+  agentId: agentId.value > 0 ? agentId.value : undefined,
+  title: undefined,
+  visitorId: undefined
+})
 
-const table = ref<TableState<ChatConv>>({ list: [], total: 0, loading: true, showSearch: true, ids: [] })
+/** Agent 下拉选项（空间内全部 Agent） */
+const agentOptions = ref<{ id: number; name: string }[]>([])
+
+const table = ref<TableState<SessionDTO>>({ list: [], total: 0, loading: true, showSearch: true, ids: [] })
 
 const drawer = ref<{
   visible: boolean
   loading: boolean
-  conv: Partial<ChatConv>
-  messages: ConvMsg[]
-}>({ visible: false, loading: false, conv: {}, messages: [] })
+  session: Partial<SessionDTO>
+  messages: SessionMsgItem[]
+  total: number
+  pageNum: number
+  pageSize: number
+}>({ visible: false, loading: false, session: {}, messages: [], total: 0, pageNum: 1, pageSize: 10 })
 
 // --------------------------------- fun ---------------------------------
 function getList() {
-  if (!agentId.value) return
   table.value.loading = true
   const params = usePageParams(queryParams)()
-  pageConv(agentId.value, params)
+  pageSession(params)
     .then((response) => {
       table.value.list = response.data.data
       table.value.total = response.data.total
@@ -183,16 +210,26 @@ function resetQuery() {
   handleQuery()
 }
 
-/** 打开对话明细抽屉：加载消息列表 */
+/** 打开对话明细抽屉：重置分页并加载消息 */
 function openDetail(row: any) {
-  drawer.value.conv = row
+  drawer.value.session = row
   drawer.value.messages = []
+  drawer.value.total = 0
+  drawer.value.pageNum = 1
   drawer.value.visible = true
   if (row.id == null) return
+  loadMessages()
+}
+
+/** 加载当前分页的对话消息（页面内按时间正序） */
+function loadMessages() {
+  if (drawer.value.session.id == null) return
   drawer.value.loading = true
-  listConvMsg(agentId.value, row.id)
+  const offset = (drawer.value.pageNum - 1) * drawer.value.pageSize
+  listSessionMsg(drawer.value.session.id, queryParams.value.agentId, offset, drawer.value.pageSize)
     .then((response) => {
-      drawer.value.messages = response.data.map((msg) => ({ ...msg, showThinking: false }))
+      drawer.value.messages = response.data.data.map((msg) => ({ ...msg, showThinking: false }))
+      drawer.value.total = response.data.total
     })
     .finally(() => {
       drawer.value.loading = false
@@ -205,46 +242,34 @@ function toggleThinking(index: number) {
   if (msg) msg.showThinking = !msg.showThinking
 }
 
-/** 返回 Agent 管理列表 */
-function goBack() {
-  router.push({ path: '/agent' })
-}
-
-/** 加载 Agent 名称（页头展示，失败回退通用标题） */
-function loadAgentName() {
-  if (!agentId.value) return
-  loadAgent(agentId.value)
+/** 加载 Agent 下拉选项 */
+function loadAgentOptions() {
+  listAllAgent()
     .then((response) => {
-      agentName.value = response.data?.name ?? ''
+      agentOptions.value = (response.data || []).map((a) => ({ id: Number(a.id), name: a.name ?? '' }))
     })
     .catch(() => {})
 }
 
 // --------------------------------- page init ---------------------------------
-loadAgentName()
+loadAgentOptions()
 getList()
 </script>
 
 <style scoped>
-.conv-header-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin-left: 12px;
-}
-
 /* 抽屉标题与对话摘要之间：加分隔横线并收紧间距（抽屉挂到 body，需 :global 命中） */
-:global(.conv-detail-drawer .el-drawer__header) {
+:global(.session-detail-drawer .el-drawer__header) {
   margin-bottom: 0;
   padding: 16px 20px 12px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
 
-:global(.conv-detail-drawer .el-drawer__body) {
+:global(.session-detail-drawer .el-drawer__body) {
   padding-top: 14px;
 }
 
 /* 对话明细：元信息（无背景，底部横线与消息区隔开） */
-.conv-detail-meta {
+.session-detail-meta {
   padding-bottom: 14px;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--el-border-color-lighter);
@@ -402,5 +427,4 @@ getList()
   white-space: pre-wrap;
   word-break: break-word;
 }
-
 </style>

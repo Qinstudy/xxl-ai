@@ -1,11 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.xxl.ai.api.business.chat.mapper.ChatConvMapper">
+<mapper namespace="com.xxl.ai.api.business.session.mapper.SessionMapper">
 
-	<resultMap id="ChatConv" type="com.xxl.ai.api.business.chat.model.entity.ChatConv" >
+	<resultMap id="Session" type="com.xxl.ai.api.business.session.model.entity.Session" >
 		<result column="id" property="id" />
 		<result column="agent_uuid" property="agentUuid" />
+		<result column="visitor_id" property="visitorId" />
+		<result column="title" property="title" />
+		<result column="add_time" property="addTime" />
+		<result column="update_time" property="updateTime" />
+	</resultMap>
+
+	<resultMap id="SessionDTO" type="com.xxl.ai.api.business.session.model.dto.SessionDTO" >
+		<result column="id" property="id" />
+		<result column="agent_uuid" property="agentUuid" />
+		<result column="agent_name" property="agentName" />
 		<result column="visitor_id" property="visitorId" />
 		<result column="title" property="title" />
 		<result column="add_time" property="addTime" />
@@ -21,8 +31,8 @@
 		t.update_time
 	</sql>
 
-	<insert id="insert" parameterType="com.xxl.ai.api.business.chat.model.entity.ChatConv" useGeneratedKeys="true" keyProperty="id" >
-		INSERT INTO xxl_ai_chat_conv (
+	<insert id="insert" parameterType="com.xxl.ai.api.business.session.model.entity.Session" useGeneratedKeys="true" keyProperty="id" >
+		INSERT INTO xxl_ai_session (
 			agent_uuid, visitor_id, title, add_time, update_time
 		) VALUES (
 			 #{agentUuid}, #{visitorId}, #{title}, NOW(), NOW()
@@ -30,43 +40,55 @@
 	</insert>
 
 	<delete id="delete" parameterType="java.util.HashMap">
-		DELETE FROM xxl_ai_chat_conv WHERE id = #{id}
+		DELETE FROM xxl_ai_session WHERE id = #{id}
 	</delete>
 
 	<update id="updateTitle" parameterType="java.util.HashMap">
-		UPDATE xxl_ai_chat_conv
+		UPDATE xxl_ai_session
 		SET title = #{title},
 			update_time = NOW()
 		WHERE id = #{id}
 	</update>
 
 	<update id="touch" parameterType="java.util.HashMap">
-		UPDATE xxl_ai_chat_conv
+		UPDATE xxl_ai_session
 		SET update_time = NOW()
 		WHERE id = #{id}
 	</update>
 
 	<delete id="deleteByAgentUuid" parameterType="java.util.HashMap">
-		DELETE FROM xxl_ai_chat_conv WHERE agent_uuid = #{agentUuid}
+		DELETE FROM xxl_ai_session WHERE agent_uuid = #{agentUuid}
 	</delete>
 
-	<select id="load" parameterType="java.util.HashMap" resultMap="ChatConv">
+	<select id="load" parameterType="java.util.HashMap" resultMap="Session">
 		SELECT <include refid="Base_Column_List" />
-		FROM xxl_ai_chat_conv AS t
+		FROM xxl_ai_session AS t
 		WHERE t.id = #{id}
 	</select>
 
-	<select id="listByVisitor" parameterType="java.util.HashMap" resultMap="ChatConv">
+	<select id="listByVisitor" parameterType="java.util.HashMap" resultMap="Session">
 		SELECT <include refid="Base_Column_List" />
-		FROM xxl_ai_chat_conv AS t
+		FROM xxl_ai_session AS t
 		WHERE t.agent_uuid = #{agentUuid} AND t.visitor_id = #{visitorId}
 		ORDER BY t.id DESC
 	</select>
 
-	<select id="pageList" parameterType="java.util.HashMap" resultMap="ChatConv">
-		SELECT <include refid="Base_Column_List" />
-		FROM xxl_ai_chat_conv AS t
-		WHERE t.agent_uuid = #{agentUuid}
+	<!-- 管理端：空间内对话分页（按 Agent、标题、访客ID 过滤，含所属 Agent 名称） -->
+	<select id="pageList" parameterType="java.util.HashMap" resultMap="SessionDTO">
+		SELECT
+			t.id,
+			t.agent_uuid,
+			a.name AS agent_name,
+			t.visitor_id,
+			t.title,
+			t.add_time,
+			t.update_time
+		FROM xxl_ai_session AS t
+		JOIN xxl_ai_agent AS a ON a.uuid = t.agent_uuid
+		WHERE a.space_id = #{spaceId}
+		<if test="agentId > 0">
+			AND a.id = #{agentId}
+		</if>
 		<if test="title != null and title != ''">
 			AND t.title like CONCAT(CONCAT('%', #{title}), '%')
 		</if>
@@ -77,10 +99,15 @@
 		LIMIT #{offset}, #{pagesize}
 	</select>
 
+	<!-- 管理端：空间内对话数量统计 -->
 	<select id="pageListCount" parameterType="java.util.HashMap" resultType="int">
 		SELECT count(1)
-		FROM xxl_ai_chat_conv AS t
-		WHERE t.agent_uuid = #{agentUuid}
+		FROM xxl_ai_session AS t
+		JOIN xxl_ai_agent AS a ON a.uuid = t.agent_uuid
+		WHERE a.space_id = #{spaceId}
+		<if test="agentId > 0">
+			AND a.id = #{agentId}
+		</if>
 		<if test="title != null and title != ''">
 			AND t.title like CONCAT(CONCAT('%', #{title}), '%')
 		</if>

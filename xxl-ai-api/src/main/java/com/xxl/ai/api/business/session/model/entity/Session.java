@@ -1,4 +1,4 @@
-package com.xxl.ai.api.business.chat.model.entity;
+package com.xxl.ai.api.business.session.model.entity;
 
 import java.util.Date;
 
@@ -7,7 +7,7 @@ import java.util.Date;
  *
  * @author xxl-ai 2026-09-05
  */
-public class ChatConv {
+public class Session {
 
     private long id;            /* 对话ID */
     private String agentUuid;   /* Agent访问UUID */

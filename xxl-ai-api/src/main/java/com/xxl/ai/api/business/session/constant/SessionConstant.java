@@ -1,13 +1,13 @@
-package com.xxl.ai.api.business.chat.constant;
+package com.xxl.ai.api.business.session.constant;
 
 /**
  * 对话常量（角色、消息状态）
  *
- * @author xxl-ai 2026-09-25
+ * @author xxl-ai 2026-10-17
  */
-public class ChatConstant {
+public class SessionConstant {
 
-    private ChatConstant() {
+    private SessionConstant() {
     }
 
     /** 角色：用户 */
