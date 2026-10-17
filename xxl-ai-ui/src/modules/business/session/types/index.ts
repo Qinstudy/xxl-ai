@@ -6,8 +6,8 @@ import type { ListQuery } from '@/types'
 /** 对话（对应后端 Session 实体） */
 export interface Session {
   id: number
-  /** Agent访问UUID */
-  agentUuid?: string
+  /** AgentID */
+  agentId?: number
   /** 访客标识 */
   visitorId: string
   /** 对话标题 */
@@ -37,8 +37,8 @@ export interface SessionMsg {
 /** 管理端对话列表项（含所属 Agent 名称） */
 export interface SessionDTO {
   id: number
-  /** Agent访问UUID */
-  agentUuid?: string
+  /** AgentID */
+  agentId?: number
   /** Agent名称 */
   agentName?: string
   /** 访客标识 */

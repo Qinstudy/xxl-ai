@@ -83,10 +83,11 @@ public enum XxlRoleEnum {
         // 首页
         resources.add(res(1, 0, "首页", ResourceTypeEnum.MENU, "dashboard", "/dashboard", "dashboard", 100));
 
-        // Agent管理（目录：Agent列表 + 对话管理）
+        // Agent管理（目录：Agent列表 + 对话管理 + 长期记忆）
         resources.add(res(2, 0, "Agent管理", ResourceTypeEnum.CATALOG, "agent", "/agent", "message", 110));
         resources.add(res(21, 2, "Agent列表", ResourceTypeEnum.MENU, "agent:default", "/agent/index", "list", 111));
         resources.add(res(22, 2, "对话管理", ResourceTypeEnum.MENU, "session:default", "/session", "message", 112));
+        resources.add(res(23, 2, "长期记忆", ResourceTypeEnum.MENU, "memory:default", "/memory", "star", 113));
 
         // 知识库
         resources.add(res(3, 0, "RAG知识库", ResourceTypeEnum.MENU, "knowledge:base", "/knowledge/base", "documentation", 120));

@@ -36,6 +36,7 @@ public class AgentAdaptor {
         agent.setKbIds(joinIds(dto.getKbIds()));
         agent.setMcpIds(joinIds(dto.getMcpIds()));
         agent.setSkillIds(joinIds(dto.getSkillIds()));
+        agent.setMemoryStatus(dto.getMemoryStatus());
         agent.setPublishStatus(dto.getPublishStatus());
         agent.setUuid(dto.getUuid());
         return agent;
@@ -60,6 +61,7 @@ public class AgentAdaptor {
         dto.setKbIds(splitIds(agent.getKbIds()));
         dto.setMcpIds(splitIds(agent.getMcpIds()));
         dto.setSkillIds(splitIds(agent.getSkillIds()));
+        dto.setMemoryStatus(agent.getMemoryStatus());
         dto.setPublishStatus(agent.getPublishStatus());
         dto.setUuid(agent.getUuid());
         dto.setAddTime(DateTool.formatDateTime(agent.getAddTime()));

@@ -476,6 +476,7 @@
       "name": "Agent Name",
       "intro": "Intro",
       "publishStatus": "Publish Status",
+      "memoryStatus": "Memory",
       "accessUrl": "Access URL",
       "gotoAgent": "Go to Agent",
       "agent": "Agent",
@@ -525,7 +526,19 @@
       "sessionTitle": "Title",
       "visitorId": "Visitor ID",
       "detail": "Session Detail",
-      "viewDetail": "View Detail"
+      "viewDetail": "View Detail",
+      "msgId": "Message ID"
+    },
+    "memory": {
+      "agent": "Agent",
+      "visitorId": "Visitor ID",
+      "content": "Memory Content",
+      "lastMsgId": "Last Msg ID",
+      "detail": "Memory Detail",
+      "viewMemory": "View Memory",
+      "editTitle": "Edit Memory",
+      "emptyContent": "No memory content",
+      "confirmDelete": "Are you sure to delete the memory with ID \"{0}\"?"
     }
   }
 }

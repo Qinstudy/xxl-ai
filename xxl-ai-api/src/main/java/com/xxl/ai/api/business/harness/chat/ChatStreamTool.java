@@ -4,10 +4,12 @@ import com.xxl.ai.api.business.agent.model.entity.Agent;
 import com.xxl.ai.api.business.session.constant.SessionConstant;
 import com.xxl.ai.api.business.session.mapper.SessionMapper;
 import com.xxl.ai.api.business.session.mapper.SessionMsgMapper;
+import com.xxl.ai.api.business.session.model.entity.Session;
 import com.xxl.ai.api.business.session.model.entity.SessionMsg;
 import com.xxl.ai.api.business.chat.service.ChatService;
 import com.xxl.ai.api.business.harness.llm.LlmChatTool;
 import com.xxl.ai.api.business.harness.mcp.McpToolFactory;
+import com.xxl.ai.api.business.harness.memory.MemoryTool;
 import com.xxl.ai.api.business.harness.rag.RagTool;
 import com.xxl.ai.api.business.harness.skill.SkillToolFactory;
 import com.xxl.ai.api.business.knowledge.mapper.KnowledgeBaseMapper;
@@ -126,6 +128,8 @@ public class ChatStreamTool implements SmartLifecycle {
     private RagTool ragTool;
     @Resource
     private KnowledgeBaseMapper knowledgeBaseMapper;
+    @Resource
+    private MemoryTool memoryTool;
 
     /** worker 线程数（单节点并发生成数） */
     @Value("${xxl-ai.chat.worker.count}")
@@ -550,6 +554,8 @@ public class ChatStreamTool implements SmartLifecycle {
      */
     private LlmChatTool.ChatText generate(long msgId, String uuid, long sessionId, String content,
                               java.util.function.Consumer<String> onThinking, java.util.function.Consumer<String> onContent) throws Exception {
+
+        // 1、解析模型运行时：
         // 生成发生在 worker 节点，需以 uuid 重新校验 Agent 可用性（请求节点与 worker 可能不同）
         Agent agent = chatService.requireReadyAgent(uuid);
         Response<SupplierRuntime> runtimeResp = supplierService.loadRuntime(agent.getSpaceId(),
@@ -561,7 +567,10 @@ public class ChatStreamTool implements SmartLifecycle {
         if (runtime.getModelType() != 0) {
             throw new IllegalStateException("所选模型不是对话模型");
         }
-        // 历史消息（角色 / 内容 平行列表）：仅取当前助手占位之前最近的 historyLimit 条，避免上下文过长
+
+        // 2、装配生成上下文：
+
+        // 2.1、历史消息（角色 / 内容 平行列表）：仅取当前助手占位之前最近的 historyLimit 条，避免上下文过长
         // 查询按 id 倒序取最近 N 条，此处按 id 升序排列还原为对话时间顺序
         List<SessionMsg> recentMsgs = sessionMsgMapper.listRecentBySessionId(sessionId, msgId, historyLimit);
         recentMsgs.sort(Comparator.comparingLong(SessionMsg::getId));
@@ -581,13 +590,19 @@ public class ChatStreamTool implements SmartLifecycle {
             roleList.remove(roleList.size() - 1);
             contentList.remove(contentList.size() - 1);
         }
-        // 系统指令（无配置时按名称默认引导）
+
+        // 2.2、系统指令：
         String systemPrompt = buildSystemPrompt(agent);
-        // 工具（MCP + Skill + 执行）与 RAG Advisor 装配
+
+        // 2.3、长期记忆注入：
+        systemPrompt = injectMemory(agent, sessionId, systemPrompt);
+
+        // 2.4、工具装配：MCP 工具 + Skill 工具（无技能时不注册）+ 终端/文件执行工具
         Object[] tools = buildTools(agent);
+
+        // 2.5、RAG Advisor 装配：降级提示先写入思考流，并并入最终思考文本，保证刷新后一致
         List<String> degradeNotices = new ArrayList<>();
         List<Object> advisors = buildAdvisors(agent, degradeNotices);
-        // 降级提示先写入思考流，并并入最终思考文本，保证刷新后一致
         StringBuilder noticeText = new StringBuilder();
         for (String notice : degradeNotices) {
             if (onThinking != null) {
@@ -595,9 +610,11 @@ public class ChatStreamTool implements SmartLifecycle {
             }
             noticeText.append(notice);
         }
+
+        // 3、harness 流式对话：增量回调写思考流与内容流，最终返回完整内容与思考文本
         LlmChatTool.ChatText chatText = llmChatTool.chat(runtime, systemPrompt, roleList, contentList, content, tools, advisors,
                 "xxl-ai-session-" + sessionId, onThinking, onContent);
-        if (noticeText.length() > 0) {
+        if (!noticeText.isEmpty()) {
             chatText = new LlmChatTool.ChatText(chatText.getContent(), noticeText + chatText.getThinking());
         }
         return chatText;
@@ -612,6 +629,29 @@ public class ChatStreamTool implements SmartLifecycle {
         }
         String name = StringTool.isBlank(agent.getName()) ? "AI 助手" : agent.getName();
         return "你是 " + name + " 的智能助手。";
+    }
+
+    /**
+     * 长期记忆注入：Agent 开启记忆时，按会话所属访客读取记忆并合并进系统指令
+     *
+     * 记忆注入失败（如查询异常）时降级为原始系统指令，保证对话主流程可用。
+     */
+    private String injectMemory(Agent agent, long sessionId, String systemPrompt) {
+        if (agent.getMemoryStatus() != 1) {
+            return systemPrompt;
+        }
+        try {
+            Session session = sessionMapper.load(sessionId);
+            if (session == null || StringTool.isBlank(session.getVisitorId())) {
+                return systemPrompt;
+            }
+            String memory = memoryTool.loadMemory(agent.getId(), session.getVisitorId());
+            return memoryTool.mergePrompt(systemPrompt, memory);
+        } catch (Exception e) {
+            logger.warn("长期记忆注入失败，已降级跳过, agentId={}, sessionId={}, err={}",
+                    agent.getId(), sessionId, e.getMessage());
+            return systemPrompt;
+        }
     }
 
     /**

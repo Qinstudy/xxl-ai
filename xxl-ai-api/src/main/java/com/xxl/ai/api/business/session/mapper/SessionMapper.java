@@ -24,12 +24,15 @@ public interface SessionMapper {
     /** 刷新对话更新时间（收到新消息时调用，列表展示最近活跃时间） */
     int touch(@Param("id") long id);
 
-    /** 按 Agent 访问 UUID 删除对话（Agent 删除时级联清理） */
-    int deleteByAgentUuid(@Param("agentUuid") String agentUuid);
+    /** 按 Agent ID 删除对话（Agent 删除时级联清理） */
+    int deleteByAgentId(@Param("agentId") long agentId);
 
     Session load(@Param("id") long id);
 
-    List<Session> listByVisitor(@Param("agentUuid") String agentUuid, @Param("visitorId") String visitorId);
+    List<Session> listByVisitor(@Param("agentId") long agentId, @Param("visitorId") String visitorId);
+
+    /** 查询 Agent 下出现过的访客标识（记忆归档按 Agent×访客扫描） */
+    List<String> listVisitorIds(@Param("agentId") long agentId);
 
     /** 管理端：分页查询空间内对话（可按 Agent、标题、访客ID 过滤，含所属 Agent 名称） */
     List<SessionDTO> pageList(@Param("spaceId") long spaceId,

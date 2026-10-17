@@ -73,8 +73,8 @@ public class ChatServiceImpl implements ChatService {
             if (StringTool.isBlank(content)) {
                 throw new IllegalArgumentException("请输入内容");
             }
-            requireReadyAgent(uuid);
-            Session session = sessionService.require(uuid, sessionId);
+            Agent agent = requireReadyAgent(uuid);
+            Session session = sessionService.require(agent.getId(), sessionId);
             long msgId = sessionService.openRound(session, content);
             chatStreamTool.submit(msgId, uuid, sessionId, content);
             return chatStreamTool.open(msgId, null);

@@ -5,7 +5,7 @@
 
 	<resultMap id="Session" type="com.xxl.ai.api.business.session.model.entity.Session" >
 		<result column="id" property="id" />
-		<result column="agent_uuid" property="agentUuid" />
+		<result column="agent_id" property="agentId" />
 		<result column="visitor_id" property="visitorId" />
 		<result column="title" property="title" />
 		<result column="add_time" property="addTime" />
@@ -14,7 +14,7 @@
 
 	<resultMap id="SessionDTO" type="com.xxl.ai.api.business.session.model.dto.SessionDTO" >
 		<result column="id" property="id" />
-		<result column="agent_uuid" property="agentUuid" />
+		<result column="agent_id" property="agentId" />
 		<result column="agent_name" property="agentName" />
 		<result column="visitor_id" property="visitorId" />
 		<result column="title" property="title" />
@@ -24,7 +24,7 @@
 
 	<sql id="Base_Column_List">
 		t.id,
-		t.agent_uuid,
+		t.agent_id,
 		t.visitor_id,
 		t.title,
 		t.add_time,
@@ -33,9 +33,9 @@
 
 	<insert id="insert" parameterType="com.xxl.ai.api.business.session.model.entity.Session" useGeneratedKeys="true" keyProperty="id" >
 		INSERT INTO xxl_ai_session (
-			agent_uuid, visitor_id, title, add_time, update_time
+			agent_id, visitor_id, title, add_time, update_time
 		) VALUES (
-			 #{agentUuid}, #{visitorId}, #{title}, NOW(), NOW()
+			 #{agentId}, #{visitorId}, #{title}, NOW(), NOW()
 		 );
 	</insert>
 
@@ -56,8 +56,8 @@
 		WHERE id = #{id}
 	</update>
 
-	<delete id="deleteByAgentUuid" parameterType="java.util.HashMap">
-		DELETE FROM xxl_ai_session WHERE agent_uuid = #{agentUuid}
+	<delete id="deleteByAgentId" parameterType="java.util.HashMap">
+		DELETE FROM xxl_ai_session WHERE agent_id = #{agentId}
 	</delete>
 
 	<select id="load" parameterType="java.util.HashMap" resultMap="Session">
@@ -69,22 +69,29 @@
 	<select id="listByVisitor" parameterType="java.util.HashMap" resultMap="Session">
 		SELECT <include refid="Base_Column_List" />
 		FROM xxl_ai_session AS t
-		WHERE t.agent_uuid = #{agentUuid} AND t.visitor_id = #{visitorId}
+		WHERE t.agent_id = #{agentId} AND t.visitor_id = #{visitorId}
 		ORDER BY t.id DESC
+	</select>
+
+	<!-- 记忆归档：查询 Agent 下出现过的访客标识 -->
+	<select id="listVisitorIds" parameterType="java.util.HashMap" resultType="java.lang.String">
+		SELECT DISTINCT t.visitor_id
+		FROM xxl_ai_session AS t
+		WHERE t.agent_id = #{agentId}
 	</select>
 
 	<!-- 管理端：空间内对话分页（按 Agent、标题、访客ID 过滤，含所属 Agent 名称） -->
 	<select id="pageList" parameterType="java.util.HashMap" resultMap="SessionDTO">
 		SELECT
 			t.id,
-			t.agent_uuid,
+			t.agent_id,
 			a.name AS agent_name,
 			t.visitor_id,
 			t.title,
 			t.add_time,
 			t.update_time
 		FROM xxl_ai_session AS t
-		JOIN xxl_ai_agent AS a ON a.uuid = t.agent_uuid
+		JOIN xxl_ai_agent AS a ON a.id = t.agent_id
 		WHERE a.space_id = #{spaceId}
 		<if test="agentId > 0">
 			AND a.id = #{agentId}
@@ -103,7 +110,7 @@
 	<select id="pageListCount" parameterType="java.util.HashMap" resultType="int">
 		SELECT count(1)
 		FROM xxl_ai_session AS t
-		JOIN xxl_ai_agent AS a ON a.uuid = t.agent_uuid
+		JOIN xxl_ai_agent AS a ON a.id = t.agent_id
 		WHERE a.space_id = #{spaceId}
 		<if test="agentId > 0">
 			AND a.id = #{agentId}

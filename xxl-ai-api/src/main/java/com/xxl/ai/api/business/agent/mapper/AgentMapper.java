@@ -28,6 +28,9 @@ public interface AgentMapper {
 
     List<Agent> listBySpace(@Param("spaceId") long spaceId);
 
+    /** 查询开启记忆且已发布的 Agent（记忆归档扫描） */
+    List<Agent> listMemoryEnabled();
+
     /** 统计空间下数据量（删除空间前置校验） */
     int countBySpaceId(@Param("spaceId") long spaceId);
 

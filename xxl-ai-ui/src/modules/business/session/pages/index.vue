@@ -117,7 +117,10 @@
               <!-- 助手内容 Markdown 渲染（净化防XSS），用户内容保持纯文本 -->
               <MarkdownView v-if="msg.role === 'assistant'" class="detail-msg-content" :content="msg.content" />
               <span v-else class="detail-msg-content">{{ msg.content }}</span>
-              <div class="detail-msg-time">{{ msg.addTime }}</div>
+              <div class="detail-msg-time">
+                <span>{{ msg.addTime }}</span>
+                <span class="detail-msg-id">{{ t('business.session.msgId') }}：{{ msg.id }}</span>
+              </div>
             </div>
           </div>
           <el-empty v-if="!drawer.loading && drawer.messages.length === 0" :description="t('common.emptyData')" :image-size="60" />
@@ -141,7 +144,7 @@ defineOptions({ name: 'Session' })
 import { t } from '@/i18n'
 import { useRoute } from 'vue-router'
 import { listSessionMsg, pageSession } from '../api'
-import { listAllAgent } from '@/modules/business/agent/api'
+import { useAgentOptions } from '@/modules/business/agent/composables/useAgentOptions'
 import MarkdownView from '@/modules/business/chat/components/MarkdownView.vue'
 import type { SessionDTO, SessionMsg, SessionQuery } from '../types'
 import { useFormReset } from '@/composables/useFormReset'
@@ -170,8 +173,8 @@ const queryParams = ref<SessionQuery>({
   visitorId: undefined
 })
 
-/** Agent 下拉选项（空间内全部 Agent） */
-const agentOptions = ref<{ id: number; name: string }[]>([])
+/** Agent 下拉选项（空间内全部 Agent，与长期记忆页共用同一取数逻辑） */
+const { agentOptions, loadAgentOptions } = useAgentOptions()
 
 const table = ref<TableState<SessionDTO>>({ list: [], total: 0, loading: true, showSearch: true, ids: [] })
 
@@ -240,15 +243,6 @@ function loadMessages() {
 function toggleThinking(index: number) {
   const msg = drawer.value.messages[index]
   if (msg) msg.showThinking = !msg.showThinking
-}
-
-/** 加载 Agent 下拉选项 */
-function loadAgentOptions() {
-  listAllAgent()
-    .then((response) => {
-      agentOptions.value = (response.data || []).map((a) => ({ id: Number(a.id), name: a.name ?? '' }))
-    })
-    .catch(() => {})
 }
 
 // --------------------------------- page init ---------------------------------
@@ -385,6 +379,10 @@ getList()
   margin-top: 6px;
   font-size: 11px;
   color: var(--el-text-color-placeholder);
+}
+
+.detail-msg-id {
+  margin-left: 10px;
 }
 
 /* 思考过程：可折叠 */

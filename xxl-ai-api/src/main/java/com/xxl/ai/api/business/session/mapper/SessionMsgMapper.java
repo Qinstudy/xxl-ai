@@ -1,5 +1,6 @@
 package com.xxl.ai.api.business.session.mapper;
 
+import com.xxl.ai.api.business.session.model.dto.SessionMsgDTO;
 import com.xxl.ai.api.business.session.model.entity.SessionMsg;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -25,23 +26,31 @@ public interface SessionMsgMapper {
 
     int deleteBySessionId(@Param("sessionId") long sessionId);
 
-    /** 按 Agent 访问 UUID 删除消息（Agent 删除时级联清理） */
-    int deleteByAgentUuid(@Param("agentUuid") String agentUuid);
+    /** 按 Agent ID 删除消息（Agent 删除时级联清理） */
+    int deleteByAgentId(@Param("agentId") long agentId);
 
     /** 统计对话消息数（用于判断是否首条消息、可自动生成标题） */
     int countBySessionId(@Param("sessionId") long sessionId);
 
     List<SessionMsg> listBySessionId(@Param("sessionId") long sessionId);
 
-    /** 管理端：分页查询对话消息（按 id 倒序取页，最新在前，用于分页查看明细） */
-    List<SessionMsg> pageBySessionId(@Param("sessionId") long sessionId,
-                                     @Param("offset") int offset,
-                                     @Param("pagesize") int pagesize);
+    /** 管理端：分页查询对话消息（按 id 倒序取页，最新在前，用于分页查看明细；时间为格式化字符串） */
+    List<SessionMsgDTO> pageBySessionId(@Param("sessionId") long sessionId,
+                                        @Param("offset") int offset,
+                                        @Param("pagesize") int pagesize);
 
     /** 取指定消息之前最近的 limit 条消息（按 id 倒序，最新在前），用于构建模型上下文、控制长度 */
     List<SessionMsg> listRecentBySessionId(@Param("sessionId") long sessionId,
                                            @Param("beforeId") long beforeId,
                                            @Param("limit") int limit);
+
+    /** 记忆归档：查询 Agent×访客 最新消息ID（无消息返回 null） */
+    Long maxIdByAgentVisitor(@Param("agentId") long agentId, @Param("visitorId") String visitorId);
+
+    /** 记忆归档：查询 Agent×访客 消息ID大于 afterId 的已完成消息（全部，按时间正序） */
+    List<SessionMsg> listByAgentVisitorAfterId(@Param("agentId") long agentId,
+                                               @Param("visitorId") String visitorId,
+                                               @Param("afterId") long afterId);
 
     /** 首页：每日会话消息量趋势 [{date, count}] */
     List<Map<String, Object>> trendList(@Param("days") int days);

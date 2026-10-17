@@ -10,7 +10,7 @@ import java.util.Date;
 public class Session {
 
     private long id;            /* 对话ID */
-    private String agentUuid;   /* Agent访问UUID */
+    private long agentId;       /* AgentID */
     private String visitorId;   /* 访客标识 */
     private String title;       /* 对话标题 */
     private Date addTime;       /* 新增时间 */
@@ -24,12 +24,12 @@ public class Session {
         this.id = id;
     }
 
-    public String getAgentUuid() {
-        return agentUuid;
+    public long getAgentId() {
+        return agentId;
     }
 
-    public void setAgentUuid(String agentUuid) {
-        this.agentUuid = agentUuid;
+    public void setAgentId(long agentId) {
+        this.agentId = agentId;
     }
 
     public String getVisitorId() {

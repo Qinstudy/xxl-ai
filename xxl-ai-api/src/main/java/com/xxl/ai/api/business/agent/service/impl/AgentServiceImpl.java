@@ -7,6 +7,7 @@ import com.xxl.ai.api.business.agent.model.dto.AgentDTO;
 import com.xxl.ai.api.business.agent.model.entity.Agent;
 import com.xxl.ai.api.business.agent.service.AgentService;
 import com.xxl.ai.api.business.harness.skill.SkillToolFactory;
+import com.xxl.ai.api.business.memory.service.MemoryService;
 import com.xxl.ai.api.business.session.service.SessionService;
 import com.xxl.tool.core.CollectionTool;
 import com.xxl.tool.core.StringTool;
@@ -15,7 +16,6 @@ import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -33,6 +33,8 @@ public class AgentServiceImpl implements AgentService {
     private AgentMapper agentMapper;
     @Resource
     private SessionService sessionService;
+    @Resource
+    private MemoryService memoryService;
     @Resource
     private SkillToolFactory skillToolFactory;
 
@@ -92,27 +94,20 @@ public class AgentServiceImpl implements AgentService {
     }
 
     /**
-     * 批量删除 Agent（同一事务内同步级联清理对话与消息）
+     * 批量删除 Agent（同一事务内同步级联清理对话、消息与长期记忆）
      */
     @Override
     public Response<String> deleteByIds(List<Long> ids) {
         if (CollectionTool.isEmpty(ids)) {
             return Response.ofFail("请选择要删除的 Agent");
         }
-        // 删除前收集已发布 Agent 的访问 UUID（未发布无关联对话）
-        List<String> agentUuids = new ArrayList<>();
-        for (Long id : ids) {
-            Agent agent = agentMapper.load(id);
-            if (agent != null && StringTool.isNotBlank(agent.getUuid())) {
-                agentUuids.add(agent.getUuid());
-            }
-        }
         int ret = agentMapper.deleteByIds(ids);
         if (ret <= 0) {
             return Response.ofFail();
         }
-        // 同步级联清理对话与消息，与 Agent 删除同事务，避免异步清理带来的不一致
-        sessionService.purgeByAgentUuids(agentUuids);
+        // 同步级联清理对话/消息与长期记忆（按 Agent ID），与 Agent 删除同事务，避免异步清理带来的不一致
+        sessionService.purgeByAgentIds(ids);
+        memoryService.purgeByAgentIds(ids);
         // 清理已删除 Agent 的运行时沙箱（skill 物化目录等），避免残留
         for (Long id : ids) {
             if (id != null && id > 0) {

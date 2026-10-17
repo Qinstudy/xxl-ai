@@ -1,6 +1,7 @@
 package com.xxl.ai.api.business.session.service;
 
 import com.xxl.ai.api.business.session.model.dto.SessionDTO;
+import com.xxl.ai.api.business.session.model.dto.SessionMsgDTO;
 import com.xxl.ai.api.business.session.model.entity.Session;
 import com.xxl.ai.api.business.session.model.entity.SessionMsg;
 import com.xxl.tool.response.PageModel;
@@ -71,14 +72,14 @@ public interface SessionService {
      * @param pagesize  分页大小
      * @return 消息分页数据（页面内按时间正序）
      */
-    Response<PageModel<SessionMsg>> pageMsgList(long spaceId, long agentId, long sessionId, int offset, int pagesize);
+    Response<PageModel<SessionMsgDTO>> pageMsgList(long spaceId, long agentId, long sessionId, int offset, int pagesize);
 
     // ==================== 运行时支撑（chat 模块调用） ====================
 
     /**
      * 校验并返回归属于该 Agent 的对话，不满足抛 IllegalArgumentException
      */
-    Session require(String uuid, long sessionId);
+    Session require(long agentId, long sessionId);
 
     /**
      * 开启一轮对话：首条消息自动生成标题 → 落库用户消息与助手占位 → 返回助手消息ID（结果流标识）
@@ -86,8 +87,8 @@ public interface SessionService {
     long openRound(Session session, String content);
 
     /**
-     * 按 Agent 访问 UUID 批量清理对话与消息（Agent 删除时同步级联）
+     * 按 Agent ID 批量清理对话与消息（Agent 删除时同步级联）
      */
-    void purgeByAgentUuids(List<String> agentUuids);
+    void purgeByAgentIds(List<Long> agentIds);
 
 }

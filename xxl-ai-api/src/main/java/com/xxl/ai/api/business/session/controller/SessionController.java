@@ -1,7 +1,7 @@
 package com.xxl.ai.api.business.session.controller;
 
 import com.xxl.ai.api.business.session.model.dto.SessionDTO;
-import com.xxl.ai.api.business.session.model.entity.SessionMsg;
+import com.xxl.ai.api.business.session.model.dto.SessionMsgDTO;
 import com.xxl.ai.api.business.session.service.SessionService;
 import com.xxl.ai.api.business.space.model.SpaceContext;
 import com.xxl.ai.api.business.space.service.SpaceService;
@@ -56,7 +56,7 @@ public class SessionController {
      */
     @RequestMapping("/msgList")
     @XxlSso(permission = "session:default")
-    public Response<PageModel<SessionMsg>> msgList(HttpServletRequest request,
+    public Response<PageModel<SessionMsgDTO>> msgList(HttpServletRequest request,
                                                    @RequestHeader(value = "xxl-space-id", required = false) Integer spaceId,
                                                    @RequestParam(required = false, defaultValue = "0") long agentId,
                                                    @RequestParam("sessionId") long sessionId,

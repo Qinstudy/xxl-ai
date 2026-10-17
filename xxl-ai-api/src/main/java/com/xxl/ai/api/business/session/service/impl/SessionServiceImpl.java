@@ -6,6 +6,7 @@ import com.xxl.ai.api.business.session.constant.SessionConstant;
 import com.xxl.ai.api.business.session.mapper.SessionMapper;
 import com.xxl.ai.api.business.session.mapper.SessionMsgMapper;
 import com.xxl.ai.api.business.session.model.dto.SessionDTO;
+import com.xxl.ai.api.business.session.model.dto.SessionMsgDTO;
 import com.xxl.ai.api.business.session.model.entity.Session;
 import com.xxl.ai.api.business.session.model.entity.SessionMsg;
 import com.xxl.ai.api.business.session.service.SessionService;
@@ -53,7 +54,7 @@ public class SessionServiceImpl implements SessionService {
             return Response.ofFail("Agent 未发布，暂不可访问");
         }
         Session session = new Session();
-        session.setAgentUuid(uuid);
+        session.setAgentId(agent.getId());
         session.setVisitorId(visitorId);
         session.setTitle(StringTool.isBlank(title) ? "新对话" : title);
         sessionMapper.insert(session);
@@ -65,7 +66,11 @@ public class SessionServiceImpl implements SessionService {
      */
     @Override
     public Response<List<Session>> list(String uuid, String visitorId) {
-        return Response.ofSuccess(sessionMapper.listByVisitor(uuid, visitorId));
+        Agent agent = agentMapper.loadByUuid(uuid);
+        if (agent == null) {
+            return Response.ofSuccess(new ArrayList<>());
+        }
+        return Response.ofSuccess(sessionMapper.listByVisitor(agent.getId(), visitorId));
     }
 
     /**
@@ -122,17 +127,17 @@ public class SessionServiceImpl implements SessionService {
      * 分页查询对话消息明细（校验对话归属当前空间与 Agent）
      */
     @Override
-    public Response<PageModel<SessionMsg>> pageMsgList(long spaceId, long agentId, long sessionId, int offset, int pagesize) {
+    public Response<PageModel<SessionMsgDTO>> pageMsgList(long spaceId, long agentId, long sessionId, int offset, int pagesize) {
         Session session = sessionMapper.load(sessionId);
         if (session == null) {
             return Response.ofFail("对话不存在");
         }
-        Agent agent = agentMapper.loadByUuid(session.getAgentUuid());
+        Agent agent = agentMapper.load(session.getAgentId());
         if (agent == null || agent.getSpaceId() != spaceId || (agentId > 0 && agent.getId() != agentId)) {
             return Response.ofFail("对话不存在");
         }
-        PageModel<SessionMsg> pageModel = new PageModel<>();
-        List<SessionMsg> pageList = sessionMsgMapper.pageBySessionId(sessionId, offset, pagesize);
+        PageModel<SessionMsgDTO> pageModel = new PageModel<>();
+        List<SessionMsgDTO> pageList = sessionMsgMapper.pageBySessionId(sessionId, offset, pagesize);
         // 查询按 id 倒序取页（最新在前），反转为时间正序，页面内按对话阅读顺序展示
         if (CollectionTool.isNotEmpty(pageList)) {
             Collections.reverse(pageList);
@@ -148,9 +153,9 @@ public class SessionServiceImpl implements SessionService {
      * 校验并返回归属于该 Agent 的对话，不满足抛 IllegalArgumentException
      */
     @Override
-    public Session require(String uuid, long sessionId) {
+    public Session require(long agentId, long sessionId) {
         Session session = sessionMapper.load(sessionId);
-        if (session == null || !uuid.equals(session.getAgentUuid())) {
+        if (session == null || session.getAgentId() != agentId) {
             throw new IllegalArgumentException("对话不存在");
         }
         return session;
@@ -195,19 +200,19 @@ public class SessionServiceImpl implements SessionService {
     }
 
     /**
-     * 按 Agent 访问 UUID 批量清理对话与消息（Agent 删除时同步级联）
+     * 按 Agent ID 批量清理对话与消息（Agent 删除时同步级联）
      */
     @Override
-    public void purgeByAgentUuids(List<String> agentUuids) {
-        if (CollectionTool.isEmpty(agentUuids)) {
+    public void purgeByAgentIds(List<Long> agentIds) {
+        if (CollectionTool.isEmpty(agentIds)) {
             return;
         }
-        for (String agentUuid : agentUuids) {
-            if (StringTool.isBlank(agentUuid)) {
+        for (Long agentId : agentIds) {
+            if (agentId == null || agentId <= 0) {
                 continue;
             }
-            sessionMsgMapper.deleteByAgentUuid(agentUuid);
-            sessionMapper.deleteByAgentUuid(agentUuid);
+            sessionMsgMapper.deleteByAgentId(agentId);
+            sessionMapper.deleteByAgentId(agentId);
         }
     }
 

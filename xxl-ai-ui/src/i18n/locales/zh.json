@@ -476,6 +476,7 @@
       "name": "Agent名称",
       "intro": "Agent介绍",
       "publishStatus": "发布状态",
+      "memoryStatus": "记忆开关",
       "accessUrl": "访问URL",
       "gotoAgent": "前往Agent",
       "agent": "Agent",
@@ -525,7 +526,19 @@
       "sessionTitle": "标题",
       "visitorId": "访客ID",
       "detail": "对话明细",
-      "viewDetail": "查看明细"
+      "viewDetail": "查看明细",
+      "msgId": "消息ID"
+    },
+    "memory": {
+      "agent": "所属Agent",
+      "visitorId": "访客ID",
+      "content": "记忆内容",
+      "lastMsgId": "最后消息ID",
+      "detail": "记忆明细",
+      "viewMemory": "查看记忆",
+      "editTitle": "修改记忆",
+      "emptyContent": "暂无记忆内容",
+      "confirmDelete": "是否确认删除记忆编号为\"{0}\"的数据项？"
     }
   }
 }

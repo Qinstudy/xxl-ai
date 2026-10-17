@@ -58,6 +58,11 @@
             <el-switch v-model="scope.row.publishStatus" :active-value="1" :inactive-value="0" @change="handlePublishChange(scope.row)" />
           </template>
         </el-table-column>
+        <el-table-column :label="t('business.agent.memoryStatus')" align="center" width="90">
+          <template #default="scope">
+            <el-switch v-model="scope.row.memoryStatus" :active-value="1" :inactive-value="0" @change="handleMemoryChange(scope.row)" />
+          </template>
+        </el-table-column>
         <el-table-column :label="t('business.agent.accessUrl')" align="center" width="110" :show-overflow-tooltip="true">
           <template #default="scope">
             <el-link
@@ -144,6 +149,9 @@
           <el-select v-model="formState.form.skillIds" multiple filterable style="width: 100%">
             <el-option v-for="item in skillOptions" :key="item.id" :label="item.name" :value="item.id as number" />
           </el-select>
+        </el-form-item>
+        <el-form-item :label="t('business.agent.memoryStatus')" prop="memoryStatus">
+          <el-switch v-model="formState.form.memoryStatus" :active-value="1" :inactive-value="0" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -258,6 +266,7 @@ function reset() {
     kbIds: [],
     mcpIds: [],
     skillIds: [],
+    memoryStatus: 0,
     publishStatus: 0,
     uuid: undefined
   }
@@ -353,6 +362,23 @@ function handlePublishChange(row: Agent) {
 /** 打开 Agent 发布页面（新窗口跳转） */
 function openAgentUrl(uuid: string) {
   window.open(agentUrl(uuid), '_blank')
+}
+
+/** 记忆开关快速切换：直接更新 Agent 记忆开关（失败回滚开关状态） */
+function handleMemoryChange(row: Agent) {
+  const target = Number(row.memoryStatus)
+  const data = { ...row }
+  delete data.addTime
+  delete data.updateTime
+  delete data.modelSupplierName
+  updateAgent(data)
+    .then(() => {
+      modal.msgSuccess(t('common.updateSuccess'))
+      getList()
+    })
+    .catch(() => {
+      row.memoryStatus = target === 1 ? 0 : 1
+    })
 }
 
 // --------------------------------- Agent 对话 ---------------------------------

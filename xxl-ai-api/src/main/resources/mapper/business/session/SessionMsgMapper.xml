@@ -14,6 +14,17 @@
 		<result column="update_time" property="updateTime" />
 	</resultMap>
 
+	<resultMap id="SessionMsgDTO" type="com.xxl.ai.api.business.session.model.dto.SessionMsgDTO" >
+		<result column="id" property="id" />
+		<result column="session_id" property="sessionId" />
+		<result column="role" property="role" />
+		<result column="reasoning" property="reasoning" />
+		<result column="content" property="content" />
+		<result column="status" property="status" />
+		<result column="add_time" property="addTime" />
+		<result column="update_time" property="updateTime" />
+	</resultMap>
+
 	<sql id="Base_Column_List">
 		t.id,
 		t.session_id,
@@ -46,10 +57,10 @@
 		DELETE FROM xxl_ai_session_msg WHERE session_id = #{sessionId}
 	</delete>
 
-	<delete id="deleteByAgentUuid" parameterType="java.util.HashMap">
+	<delete id="deleteByAgentId" parameterType="java.util.HashMap">
 		DELETE t FROM xxl_ai_session_msg AS t
 		JOIN xxl_ai_session AS c ON t.session_id = c.id
-		WHERE c.agent_uuid = #{agentUuid}
+		WHERE c.agent_id = #{agentId}
 	</delete>
 
 	<select id="listBySessionId" parameterType="java.util.HashMap" resultMap="SessionMsg">
@@ -59,7 +70,7 @@
 		ORDER BY t.id ASC
 	</select>
 
-	<select id="pageBySessionId" parameterType="java.util.HashMap" resultMap="SessionMsg">
+	<select id="pageBySessionId" parameterType="java.util.HashMap" resultMap="SessionMsgDTO">
 		SELECT <include refid="Base_Column_List" />
 		FROM xxl_ai_session_msg AS t
 		WHERE t.session_id = #{sessionId}
@@ -81,6 +92,25 @@
 		WHERE t.session_id = #{sessionId}
 	</select>
 
+	<!-- 记忆归档：Agent×访客 最新消息ID -->
+	<select id="maxIdByAgentVisitor" parameterType="java.util.HashMap" resultType="java.lang.Long">
+		SELECT MAX(t.id)
+		FROM xxl_ai_session_msg AS t
+		JOIN xxl_ai_session AS s ON t.session_id = s.id
+		WHERE s.agent_id = #{agentId} AND s.visitor_id = #{visitorId}
+	</select>
+
+	<!-- 记忆归档：Agent×访客 消息ID大于 afterId 的已完成消息（取最近 limit 条，按时间正序） -->
+	<select id="listByAgentVisitorAfterId" parameterType="java.util.HashMap" resultMap="SessionMsg">
+		SELECT t.id, t.session_id, t.role, t.reasoning, t.content, t.status, t.add_time, t.update_time
+		FROM xxl_ai_session_msg AS t
+		JOIN xxl_ai_session AS s ON t.session_id = s.id
+		WHERE s.agent_id = #{agentId} AND s.visitor_id = #{visitorId}
+		  AND t.id <![CDATA[ > ]]> #{afterId}
+		  AND t.status = 1
+		ORDER BY t.id ASC
+	</select>
+
 	<!-- 首页：每日会话消息量趋势（近 days 天，按日聚合） -->
 	<select id="trendList" parameterType="java.util.HashMap" resultType="java.util.LinkedHashMap">
 		SELECT DATE_FORMAT(t.add_time, '%Y-%m-%d') AS `date`, COUNT(1) AS `count`
@@ -91,12 +121,12 @@
 
 	<!-- 首页：各 Agent 会话消息量占比（近 days 天，按 Agent 聚合，消息量倒序） -->
 	<select id="agentShare" parameterType="java.util.HashMap" resultType="java.util.LinkedHashMap">
-		SELECT IFNULL(a.name, c.agent_uuid) AS `name`, COUNT(1) AS `value`
+		SELECT IFNULL(a.name, CAST(c.agent_id AS CHAR)) AS `name`, COUNT(1) AS `value`
 		FROM xxl_ai_session_msg AS t
 		JOIN xxl_ai_session AS c ON t.session_id = c.id
-		LEFT JOIN xxl_ai_agent AS a ON a.uuid = c.agent_uuid
+		LEFT JOIN xxl_ai_agent AS a ON a.id = c.agent_id
 		WHERE t.add_time >= DATE_SUB(CURDATE(), INTERVAL #{days} DAY)
-		GROUP BY a.id, a.name, c.agent_uuid
+		GROUP BY a.id, a.name, c.agent_id
 		ORDER BY `value` DESC
 	</select>
 

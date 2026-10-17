@@ -8,7 +8,7 @@ package com.xxl.ai.api.business.session.model.dto;
 public class SessionDTO {
 
     private long id;                /* 对话ID */
-    private String agentUuid;       /* Agent访问UUID */
+    private long agentId;           /* AgentID */
     private String agentName;       /* Agent名称 */
     private String visitorId;       /* 访客标识 */
     private String title;           /* 对话标题 */
@@ -23,12 +23,12 @@ public class SessionDTO {
         this.id = id;
     }
 
-    public String getAgentUuid() {
-        return agentUuid;
+    public long getAgentId() {
+        return agentId;
     }
 
-    public void setAgentUuid(String agentUuid) {
-        this.agentUuid = agentUuid;
+    public void setAgentId(long agentId) {
+        this.agentId = agentId;
     }
 
     public String getAgentName() {

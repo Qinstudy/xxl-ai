@@ -20,6 +20,7 @@ public class AgentDTO {
     private List<Long> kbIds;       /* 知识库ID集合 */
     private List<Long> mcpIds;      /* MCP ID集合 */
     private List<Long> skillIds;    /* Skill ID集合 */
+    private int memoryStatus;       /* 记忆开关：0-关闭、1-开启 */
     private int publishStatus;      /* 发布状态：0-未发布、1-已发布 */
     private String uuid;            /* 访问UUID */
     private String addTime;         /* 新增时间（格式化字符串） */
@@ -111,6 +112,14 @@ public class AgentDTO {
 
     public void setSkillIds(List<Long> skillIds) {
         this.skillIds = skillIds;
+    }
+
+    public int getMemoryStatus() {
+        return memoryStatus;
+    }
+
+    public void setMemoryStatus(int memoryStatus) {
+        this.memoryStatus = memoryStatus;
     }
 
     public int getPublishStatus() {

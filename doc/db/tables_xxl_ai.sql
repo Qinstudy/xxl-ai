@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS `xxl_ai_agent` (
     `kb_ids`              VARCHAR(500)    NULL DEFAULT NULL     COMMENT '知识库ID集合(逗号分隔)',
     `mcp_ids`             VARCHAR(500)    NULL DEFAULT NULL     COMMENT 'MCP ID集合(逗号分隔)',
     `skill_ids`           VARCHAR(500)    NULL DEFAULT NULL     COMMENT 'Skill ID集合(逗号分隔)',
+    `memory_status`       TINYINT         NOT NULL DEFAULT 0    COMMENT '记忆开关：0-关闭、1-开启',
     `publish_status`      TINYINT         NOT NULL DEFAULT 0    COMMENT '发布状态：0-未发布、1-已发布',
     `uuid`                VARCHAR(32)     NULL DEFAULT NULL     COMMENT '访问UUID',
     `add_time`            DATETIME        NOT NULL              COMMENT '新增时间',
@@ -171,13 +172,13 @@ CREATE TABLE IF NOT EXISTS `xxl_ai_agent` (
 -- 10、Agent 对话表
 CREATE TABLE IF NOT EXISTS `xxl_ai_session` (
     `id`            BIGINT          NOT NULL            AUTO_INCREMENT,
-    `agent_uuid`    VARCHAR(32)     NOT NULL            COMMENT 'Agent访问UUID',
+    `agent_id`      BIGINT          NOT NULL            COMMENT 'AgentID',
     `visitor_id`    VARCHAR(64)     NOT NULL            COMMENT '访客标识',
     `title`         VARCHAR(100)    NOT NULL DEFAULT '新对话'  COMMENT '对话标题',
     `add_time`      DATETIME        NOT NULL            COMMENT '新增时间',
     `update_time`   DATETIME        NOT NULL            COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    KEY `i_agent_visitor` (`agent_uuid`, `visitor_id`)
+    KEY `i_agent_visitor` (`agent_id`, `visitor_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent对话表';
 
 -- 11、Agent 消息表
@@ -193,6 +194,19 @@ CREATE TABLE IF NOT EXISTS `xxl_ai_session_msg` (
     PRIMARY KEY (`id`),
     KEY `i_session_id` (`session_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent消息表';
+
+-- 12、Agent 长期记忆表（Agent × 访客 维度，单字段 Markdown 维护记忆内容）
+CREATE TABLE IF NOT EXISTS `xxl_ai_memory` (
+    `id`            BIGINT          NOT NULL            AUTO_INCREMENT  COMMENT '记忆ID',
+    `agent_id`      BIGINT          NOT NULL                            COMMENT 'AgentID',
+    `visitor_id`    VARCHAR(64)     NOT NULL                            COMMENT '访客标识',
+    `content`       TEXT            NULL DEFAULT NULL                   COMMENT '记忆内容(Markdown，按维度分节)',
+    `last_msg_id`   BIGINT          NOT NULL DEFAULT 0                  COMMENT '最后归档处理的消息ID（增量水位线）',
+    `add_time`      DATETIME        NOT NULL                            COMMENT '新增时间',
+    `update_time`   DATETIME        NOT NULL                            COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `i_agent_visitor` (`agent_id`, `visitor_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Agent长期记忆表';
 
 
 -- ================== user and base ==================
@@ -254,7 +268,8 @@ VALUES (1, 'admin', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923ad
 -- 2、系统配置
 INSERT INTO `xxl_ai_config` (`name`, `key`, `value`, `status`, `remark`, `add_time`, `update_time`)
 VALUES ('系统配置-登录验证码启用开关', 'system.login.captcha.enabled', 'true', 0, 'true 开启，false 关闭', now(), now()),
-       ('系统配置-界面语言', 'system.i18n.language', 'zh', 0, 'zh 中文，en 英文', now(), now());
+       ('系统配置-界面语言', 'system.i18n.language', 'zh', 0, 'zh 中文，en 英文', now(), now()),
+       ('长期记忆内容最大长度', 'memory.content.max.length', '2000', 0, '生成记忆内容的最大字符数，超出截断', now(), now());
 
 -- 3、默认业务空间
 INSERT INTO `xxl_ai_space` (`name`, `code`, `status`, `remark`, `add_time`, `update_time`)

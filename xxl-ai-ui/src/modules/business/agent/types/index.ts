@@ -25,6 +25,8 @@ export interface Agent {
   mcpIds?: number[]
   /** Skill ID集合 */
   skillIds?: number[]
+  /** 记忆开关：0-关闭、1-开启 */
+  memoryStatus?: number
   /** 发布状态：0-未发布、1-已发布 */
   publishStatus?: number
   /** 访问UUID */

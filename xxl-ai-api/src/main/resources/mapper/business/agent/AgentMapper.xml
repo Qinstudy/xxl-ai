@@ -15,6 +15,7 @@
 		<result column="kb_ids" property="kbIds" />
 		<result column="mcp_ids" property="mcpIds" />
 		<result column="skill_ids" property="skillIds" />
+		<result column="memory_status" property="memoryStatus" />
 		<result column="publish_status" property="publishStatus" />
 		<result column="uuid" property="uuid" />
 		<result column="add_time" property="addTime" />
@@ -32,6 +33,7 @@
 		t.kb_ids,
 		t.mcp_ids,
 		t.skill_ids,
+		t.memory_status,
 		t.publish_status,
 		t.uuid,
 		t.add_time,
@@ -41,10 +43,10 @@
 	<insert id="insert" parameterType="com.xxl.ai.api.business.agent.model.entity.Agent" useGeneratedKeys="true" keyProperty="id" >
 		INSERT INTO xxl_ai_agent (
 			space_id, name, intro, model_supplier_id, model_id, system_prompt,
-			kb_ids, mcp_ids, skill_ids, publish_status, uuid, add_time, update_time
+			kb_ids, mcp_ids, skill_ids, memory_status, publish_status, uuid, add_time, update_time
 		) VALUES (
 			 #{spaceId}, #{name}, #{intro}, #{modelSupplierId}, #{modelId}, #{systemPrompt},
-			 #{kbIds}, #{mcpIds}, #{skillIds}, #{publishStatus}, #{uuid}, NOW(), NOW()
+			 #{kbIds}, #{mcpIds}, #{skillIds}, #{memoryStatus}, #{publishStatus}, #{uuid}, NOW(), NOW()
 		 );
 	</insert>
 
@@ -70,6 +72,7 @@
 			kb_ids = #{kbIds},
 			mcp_ids = #{mcpIds},
 			skill_ids = #{skillIds},
+			memory_status = #{memoryStatus},
 			publish_status = #{publishStatus},
 			uuid = #{uuid},
 			update_time = NOW()
@@ -132,6 +135,15 @@
 		<if test="publishStatus gt -1">
 			AND t.publish_status = #{publishStatus}
 		</if>
+	</select>
+
+	<select id="listMemoryEnabled" resultMap="Agent">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_ai_agent AS t
+		WHERE t.memory_status = 1
+		  AND t.publish_status = 1
+		  AND t.uuid IS NOT NULL AND t.uuid != ''
+		ORDER BY t.id ASC
 	</select>
 
 	<select id="countAll" resultType="int">

@@ -45,15 +45,22 @@ public class LlmChatTool {
      * @param contentList  历史消息内容（与 roleList 平行）
      * @param content      当前用户消息
      * @param tools        已装配的工具（ToolCallback / @Tool 对象，可为空）
-     * @param advisorList  已装配的对话 Advisor（可为空）
+     * @param advisorObjects  已装配的对话 Advisor（可为空）
      * @param sessionId    会话标识（Header {session} 占位替换）
      * @param onThinking   思考过程增量回调（可空）
      * @param onContent    回复内容增量回调（可空）
      * @return 完整回复（内容 + 思考过程）
      */
-    public ChatText chat(SupplierRuntime runtime, String systemPrompt, List<String> roleList, List<String> contentList,
-                         String content, Object[] tools, List<Object> advisorObjects, String sessionId,
-                         Consumer<String> onThinking, Consumer<String> onContent) {
+    public ChatText chat(SupplierRuntime runtime,
+                         String systemPrompt,
+                         List<String> roleList,
+                         List<String> contentList,
+                         String content,
+                         Object[] tools,
+                         List<Object> advisorObjects,
+                         String sessionId,
+                         Consumer<String> onThinking,
+                         Consumer<String> onContent) {
         // 装配对话请求：消息（系统指令+历史+当前）+ 工具 + Advisor
         ChatClient chatClient = llmModelFactory.chatClient(runtime, sessionId);
         ChatClient.ChatClientRequestSpec spec = chatClient.prompt()

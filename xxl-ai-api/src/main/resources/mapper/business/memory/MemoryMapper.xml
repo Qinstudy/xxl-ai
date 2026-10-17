@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xxl.ai.api.business.memory.mapper.MemoryMapper">
+
+	<resultMap id="Memory" type="com.xxl.ai.api.business.memory.model.entity.Memory" >
+		<result column="id" property="id" />
+		<result column="agent_id" property="agentId" />
+		<result column="visitor_id" property="visitorId" />
+		<result column="content" property="content" />
+		<result column="last_msg_id" property="lastMsgId" />
+		<result column="add_time" property="addTime" />
+		<result column="update_time" property="updateTime" />
+	</resultMap>
+
+	<resultMap id="MemoryDTO" type="com.xxl.ai.api.business.memory.model.dto.MemoryDTO" >
+		<result column="id" property="id" />
+		<result column="agent_id" property="agentId" />
+		<result column="agent_name" property="agentName" />
+		<result column="visitor_id" property="visitorId" />
+		<result column="content" property="content" />
+		<result column="last_msg_id" property="lastMsgId" />
+		<result column="add_time" property="addTime" />
+		<result column="update_time" property="updateTime" />
+	</resultMap>
+
+	<sql id="Base_Column_List">
+		t.id,
+		t.agent_id,
+		t.visitor_id,
+		t.content,
+		t.last_msg_id,
+		t.add_time,
+		t.update_time
+	</sql>
+
+	<insert id="insert" parameterType="com.xxl.ai.api.business.memory.model.entity.Memory" useGeneratedKeys="true" keyProperty="id" >
+		INSERT INTO xxl_ai_memory (
+			agent_id, visitor_id, content, last_msg_id, add_time, update_time
+		) VALUES (
+			 #{agentId}, #{visitorId}, #{content}, #{lastMsgId}, NOW(), NOW()
+		 );
+	</insert>
+
+	<insert id="upsert" parameterType="com.xxl.ai.api.business.memory.model.entity.Memory" useGeneratedKeys="true" keyProperty="id" >
+		INSERT INTO xxl_ai_memory (
+			agent_id, visitor_id, content, last_msg_id, add_time, update_time
+		) VALUES (
+			 #{agentId}, #{visitorId}, #{content}, #{lastMsgId}, NOW(), NOW()
+		 )
+		ON DUPLICATE KEY UPDATE
+			content = VALUES(content),
+			last_msg_id = VALUES(last_msg_id),
+			update_time = NOW()
+	</insert>
+
+	<delete id="deleteByIds" parameterType="java.util.HashMap">
+		DELETE FROM xxl_ai_memory
+		WHERE id in
+		<foreach collection="ids" item="item" open="(" close=")" separator="," >
+			#{item}
+		</foreach>
+	</delete>
+
+	<delete id="deleteByAgentId" parameterType="java.util.HashMap">
+		DELETE FROM xxl_ai_memory WHERE agent_id = #{agentId}
+	</delete>
+
+	<!-- 修改记忆内容：join Agent 限定空间归属，避免跨空间越权修改 -->
+	<update id="updateContent" parameterType="java.util.HashMap">
+		UPDATE xxl_ai_memory AS t
+		JOIN xxl_ai_agent AS a ON a.id = t.agent_id
+		SET t.content = #{content}, t.update_time = NOW()
+		WHERE t.id = #{id} AND a.space_id = #{spaceId}
+	</update>
+
+	<select id="load" parameterType="java.util.HashMap" resultMap="Memory">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_ai_memory AS t
+		WHERE t.id = #{id}
+	</select>
+
+	<select id="loadByAgentVisitor" parameterType="java.util.HashMap" resultMap="Memory">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_ai_memory AS t
+		WHERE t.agent_id = #{agentId} AND t.visitor_id = #{visitorId}
+	</select>
+
+	<!-- 管理端：空间内记忆分页（按 Agent、访客ID 过滤，含所属 Agent 名称） -->
+	<select id="pageList" parameterType="java.util.HashMap" resultMap="MemoryDTO">
+		SELECT
+			t.id,
+			t.agent_id,
+			a.name AS agent_name,
+			t.visitor_id,
+			t.content,
+			t.last_msg_id,
+			t.add_time,
+			t.update_time
+		FROM xxl_ai_memory AS t
+		JOIN xxl_ai_agent AS a ON a.id = t.agent_id
+		WHERE a.space_id = #{spaceId}
+		<if test="agentId > 0">
+			AND a.id = #{agentId}
+		</if>
+		<if test="visitorId != null and visitorId != ''">
+			AND t.visitor_id like CONCAT(CONCAT('%', #{visitorId}), '%')
+		</if>
+		ORDER BY t.id DESC
+		LIMIT #{offset}, #{pagesize}
+	</select>
+
+	<!-- 管理端：空间内记忆数量统计 -->
+	<select id="pageListCount" parameterType="java.util.HashMap" resultType="int">
+		SELECT count(1)
+		FROM xxl_ai_memory AS t
+		JOIN xxl_ai_agent AS a ON a.id = t.agent_id
+		WHERE a.space_id = #{spaceId}
+		<if test="agentId > 0">
+			AND a.id = #{agentId}
+		</if>
+		<if test="visitorId != null and visitorId != ''">
+			AND t.visitor_id like CONCAT(CONCAT('%', #{visitorId}), '%')
+		</if>
+	</select>
+
+</mapper>
