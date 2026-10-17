@@ -83,38 +83,40 @@ public enum XxlRoleEnum {
         // 首页
         resources.add(res(1, 0, "首页", ResourceTypeEnum.MENU, "dashboard", "/dashboard", "dashboard", 100));
 
-        // Agent管理（目录：Agent列表 + 对话管理 + 长期记忆）
-        resources.add(res(2, 0, "Agent管理", ResourceTypeEnum.CATALOG, "agent", "/agent", "message", 110));
-        resources.add(res(21, 2, "Agent列表", ResourceTypeEnum.MENU, "agent:default", "/agent/index", "list", 111));
-        resources.add(res(22, 2, "对话管理", ResourceTypeEnum.MENU, "session:default", "/session", "message", 112));
-        resources.add(res(23, 2, "长期记忆", ResourceTypeEnum.MENU, "memory:default", "/memory", "star", 113));
+        // Agent管理（一级菜单）
+        resources.add(res(2, 0, "Agent管理", ResourceTypeEnum.MENU, "agent:default", "/agent/index", "monitor", 200));
+
+        // 对话和记忆（目录：对话管理 + 长期记忆）
+        resources.add(res(3, 0, "对话和记忆", ResourceTypeEnum.CATALOG, "dialog", "/dialog", "message", 300));
+        resources.add(res(31, 3, "对话管理", ResourceTypeEnum.MENU, "session:default", "/session", "message", 301));
+        resources.add(res(32, 3, "长期记忆", ResourceTypeEnum.MENU, "memory:default", "/memory", "star", 302));
 
         // 知识库
-        resources.add(res(3, 0, "RAG知识库", ResourceTypeEnum.MENU, "knowledge:base", "/knowledge/base", "documentation", 120));
-        resources.add(resHidden(31, 0, "知识文档", ResourceTypeEnum.MENU, "knowledge:doc", "/knowledge/base/doc", "", 141));
+        resources.add(res(4, 0, "RAG知识库", ResourceTypeEnum.MENU, "knowledge:base", "/knowledge/base", "documentation", 400));
+        resources.add(resHidden(41, 0, "知识文档", ResourceTypeEnum.MENU, "knowledge:doc", "/knowledge/base/doc", "", 401));
 
         // SKILL
-        resources.add(res(4, 0, "SKILL技能", ResourceTypeEnum.MENU, "skill:default", "/skill", "skill", 130));
-        resources.add(resHidden(41, 0, "SKILL内容", ResourceTypeEnum.MENU, "skill:default", "/skill/content", "", 131));
+        resources.add(res(5, 0, "SKILL技能", ResourceTypeEnum.MENU, "skill:default", "/skill", "skill", 500));
+        resources.add(resHidden(51, 0, "SKILL内容", ResourceTypeEnum.MENU, "skill:default", "/skill/content", "", 501));
 
         // MCP
-        resources.add(res(5, 0, "MCP工具", ResourceTypeEnum.MENU, "mcp:default", "/mcp", "link", 140));
+        resources.add(res(6, 0, "MCP工具", ResourceTypeEnum.MENU, "mcp:default", "/mcp", "link", 600));
 
         // 供应商
-        resources.add(res(6, 0, "供应商模型", ResourceTypeEnum.MENU, "supplier:default", "/supplier", "server", 150));
-        resources.add(resHidden(61, 0, "供应商模型", ResourceTypeEnum.MENU, "supplier:default", "/supplier/model", "", 111));
+        resources.add(res(7, 0, "供应商模型", ResourceTypeEnum.MENU, "supplier:default", "/supplier", "server", 700));
+        resources.add(resHidden(71, 0, "供应商模型", ResourceTypeEnum.MENU, "supplier:default", "/supplier/model", "", 701));
 
         // 系统管理（仅管理员）
         if (role == ADMIN) {
-            resources.add(res(7, 0, "系统管理", ResourceTypeEnum.CATALOG, "system", "/system", "system", 200));
-            resources.add(res(71, 7, "业务空间", ResourceTypeEnum.MENU, "space:default", "/space", "component", 199));
-            resources.add(res(72, 7, "用户管理", ResourceTypeEnum.MENU, "system:user", "/system/user", "user", 201));
-            resources.add(res(73, 7, "配置管理", ResourceTypeEnum.MENU, "system:config", "/system/config", "edit", 202));
-            resources.add(res(74, 7, "审计日志", ResourceTypeEnum.MENU, "system:log", "/system/log", "log", 203));
+            resources.add(res(8, 0, "系统管理", ResourceTypeEnum.CATALOG, "system", "/system", "system", 800));
+            resources.add(res(81, 8, "业务空间", ResourceTypeEnum.MENU, "space:default", "/space", "component", 801));
+            resources.add(res(82, 8, "用户管理", ResourceTypeEnum.MENU, "system:user", "/system/user", "user", 802));
+            resources.add(res(83, 8, "配置管理", ResourceTypeEnum.MENU, "system:config", "/system/config", "edit", 803));
+            resources.add(res(84, 8, "审计日志", ResourceTypeEnum.MENU, "system:log", "/system/log", "log", 804));
         }
 
         // 帮助中心
-        resources.add(res(8, 0, "帮助中心", ResourceTypeEnum.MENU, "help", "/help", "guide", 300));
+        resources.add(res(9, 0, "帮助中心", ResourceTypeEnum.MENU, "help", "/help", "guide", 900));
 
         return resources;
     }

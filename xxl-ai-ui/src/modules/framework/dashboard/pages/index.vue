@@ -83,12 +83,12 @@ interface StatItem {
   bg: string
 }
 
-// 指标卡片：Agent / Skill / MCP / 供应商模型 数量
+// 指标卡片：Agent / Skill / MCP / 供应商模型 数量（图标与对应菜单图标保持一致）
 const stats = ref<StatItem[]>([
-  { label: t('dashboard.agentCount'), value: 0, icon: 'message', color: '#5b6abf', bg: '#eef0fb' },
+  { label: t('dashboard.agentCount'), value: 0, icon: 'monitor', color: '#5b6abf', bg: '#eef0fb' },
   { label: t('dashboard.skillCount'), value: 0, icon: 'skill', color: '#319c8a', bg: '#e8f6f3' },
-  { label: t('dashboard.mcpCount'), value: 0, icon: 'server', color: '#d4943c', bg: '#fcf4e8' },
-  { label: t('dashboard.modelCount'), value: 0, icon: 'component', color: '#c5566a', bg: '#fbeef1' }
+  { label: t('dashboard.mcpCount'), value: 0, icon: 'link', color: '#d4943c', bg: '#fcf4e8' },
+  { label: t('dashboard.modelCount'), value: 0, icon: 'server', color: '#c5566a', bg: '#fbeef1' }
 ])
 
 const trendChartRef = ref<HTMLElement>()

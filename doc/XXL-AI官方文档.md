@@ -907,7 +907,7 @@ xxl-ai.chat.history.limit=50        # 附加给模型的最近历史消息条数
 | 运行时 | `MemoryTool`（harness/memory） | 读取记忆、合并系统指令、按维度模型生成（定长截断、Markdown 规范化） |
 | 运行时 | `MemoryArchiveTool`（harness/memory） | `CyclicThread` 心跳 + Redis 锁互斥的异步归档 |
 
-**管理端入口**：「Agent管理 → 长期记忆」，支持按 Agent / 访客过滤查看、查看记忆正文、修改记忆正文、删除。
+**管理端入口**：「对话和记忆 → 长期记忆」，支持按 Agent / 访客过滤查看、查看记忆正文、修改记忆正文、删除。
 
 
 ## 六、总体设计（本地版）
