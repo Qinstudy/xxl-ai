@@ -28,7 +28,8 @@ export function useChatStream() {
   async function sendMessage(
     payload: { uuid: string; visitorId: string; sessionId: number; content: string },
     onThinking: ChatStreamHandler,
-    onContent: ChatStreamHandler
+    onContent: ChatStreamHandler,
+    onError?: (message: string) => void
   ) {
     stopped = false
     controller = new AbortController()
@@ -36,19 +37,24 @@ export function useChatStream() {
     if (!reader) {
       throw new Error('empty stream')
     }
-    await streamWithResume(reader, {}, onThinking, onContent, () => stopped, controller.signal)
+    await streamWithResume(reader, {}, onThinking, onContent, onError, () => stopped, controller.signal)
   }
 
   /**
    * 续传生成中的助手消息：从结果流起点重放全部增量（用于刷新页面/切换对话后恢复生成）
    */
-  async function resumeMessage(msgId: number, onThinking: ChatStreamHandler, onContent: ChatStreamHandler) {
+  async function resumeMessage(
+    msgId: number,
+    onThinking: ChatStreamHandler,
+    onContent: ChatStreamHandler,
+    onError?: (message: string) => void
+  ) {
     if (!msgId) return
     stopped = false
     controller = new AbortController()
     const reader = await resumeStream(msgId, undefined, controller.signal)
     if (!reader) return
-    await streamWithResume(reader, { msgId }, onThinking, onContent, () => stopped, controller.signal)
+    await streamWithResume(reader, { msgId }, onThinking, onContent, onError, () => stopped, controller.signal)
   }
 
   /**
@@ -68,6 +74,7 @@ export function useChatStream() {
  *
  * @param reader    初始流（发送或续传获得）
  * @param state     流状态（stream 事件回填 msgId，内容事件推进 lastEventId）
+ * @param onError   错误回调（error 终态事件携带的错误信息）
  * @param isStopped 是否已被用户主动终止（终止即不再续传）
  * @param signal    取消信号（终止时中断 fetch）
  */
@@ -76,6 +83,7 @@ async function streamWithResume(
   state: ChatStreamState,
   onThinking: ChatStreamHandler,
   onContent: ChatStreamHandler,
+  onError: ((message: string) => void) | undefined,
   isStopped: () => boolean,
   signal: AbortSignal
 ) {
@@ -84,7 +92,7 @@ async function streamWithResume(
     if (isStopped()) return
     let completed = false
     try {
-      completed = await readStream(reader, onThinking, onContent, state)
+      completed = await readStream(reader, onThinking, onContent, onError, state)
     } catch (e) {
       // 网络中断：进入续传分支
       completed = false
@@ -118,6 +126,7 @@ async function readStream(
   reader: ReadableStreamDefaultReader<Uint8Array>,
   onThinking: ChatStreamHandler,
   onContent: ChatStreamHandler,
+  onError: ((message: string) => void) | undefined,
   state: ChatStreamState
 ): Promise<boolean> {
   const decoder = new TextDecoder('utf-8')
@@ -138,6 +147,7 @@ async function readStream(
     if (eventName === 'error') {
       if (eventId) state.lastEventId = eventId
       ElMessage.error(data || '生成失败')
+      onError?.(data)
       return true
     }
     if (!data) return false

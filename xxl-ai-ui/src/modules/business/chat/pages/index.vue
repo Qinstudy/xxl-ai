@@ -349,7 +349,9 @@ async function resumeGenerating(msg: SessionMsgItem) {
         const m = messages.value[idx]
         if (m) m.content += chunk
         scrollToBottom()
-      }
+      },
+      // 续传过程中生成失败：同样回读后端失败态消息，终止"思考中"占位
+      () => reloadMessages()
     )
   } catch (e) {
     // 续传失败保留已展示内容
@@ -464,7 +466,9 @@ async function handleSend() {
         const msg = messages.value[assistantIdx]
         if (msg) msg.content += chunk
         scrollToBottom()
-      }
+      },
+      // 生成失败：参考终止逻辑，从后端回读失败态消息（status=2 + 失败提示），终止"思考中"占位
+      () => reloadMessages()
     )
     // 流结束后再次滚到底：Markdown 块（代码/表格等）渲染完成后高度变化
     await scrollToBottom()

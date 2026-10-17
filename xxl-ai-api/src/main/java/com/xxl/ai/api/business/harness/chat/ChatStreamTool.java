@@ -1,11 +1,6 @@
 package com.xxl.ai.api.business.harness.chat;
 
 import com.xxl.ai.api.business.agent.model.entity.Agent;
-import com.xxl.ai.api.business.session.constant.SessionConstant;
-import com.xxl.ai.api.business.session.mapper.SessionMapper;
-import com.xxl.ai.api.business.session.mapper.SessionMsgMapper;
-import com.xxl.ai.api.business.session.model.entity.Session;
-import com.xxl.ai.api.business.session.model.entity.SessionMsg;
 import com.xxl.ai.api.business.chat.service.ChatService;
 import com.xxl.ai.api.business.harness.llm.LlmChatTool;
 import com.xxl.ai.api.business.harness.mcp.McpToolFactory;
@@ -15,6 +10,11 @@ import com.xxl.ai.api.business.harness.skill.SkillShellTracker;
 import com.xxl.ai.api.business.harness.skill.SkillToolFactory;
 import com.xxl.ai.api.business.knowledge.mapper.KnowledgeBaseMapper;
 import com.xxl.ai.api.business.knowledge.model.entity.KnowledgeBase;
+import com.xxl.ai.api.business.session.constant.SessionConstant;
+import com.xxl.ai.api.business.session.mapper.SessionMapper;
+import com.xxl.ai.api.business.session.mapper.SessionMsgMapper;
+import com.xxl.ai.api.business.session.model.entity.Session;
+import com.xxl.ai.api.business.session.model.entity.SessionMsg;
 import com.xxl.ai.api.business.supplier.model.SupplierRuntime;
 import com.xxl.ai.api.business.supplier.service.SupplierService;
 import com.xxl.ai.api.framework.util.I18nUtil;
@@ -30,25 +30,14 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.data.domain.Range;
 import org.springframework.data.redis.connection.RedisStreamCommands;
-import org.springframework.data.redis.connection.stream.Consumer;
-import org.springframework.data.redis.connection.stream.MapRecord;
-import org.springframework.data.redis.connection.stream.PendingMessages;
-import org.springframework.data.redis.connection.stream.ReadOffset;
-import org.springframework.data.redis.connection.stream.RecordId;
-import org.springframework.data.redis.connection.stream.StreamOffset;
-import org.springframework.data.redis.connection.stream.StreamReadOptions;
-import org.springframework.data.redis.connection.stream.StreamRecords;
+import org.springframework.data.redis.connection.stream.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -111,6 +100,9 @@ public class ChatStreamTool implements SmartLifecycle {
 
     /** 人工终止提示文案 key（追加到被终止回复正文末尾） */
     private static final String TERMINATED_NOTICE_KEY = "chat_terminated_notice";
+    /** 生成失败提示文案 key（追加到失败回复正文末尾） */
+    private static final String FAILED_NOTICE_KEY = "chat_failed_notice";
+
     /** 任务队列最大长度（近似裁剪） */
     private static final long TASK_STREAM_MAXLEN = 5000;
     /** XREAD 阻塞窗口(ms)：空闲轮询/心跳间隔，须小于 spring.data.redis.timeout */
@@ -551,12 +543,15 @@ public class ChatStreamTool implements SmartLifecycle {
                 saveAssistant(msgId, sessionId, terminatedText(partial.getContent(), partial.getThinking()),
                         SessionConstant.MSG_STATUS_FAILED);
             } else if (failure != null) {
-                // b、生成失败：写 error 终态并回填已生成的部分内容（status=2），避免产出丢失
-                logger.warn("Chat 生成失败, msgId={}, err={}", msgId, failure.getMessage());
-                appendResult(msgId, EVENT_ERROR, failure.getMessage());
+                // b、生成失败：先回填正文与状态（status=2，追加失败提示保证正文非空），再下发 error 终态，保证前端收到 error 后回读消息时正文与状态已就绪，不会停留在"思考中"占位
+                String errorMsg = failure.getMessage()!=null ? failure.getMessage() : failure.toString();
+                logger.error("Chat 生成失败, msgId={}, sessionId={}, err={}", msgId, sessionId, errorMsg, failure);
+
                 saveAssistant(msgId, sessionId,
-                        new LlmChatTool.ChatText(replyText.toString(), thinkText.toString()),
-                        SessionConstant.MSG_STATUS_FAILED);
+                        failedText(replyText.toString(), thinkText.toString(), errorMsg),
+                        SessionConstant.MSG_STATUS_FAILED
+                );
+                appendResult(msgId, EVENT_ERROR, errorMsg);
             } else {
                 // c、生成成功：回填完整结果（status=1）
                 saveAssistant(msgId, sessionId, chatText, SessionConstant.MSG_STATUS_DONE);
@@ -574,6 +569,15 @@ public class ChatStreamTool implements SmartLifecycle {
      */
     private LlmChatTool.ChatText terminatedText(String content, String thinking) {
         return new LlmChatTool.ChatText((content == null ? "" : content) + "\n\n> " + I18nUtil.getString(TERMINATED_NOTICE_KEY), thinking);
+    }
+
+    /**
+     * 追加生成失败记录到正文末尾（文案取自后端 i18n，附失败原因）：
+     */
+    private LlmChatTool.ChatText failedText(String content, String thinking, String errorMsg) {
+        String notice = I18nUtil.getString(FAILED_NOTICE_KEY);
+        String suffix = StringTool.isNotBlank(errorMsg) ? "：" + errorMsg : "";
+        return new LlmChatTool.ChatText((content == null ? "" : content) + "\n\n> " + notice + suffix, thinking);
     }
 
     // ==================== 任务结果队列操作（Redis Stream）： ====================
