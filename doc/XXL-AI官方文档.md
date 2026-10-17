@@ -860,7 +860,7 @@ xxl-ai.chat.history.limit=50        # 附加给模型的最近历史消息条数
 | 知识库 | `xxl_ai_knowledge_base`、`xxl_ai_knowledge_doc` | 知识库、文档（向量化状态） |
 | MCP | `xxl_ai_mcp` | MCP 服务配置 |
 | SKILL | `xxl_ai_skill`、`xxl_ai_skill_file` | 技能、技能文件树 |
-| Agent | `xxl_ai_agent`、`xxl_ai_session`、`xxl_ai_session_msg` | Agent、对话、消息 |
+| Agent | `xxl_ai_agent`、`xxl_ai_session`、`xxl_ai_session_msg`、`xxl_ai_memory` | Agent、对话、消息、长期记忆 |
 
 **空间隔离**：除平台表外，业务表均带 `space_id`；管理端当前空间由请求头 `xxl-space-id` 传入，后端按空间过滤；管理员可见全部空间，普通用户按 `xxl_ai_user_space` 授权。公开对话端以 Agent 的 `uuid` + 访客 `visitorId` 隔离会话。所有关联均为应用层维护（无数据库外键）。
 
@@ -874,6 +874,40 @@ xxl-ai.chat.history.limit=50        # 附加给模型的最近历史消息条数
 - **MCP `McpToolFactory`**：`McpClientTool` 基于官方 Java MCP SDK（stdio / Streamable HTTP），将 MCP 工具转换为 spring-ai `ToolCallback`；仓库内附示例 MCP 服务 `xxl-ai-sample`（spring-ai `@McpTool`，Streamable HTTP），供「MCP管理」连通测试联调；
 - **SKILL `SkillToolFactory`**：将 DB 技能文件树物化为 `{skill.root}/agent_{agentId}/{skillName}/`，构建 `SkillsTool` 及配套 shell / 文件执行工具（bash、Read/Write/Edit、Glob、Grep、List），技能内容变更按更新时间指纹自动重建；
 - **工具装配顺序**：`buildTools` 依次装配 MCP 工具 + Skill 工具 + 执行工具，统一以 `Object` 列表随请求传入，spring-ai 自动解析注册。
+
+### 5.8、长短期记忆
+
+对话记忆分「短期」与「长期」两层协同，兼顾本轮上下文与跨会话长期画像：
+
+| 层 | 载体 | 说明 |
+|---|---|---|
+| 短期记忆 | `xxl_ai_session_msg`（最近 N 条） | 当前对话窗口内的最近消息，按 `xxl-ai.chat.history.limit`（默认 50 条）截断后随请求附给模型，仅覆盖当前会话 |
+| 长期记忆 | `xxl_ai_memory` | 以「Agent × 访客」为维度的持久化记忆（单字段 Markdown，按维度分节），跨会话复用 |
+
+**开关与注入**：Agent 表新增 `memory_status`（0-关闭、1-开启）。对话生成（`ChatStreamTool.generate`）时若开启，按会话所属访客读取该 Agent×访客的长期记忆，经 `MemoryTool.mergePrompt` 以 Markdown 追加到系统指令一并注入；读取失败降级跳过，不影响对话主流程。
+
+**记忆维度**：`用户画像 / 偏好习惯 / 关键事实 / 目标与意图 / 近期进展`；生成时按维度抽取、空维度省略，最终内容按 `memory.content.max.length`（默认 2000 字）定长截断。
+
+**记忆生成**：由 `MemoryArchiveTool`（harness，`SmartLifecycle` + `CyclicThread` 心跳）异步归档：
+
+```
+心跳（默认 60s）
+  └─ Redis SETNX 抢锁（TTL = 心跳间隔，仅作互斥；抢不到忽略，抢到归档、处理完立即解锁）
+       └─ 遍历开启记忆且已发布的 Agent → 其下每个访客
+            ├─ 仅判断：是否存在比水位线 last_msg_id 更新的消息，无则跳过
+            └─ 有 → 取水位线之后的全部新消息 + 历史记忆 → 模型按固定维度生成最新记忆（定长）
+                    → 按唯一键 upsert，水位线推进到最新消息 ID
+```
+
+**组件划分**：
+
+| 层 | 组件（目录） | 职责 |
+|---|---|---|
+| 业务 | `MemoryController` / `MemoryService`（business/memory） | 管理端记忆分页查询、修改正文、批量删除（按空间隔离） |
+| 运行时 | `MemoryTool`（harness/memory） | 读取记忆、合并系统指令、按维度模型生成（定长截断、Markdown 规范化） |
+| 运行时 | `MemoryArchiveTool`（harness/memory） | `CyclicThread` 心跳 + Redis 锁互斥的异步归档 |
+
+**管理端入口**：「Agent管理 → 长期记忆」，支持按 Agent / 访客过滤查看、查看记忆正文、修改记忆正文、删除。
 
 
 ## 六、总体设计（本地版）

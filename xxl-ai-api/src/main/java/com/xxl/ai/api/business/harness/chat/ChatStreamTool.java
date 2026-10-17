@@ -627,8 +627,9 @@ public class ChatStreamTool implements SmartLifecycle {
         if (StringTool.isNotBlank(agent.getSystemPrompt())) {
             return agent.getSystemPrompt().trim();
         }
-        String name = StringTool.isBlank(agent.getName()) ? "AI 助手" : agent.getName();
-        return "你是 " + name + " 的智能助手。";
+        /*String name = StringTool.isBlank(agent.getName()) ? "AI 助手" : agent.getName();
+        return "你是 " + name + " 的智能助手。";*/
+        return "";
     }
 
     /**
