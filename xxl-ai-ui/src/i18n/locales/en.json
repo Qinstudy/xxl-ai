@@ -476,7 +476,7 @@
       "name": "Agent Name",
       "intro": "Intro",
       "publishStatus": "Publish Status",
-      "memoryStatus": "Memory",
+      "memoryStatus": "Long-term Memory",
       "accessUrl": "Access URL",
       "gotoAgent": "Go to Agent",
       "agent": "Agent",

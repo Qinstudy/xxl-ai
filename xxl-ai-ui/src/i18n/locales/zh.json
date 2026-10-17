@@ -476,7 +476,7 @@
       "name": "Agent名称",
       "intro": "Agent介绍",
       "publishStatus": "发布状态",
-      "memoryStatus": "记忆开关",
+      "memoryStatus": "长期记忆",
       "accessUrl": "访问URL",
       "gotoAgent": "前往Agent",
       "agent": "Agent",
