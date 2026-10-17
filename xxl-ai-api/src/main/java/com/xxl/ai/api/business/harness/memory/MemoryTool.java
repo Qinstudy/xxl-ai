@@ -43,7 +43,8 @@ public class MemoryTool {
             1. 只输出 Markdown 记忆正文，不要任何解释、前言或代码块围栏；
             2. 每个维度标题独占一行，形如“## 维度名”（井号后有且仅有一个空格）；
             3. 每个要点独占一行，以“- ”开头；
-            4. 标题与要点之间、要点与要点之间都必须换行，禁止把标题与内容写在同一行。
+            4. 标题与要点之间、要点与要点之间都必须换行，禁止把标题与内容写在同一行；
+            5. 不同维度之间空一行。
 
             维度（无内容的维度整节省略）：
             ## 用户画像
@@ -142,9 +143,13 @@ public class MemoryTool {
         for (String section : MEMORY_SECTIONS) {
             text = text.replaceAll("(?m)(#{1,6} " + section + ")[ \\t]*(?=\\S)", "$1\n");
         }
-        // 4) 行首列表标记后补空格：-xxx → - xxx
-        text = text.replaceAll("(?m)^([-*+])(?=\\S)", "$1 ");
-        // 5) 合并多余空行
+        // 4) 行内列表项另起一行：…口吻-开场… → …口吻\n- 开场…（仅当前一字符非 ASCII，避免误拆英文连字符 / URL）
+        text = text.replaceAll("([^\\x00-\\x7F])[-*+\\u2022\\u2013\\u2014][ \\t]*(?=\\S)", "$1\n- ");
+        // 5) 行首列表标记后补空格：-xxx → - xxx
+        text = text.replaceAll("(?m)^([-*+\\u2022\\u2013\\u2014])(?=\\S)", "$1 ");
+        // 6) 维度标题前空一行：不同维度之间留空行
+        text = text.replaceAll("(?m)^(#{1,6} )", "\n$1");
+        // 7) 合并多余空行
         text = text.replaceAll("\\n{3,}", "\n\n");
         return text.trim();
     }
