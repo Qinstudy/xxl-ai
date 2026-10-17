@@ -61,13 +61,20 @@ public class LlmChatTool {
                          String sessionId,
                          Consumer<String> onThinking,
                          Consumer<String> onContent) {
-        // 装配对话请求：消息（系统指令+历史+当前）+ 工具 + Advisor
+
+        // 创建 ChatClient（spring-ai）
         ChatClient chatClient = llmModelFactory.chatClient(runtime, sessionId);
+
+        // 消息装配：系统指令 + 历史（角色与内容平行列表）+ 当前用户消息
         ChatClient.ChatClientRequestSpec spec = chatClient.prompt()
                 .messages(buildMessages(systemPrompt, roleList, contentList, content));
+
+        // 附加工具（ToolCallback / @Tool 对象）
         if (tools != null && tools.length > 0) {
             spec = spec.tools(tools);
         }
+
+        // 附加对话 Advisor
         if (advisorObjects != null && !advisorObjects.isEmpty()) {
             List<Advisor> advisorList = new ArrayList<>();
             for (Object advisor : advisorObjects) {
@@ -79,6 +86,8 @@ public class LlmChatTool {
                 spec = spec.advisors(advisorList);
             }
         }
+
+        // 流式对话并经回调输出：思考过程增量 / 回复内容增量
         return stream(spec, onThinking, onContent);
     }
 
@@ -109,38 +118,53 @@ public class LlmChatTool {
 
     /**
      * 流式对话并经回调输出：思考过程增量 / 回复内容增量
+     *
+     * 同步消费流式响应：回调抛出（如会话终止）或线程中断时由循环直接中断。
+     * 增量仅判空、不判空白——模型会单独下发换行（如 "\n"），用 isNotBlank 会吞掉换行。
      */
     private ChatText stream(ChatClient.ChatClientRequestSpec spec,
-                            Consumer<String> onThinking, Consumer<String> onContent) {
+                            Consumer<String> onThinking,
+                            Consumer<String> onContent) {
+
+        // 流式对话响应
         Flux<ChatResponse> chatResponses = spec.stream().chatResponse();
         StringBuilder fullText = new StringBuilder();
         StringBuilder thinkText = new StringBuilder();
+
+        // 思考过程增量计算：与上轮累积内容比较，取首现差异子串；无变化返回 null
         String prevReasoning = "";
+
+        // 逐条消费流式响应
         for (ChatResponse chatResponse : chatResponses.toIterable()) {
+
+            // 获取生成结果（包含思考过程与回复内容）
             Generation generation = chatResponse.getResult();
             if (generation == null || generation.getOutput() == null) {
                 continue;
             }
             Message output = generation.getOutput();
-            // 思考过程：推理模型 reason_content 按流累积下发，取变化增量转发，重复值去重
             Object reasoningObj = output.getMetadata().get(KEY_REASONING);
             String reasoning = reasoningObj instanceof String value ? value : null;
+
+            // 思考过程增量输出
             String delta = computeReasoningDelta(prevReasoning, reasoning);
-            if (StringTool.isNotBlank(delta)) {
+            if (StringTool.isNotEmpty(delta)) {
                 prevReasoning = reasoning;
                 thinkText.append(delta);
                 if (onThinking != null) {
                     onThinking.accept(delta);
                 }
             }
-            // 回复内容
+
+            // 回复内容增量输出
             String chunk = output.getText();
-            if (StringTool.isNotBlank(chunk)) {
+            if (StringTool.isNotEmpty(chunk)) {
                 fullText.append(chunk);
                 if (onContent != null) {
                     onContent.accept(chunk);
                 }
             }
+
         }
         return new ChatText(fullText.toString(), thinkText.toString());
     }

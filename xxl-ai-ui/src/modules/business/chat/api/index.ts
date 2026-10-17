@@ -52,12 +52,14 @@ export async function sendStream(
   uuid: string,
   visitorId: string,
   sessionId: number,
-  content: string
+  content: string,
+  signal?: AbortSignal
 ): Promise<ReadableStreamDefaultReader<Uint8Array> | null> {
   const response = await fetch(`${BASE}/chat/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ uuid, visitorId, sessionId, content })
+    body: JSON.stringify({ uuid, visitorId, sessionId, content }),
+    signal
   })
   if (!response.ok || !response.body) {
     throw new Error(`请求失败，HTTP ${response.status}`)
@@ -71,13 +73,21 @@ export async function sendStream(
  */
 export async function resumeStream(
   msgId: number,
-  lastEventId?: string
+  lastEventId?: string,
+  signal?: AbortSignal
 ): Promise<ReadableStreamDefaultReader<Uint8Array> | null> {
   const params = new URLSearchParams({ msgId: String(msgId) })
   if (lastEventId) params.set('lastEventId', lastEventId)
-  const response = await fetch(`${BASE}/chat/resume?${params.toString()}`, { method: 'POST' })
+  const response = await fetch(`${BASE}/chat/resume?${params.toString()}`, { method: 'POST', signal })
   if (!response.ok || !response.body) {
     throw new Error(`请求失败，HTTP ${response.status}`)
   }
   return response.body.getReader()
+}
+
+/**
+ * 主动终止会话（停止生成）：中断后端进行中的生成并清理工具调用进程
+ */
+export function stopStream(sessionId: number): Promise<Response<string>> {
+  return request({ url: '/chat/stop', method: 'post', params: { sessionId } })
 }

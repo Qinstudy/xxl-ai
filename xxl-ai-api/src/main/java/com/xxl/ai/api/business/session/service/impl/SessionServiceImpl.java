@@ -200,6 +200,15 @@ public class SessionServiceImpl implements SessionService {
     }
 
     /**
+     * 回填助手消息为失败态（发起生成失败时兜底）
+     */
+    @Override
+    public void fail(long msgId, long sessionId) {
+        sessionMsgMapper.updateAssistant(msgId, "", null, SessionConstant.MSG_STATUS_FAILED);
+        sessionMapper.touch(sessionId);
+    }
+
+    /**
      * 按 Agent ID 批量清理对话与消息（Agent 删除时同步级联）
      */
     @Override

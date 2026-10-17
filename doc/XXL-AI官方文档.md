@@ -1092,12 +1092,11 @@ docker compose down
 - 2、【重构】会话模块重构（云版）：会话管理独立入口，支持跨Agent会话检索；C端会话交互与会话管理逻辑拆分，子模块更KISS、可维护性提升；
 - 3、【优化】Desk版本代码重构，落地进程即目录、网关薄化、契约按域、模块自包含、别名优先等规范化改造；
 - 4、【升级】Docker Compose升级：升级 Redis、Milvus 至最新LTS版本；
-- 5、【TODO】会话终止（云版）：支持主动终止会话，终止时清理工具调用进程，避免工具调用进程泄露；
+- 5、【ING】会话终止（云版）：支持主动终止会话，终止时清理工具调用进程，避免工具调用进程泄露；
 
-- 【TODO】云版：OpenAPI：针对搭建的Agent提供OpenAPI接口能力，通过agentId + accessToken访问，便于集成到第三方系统应用（提供内置Agent对话能力，可用于功能调试或快速集成应用）。
-- 【TODO】云版：可观测：支持Agent可观测，包括Session对话、工具/知识/记忆等Trace明细可观测等。
+
 - 【TODO】Desk版本：UI升级，左侧操作栏；
-- 【TODO】Desk版本：支持SKILL/MCP工具；
+- 【TODO】Desk版本：支持SKILL/MCP，记忆；
 - 【TODO】Desk版本：支持浏览器工具操作；
 
 
@@ -1108,7 +1107,8 @@ docker compose down
     - Agent 生图：文生图 / 图生图，支持集成多模型供应商；
     - Agent 生视频：文生视频 / 图生视频，支持集成多模型供应商；
     - Chat 对话增强：对话记忆控制、多模态输入；
-- 2、其他
+- 2、云版：OpenAPI：针对搭建的Agent提供OpenAPI接口能力，通过agentId + accessToken访问，便于集成到第三方系统应用（提供内置Agent对话能力，可用于功能调试或快速集成应用）。
+- 3、云版：可观测：支持Agent可观测，包括Session对话、工具/知识/记忆等Trace明细可观测等。
 
 ## 七、其他
 

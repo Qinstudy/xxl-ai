@@ -15,6 +15,7 @@ import org.springaicommunity.agent.tools.GlobTool;
 import org.springaicommunity.agent.tools.GrepTool;
 import org.springaicommunity.agent.tools.ListDirectoryTool;
 import org.springaicommunity.agent.tools.ShellTools;
+import org.springaicommunity.agent.exec.LocalExecBackend;
 import org.springaicommunity.agent.tools.SkillsTool;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Value;
@@ -116,24 +117,31 @@ public class SkillToolFactory {
     /**
      * 构建 Agent 装配的终端/文件执行工具集（无技能时返回空列表表示不注册）
      *
-     * 与 buildTool 配套：SkillsTool 注入 SKILL.md 内容（含 bash 指令），此处提供 SKILL.md 依赖的
-     * 执行能力（ShellTools 的 bash/bash_output/kill_shell 与 FileSystemTools 的 Read/Write/Edit、
-     * GlobTool 的 Glob、GrepTool 的 Grep、ListDirectoryTool 的 List Directory），
-     * 全部限定于 Agent 物化根，按 Agent 隔离沙箱
+     * 与 buildTool 配套：提供 SKILL.md 依赖的执行能力（Shell / FileSystem / Glob / Grep / ListDirectory），
+     * 全部限定于 Agent 物化根。Shell 命令经 tracker 执行，会话终止或生成结束时统一回收，避免进程泄露。
      */
-    public List<Object> buildExecutorTools(Agent agent) {
+    public List<Object> buildExecutorTools(Agent agent, SkillShellTracker tracker) {
         SkillSnapshot snapshot = sync(agent);
         if (snapshot == null) {
             return new ArrayList<>();
         }
         Path agentRoot = snapshot.root();
         List<Object> tools = new ArrayList<>();
-        tools.add(ShellTools.builder().workingDirectory(agentRoot).build());
+        tools.add(ShellTools.builder().execBackend(tracker).build());
         tools.add(FileSystemTools.builder().allowedDirectory(agentRoot).build());
         tools.add(GlobTool.builder().workingDirectory(agentRoot).allowedDirectory(agentRoot).build());
         tools.add(GrepTool.builder().workingDirectory(agentRoot).allowedDirectory(agentRoot).build());
         tools.add(ListDirectoryTool.builder().workingDirectory(agentRoot).allowedDirectory(agentRoot).build());
         return tools;
+    }
+
+    /**
+     * 构建 Agent 的 Shell 进程跟踪器：工作目录限定于 Agent 物化根，进程经其登记以便回收
+     *
+     * @param agentId Agent ID
+     */
+    public SkillShellTracker newShellTracker(long agentId) {
+        return new SkillShellTracker(LocalExecBackend.builder().workingDirectory(agentRoot(agentId)).build());
     }
 
     /**
@@ -278,7 +286,14 @@ public class SkillToolFactory {
      * Agent 物化根目录：{skill.root}/agent_{agentId}（agentId 全局唯一，无需再按空间分层）
      */
     private Path agentRoot(Agent agent) {
-        return skillsRoot().resolve("agent_" + agent.getId());
+        return agentRoot(agent.getId());
+    }
+
+    /**
+     * Agent 物化根目录（按 agentId）：{skill.root}/agent_{agentId}
+     */
+    private Path agentRoot(long agentId) {
+        return skillsRoot().resolve("agent_" + agentId);
     }
 
     /**

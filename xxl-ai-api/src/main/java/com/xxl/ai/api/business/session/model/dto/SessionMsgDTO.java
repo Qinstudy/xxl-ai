@@ -12,7 +12,7 @@ public class SessionMsgDTO {
     private String role;        /* 角色：user-用户、assistant-助手 */
     private String reasoning;   /* 思考过程（推理模型 reasoning_content，可空） */
     private String content;     /* 消息内容 */
-    private int status;         /* 状态：0-生成中、1-完成、2-失败 */
+    private int status;         /* 状态：0-生成中、1-完成、2-失败（含主动终止） */
     private String addTime;     /* 新增时间（格式化字符串） */
     private String updateTime;  /* 更新时间（格式化字符串） */
 

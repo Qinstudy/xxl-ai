@@ -87,6 +87,11 @@ public interface SessionService {
     long openRound(Session session, String content);
 
     /**
+     * 回填助手消息为失败态（发起生成失败时兜底，避免占位永远停留在生成中）
+     */
+    void fail(long msgId, long sessionId);
+
+    /**
      * 按 Agent ID 批量清理对话与消息（Agent 删除时同步级联）
      */
     void purgeByAgentIds(List<Long> agentIds);

@@ -28,7 +28,7 @@ export interface SessionMsg {
   reasoning?: string
   /** 消息内容 */
   content: string
-  /** 状态：0-生成中、1-完成、2-失败（生成中可据消息ID断点续传） */
+  /** 状态：0-生成中、1-完成、2-失败（含主动终止；生成中可据消息ID断点续传） */
   status?: number
   addTime?: string
   [key: string]: unknown

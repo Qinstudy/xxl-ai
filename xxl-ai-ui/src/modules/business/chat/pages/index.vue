@@ -104,13 +104,17 @@
                     </div>
                     <div v-if="msg.showThinking" class="msg-reasoning-body">{{ msg.reasoning }}</div>
                   </div>
-                  <!-- 回复内容 -->
-                  <span v-if="!msg.content" class="msg-streaming"
+                  <!-- 回复内容：生成失败（status=2，含主动终止）且无内容时不再显示"思考中" -->
+                  <span v-if="!msg.content && msg.status !== 2" class="msg-streaming"
                     >{{ t('business.chat.thinkingStreaming') }}<span class="streaming-dots"><span></span><span></span><span></span></span
                   ></span>
                   <!-- 访客输入：纯文本；模型返回：Markdown 渲染（净化防XSS） -->
                   <MarkdownView v-if="msg.role === 'assistant'" class="msg-content" :content="msg.content" />
                   <span v-else class="msg-content">{{ msg.content }}</span>
+                  <!-- 异常消息状态提示：生成失败 -->
+                  <div v-if="msg.role === 'assistant' && msg.status === 2" class="msg-status-tip">
+                    <span>{{ t('business.chat.failed') }}</span>
+                  </div>
                 </div>
                 <!-- 发送时间：鼠标悬浮展示 -->
                 <div class="msg-time">{{ timeText(msg) }}</div>
@@ -158,7 +162,10 @@
         />
         <div class="input-footer">
           <span class="input-tip">{{ t('business.chat.enterTip') }}</span>
-          <el-button type="primary" :loading="sending" @click="handleSend">
+          <el-button v-if="sending" type="danger" plain @click="handleStop">
+            {{ t('business.chat.stop') }}
+          </el-button>
+          <el-button v-else type="primary" @click="handleSend">
             {{ t('business.chat.send') }}
           </el-button>
         </div>
@@ -172,7 +179,7 @@ import { t } from '@/i18n'
 import logo from '@/assets/images/logo.png'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { createSession, deleteSession as removeSession, listSession, listMsg, loadAgentInfo, renameSession } from '../api'
+import { createSession, deleteSession as removeSession, listSession, listMsg, loadAgentInfo, renameSession, stopStream } from '../api'
 import { useChatStream } from '../composables/useChatStream'
 import MarkdownView from '../components/MarkdownView.vue'
 import type { AgentChatInfo } from '../types'
@@ -182,7 +189,7 @@ import { SvgIcon } from '@/components'
 import { useFullscreen } from '@vueuse/core'
 import { nextTick, onMounted, ref } from 'vue'
 
-const { sendMessage, resumeMessage } = useChatStream()
+const { sendMessage, resumeMessage, stopMessage } = useChatStream()
 
 const route = useRoute()
 const router = useRouter()
@@ -312,6 +319,15 @@ async function selectSession(sessionId: number) {
     pending.showThinking = true
     void resumeGenerating(pending)
   }
+}
+
+/** 重新加载当前对话消息（终止后回显后端已落库的终止内容，避免占位一直显示"思考中"） */
+async function reloadMessages() {
+  const sessionId = currentSessionId.value
+  if (!sessionId) return
+  const res = await listMsg(sessionId)
+  messages.value = res.data.map((m) => ({ ...m, showThinking: false }))
+  await scrollToBottom()
 }
 
 /**
@@ -466,6 +482,45 @@ async function handleSend() {
       }
     }
   }
+}
+
+/**
+ * 终止生成：先中断前端流（本地立即生效），再通知后端终止生成并清理工具调用进程
+ * 后端终止失败时重试，仍失败则提示并重新拉取消息与后端状态收敛
+ */
+async function handleStop() {
+  const sessionId = currentSessionId.value
+  if (!sending.value || !sessionId) return
+  // 先中断前端流（避免继续渲染、不再自动续传），后端终止为独立请求不影响此步
+  stopMessage()
+  // 通知后端终止（失败重试），成功后再回读落库内容
+  const stopped = await requestStop(sessionId)
+  if (!stopped) {
+    ElMessage.error(t('business.chat.stopFail'))
+  }
+  // 稍候重新拉取消息：回显后端已落库的内容（status=2），避免占位一直显示"思考中"
+  setTimeout(() => {
+    if (currentSessionId.value === sessionId) {
+      reloadMessages()
+    }
+  }, 500)
+}
+
+/**
+ * 请求后端终止会话（最多重试 3 次，退避 300/600ms），返回是否成功
+ */
+async function requestStop(sessionId: number): Promise<boolean> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await stopStream(sessionId)
+      return true
+    } catch (e) {
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)))
+      }
+    }
+  }
+  return false
 }
 
 /** 展开/收起思考过程 */
@@ -1043,6 +1098,19 @@ onMounted(() => {
   align-items: center;
   color: #b0b3b8;
   font-style: italic;
+}
+
+/* 消息状态提示：生成失败 */
+.msg-status-tip {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #f56c6c;
+  background: #fef0f0;
 }
 
 /* 思考中：省略号逐点跳动，呈现滚动加载效果 */

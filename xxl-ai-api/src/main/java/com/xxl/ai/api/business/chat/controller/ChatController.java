@@ -57,4 +57,13 @@ public class ChatController {
         return chatService.resume(msgId, lastEventId);
     }
 
+    /**
+     * 主动终止会话（公开）：中断进行中的生成，并清理工具调用进程
+     */
+    @RequestMapping("/stop")
+    @XxlSso(login = false)
+    public Response<String> stop(@RequestParam("sessionId") long sessionId) {
+        return chatService.stop(sessionId);
+    }
+
 }

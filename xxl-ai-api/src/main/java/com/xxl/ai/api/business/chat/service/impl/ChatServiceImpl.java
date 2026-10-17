@@ -90,8 +90,14 @@ public class ChatServiceImpl implements ChatService {
             Agent agent = requireReadyAgent(uuid);
             Session session = sessionService.require(agent.getId(), sessionId);
             long msgId = sessionService.openRound(session, content);
-            // 任务队列属系统内部流转，使用 agent_id（uuid 仅用于 C 端投放入口）
-            chatStreamTool.submit(msgId, agent.getId(), sessionId, content);
+            try {
+                // 任务队列属系统内部流转，使用 agent_id（uuid 仅用于 C 端投放入口）
+                chatStreamTool.submit(msgId, agent.getId(), sessionId, content);
+            } catch (Exception submitError) {
+                // 投递失败：占位消息回填失败态，避免永远停留在生成中（无任务可消费）
+                sessionService.fail(msgId, sessionId);
+                throw submitError;
+            }
             return chatStreamTool.open(msgId, null);
         } catch (Exception e) {
             logger.warn("Agent 对话提交失败, uuid={}, err={}", uuid, e.getMessage());
@@ -108,6 +114,18 @@ public class ChatServiceImpl implements ChatService {
             return chatStreamTool.error("无效的会话流标识");
         }
         return chatStreamTool.open(msgId, lastEventId);
+    }
+
+    /**
+     * 主动终止本节点会话进行中的生成：标记终止 → 中断生成 → 回收工具调用进程（幂等，无进行中生成亦成功）
+     */
+    @Override
+    public Response<String> stop(long sessionId) {
+        if (sessionId <= 0) {
+            return Response.ofFail("无效的会话标识");
+        }
+        chatStreamTool.cancel(sessionId);
+        return Response.ofSuccess();
     }
 
 }

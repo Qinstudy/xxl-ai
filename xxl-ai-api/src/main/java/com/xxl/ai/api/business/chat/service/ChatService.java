@@ -43,4 +43,12 @@ public interface ChatService {
      */
     SseEmitter resume(long msgId, String lastEventId);
 
+    /**
+     * 主动终止本节点会话进行中的生成：标记终止 → 中断生成线程 → 回收工具调用进程
+     *
+     * 已生成的部分内容按失败状态回填（正文追加终止提示），生成侧写 done 终态结束结果流；
+     * 其他节点上的在途生成不受影响（无进行中生成时亦返回成功）。
+     */
+    Response<String> stop(long sessionId);
+
 }

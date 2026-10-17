@@ -1,8 +1,8 @@
 /**
- * 对话流式 composable：SSE 事件解析 + 断线自动续传
+ * 对话流式 composable：SSE 事件解析 + 断线自动续传 + 主动终止
  *
  * 发送/续传均返回可读流 reader，由本模块统一按 SSE 事件解析（stream/thinking/message/ping），
- * 中断时携带 msgId + lastEventId 自动续传（最多 3 次）。
+ * 中断时携带 msgId + lastEventId 自动续传（最多 3 次）；用户主动终止时不再续传。
  */
 import { ElMessage } from 'element-plus'
 import { resumeStream, sendStream } from '../api'
@@ -17,6 +17,11 @@ interface ChatStreamState {
 }
 
 export function useChatStream() {
+  /** 是否已被用户主动终止（终止后不再自动续传） */
+  let stopped = false
+  /** 当前流的取消控制器（终止时中断 fetch） */
+  let controller: AbortController | null = null
+
   /**
    * 发送消息并流式接收：打开流 → 解析并自动续传
    */
@@ -25,11 +30,13 @@ export function useChatStream() {
     onThinking: ChatStreamHandler,
     onContent: ChatStreamHandler
   ) {
-    const reader = await sendStream(payload.uuid, payload.visitorId, payload.sessionId, payload.content)
+    stopped = false
+    controller = new AbortController()
+    const reader = await sendStream(payload.uuid, payload.visitorId, payload.sessionId, payload.content, controller.signal)
     if (!reader) {
       throw new Error('empty stream')
     }
-    await streamWithResume(reader, {}, onThinking, onContent)
+    await streamWithResume(reader, {}, onThinking, onContent, () => stopped, controller.signal)
   }
 
   /**
@@ -37,28 +44,44 @@ export function useChatStream() {
    */
   async function resumeMessage(msgId: number, onThinking: ChatStreamHandler, onContent: ChatStreamHandler) {
     if (!msgId) return
-    const reader = await resumeStream(msgId)
+    stopped = false
+    controller = new AbortController()
+    const reader = await resumeStream(msgId, undefined, controller.signal)
     if (!reader) return
-    await streamWithResume(reader, { msgId }, onThinking, onContent)
+    await streamWithResume(reader, { msgId }, onThinking, onContent, () => stopped, controller.signal)
   }
 
-  return { sendMessage, resumeMessage }
+  /**
+   * 主动终止：标记不再续传并中断当前 fetch（后端终止由调用方经 stopStream 触发）
+   */
+  function stopMessage() {
+    stopped = true
+    controller?.abort()
+    controller = null
+  }
+
+  return { sendMessage, resumeMessage, stopMessage }
 }
 
 /**
  * 读取流并断线自动续传：正常结束（done/error 终态事件）返回；中断则携 msgId + lastEventId 续传（最多 3 次）
  *
- * @param reader 初始流（发送或续传获得）
- * @param state  流状态（stream 事件回填 msgId，内容事件推进 lastEventId）
+ * @param reader    初始流（发送或续传获得）
+ * @param state     流状态（stream 事件回填 msgId，内容事件推进 lastEventId）
+ * @param isStopped 是否已被用户主动终止（终止即不再续传）
+ * @param signal    取消信号（终止时中断 fetch）
  */
 async function streamWithResume(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
+  reader: ReadableStreamDefaultReader<Uint8Array> | null,
   state: ChatStreamState,
   onThinking: ChatStreamHandler,
-  onContent: ChatStreamHandler
+  onContent: ChatStreamHandler,
+  isStopped: () => boolean,
+  signal: AbortSignal
 ) {
   let attempts = 0
   while (reader) {
+    if (isStopped()) return
     let completed = false
     try {
       completed = await readStream(reader, onThinking, onContent, state)
@@ -66,13 +89,14 @@ async function streamWithResume(
       // 网络中断：进入续传分支
       completed = false
     }
-    if (completed) return
+    if (completed || isStopped()) return
     // 未正常结束且已获得 msgId：携带断点续传（最多 3 次）
     if (!state.msgId || attempts >= 3) return
     attempts++
     await new Promise((resolve) => setTimeout(resolve, 500 * attempts))
+    if (isStopped()) return
     try {
-      const resumed = await resumeStream(state.msgId, state.lastEventId)
+      const resumed = await resumeStream(state.msgId, state.lastEventId, signal)
       if (!resumed) return
       reader = resumed
     } catch (e) {

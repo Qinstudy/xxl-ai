@@ -19,7 +19,7 @@ public class SessionConstant {
     public static final int MSG_STATUS_GENERATING = 0;
     /** 消息状态：完成 */
     public static final int MSG_STATUS_DONE = 1;
-    /** 消息状态：失败 */
+    /** 消息状态：失败（含用户主动终止，保留已生成的部分内容） */
     public static final int MSG_STATUS_FAILED = 2;
 
 }
