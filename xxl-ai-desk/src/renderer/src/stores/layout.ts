@@ -4,14 +4,17 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export const useLayoutStore = defineStore('layout', () => {
-  /* 侧栏宽度约束与默认值 */
-  const DEFAULT_WIDTH = 292
-  const MIN_WIDTH = 220
-  const MAX_WIDTH = 560
-  const STORAGE_KEY = 'desk-sidebar-width'
+  /* 子菜单栏宽度：三个板块共用同一宽度（图标栏宽度另由 --desk-rail-width 计） */
+  const PANEL_DEFAULT_WIDTH = 240
+  const PANEL_MIN_WIDTH = 180
+  const PANEL_MAX_WIDTH = 520
+  const PANEL_STORAGE_KEY = 'desk-panel-width'
 
-  /* 侧栏是否折叠（折叠后宽度收为 0，内容区铺满） */
+  /* 侧栏是否折叠（折叠后仅保留左侧图标栏，内容区铺满） */
   const sidebarCollapsed = ref(false)
+
+  /* 系统设置子菜单当前选中项（独立于首页/插件，供侧栏与设置页共享） */
+  const settingsTab = ref('general')
 
   /* 底部终端面板是否展示（默认隐藏） */
   const terminalVisible = ref(false)
@@ -31,10 +34,12 @@ export const useLayoutStore = defineStore('layout', () => {
     browser: 480
   }
 
-  /* 侧栏宽度（持久化到 localStorage，下次启动沿用） */
-  const stored = Number(localStorage.getItem(STORAGE_KEY))
-  const sidebarWidth = ref(
-    Number.isFinite(stored) && stored >= MIN_WIDTH && stored <= MAX_WIDTH ? stored : DEFAULT_WIDTH
+  /* 子菜单栏宽度（三板块共用；持久化到 localStorage，越界回落默认值） */
+  const storedPanel = Number(localStorage.getItem(PANEL_STORAGE_KEY))
+  const panelWidth = ref(
+    Number.isFinite(storedPanel) && storedPanel >= PANEL_MIN_WIDTH && storedPanel <= PANEL_MAX_WIDTH
+      ? Math.round(storedPanel)
+      : PANEL_DEFAULT_WIDTH
   )
 
   /* 右侧侧栏（侧边任务）宽度约束与默认值 */
@@ -56,6 +61,16 @@ export const useLayoutStore = defineStore('layout', () => {
   /* 切换侧栏折叠状态 */
   function toggleSidebar(): void {
     sidebarCollapsed.value = !sidebarCollapsed.value
+  }
+
+  /* 展开侧栏（图标栏点击入口时还原完整子菜单栏） */
+  function expandSidebar(): void {
+    sidebarCollapsed.value = false
+  }
+
+  /* 设置系统设置子菜单选中项 */
+  function setSettingsTab(tab: string): void {
+    settingsTab.value = tab
   }
 
   /* 切换底部终端面板显隐 */
@@ -88,11 +103,17 @@ export const useLayoutStore = defineStore('layout', () => {
     rightPanelMaximized.value = !rightPanelMaximized.value
   }
 
-  /* 设置侧栏宽度（夹取到合理区间并持久化） */
-  function setSidebarWidth(width: number): void {
-    const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, Math.round(width)))
-    sidebarWidth.value = next
-    localStorage.setItem(STORAGE_KEY, String(next))
+  /* 设置子菜单栏宽度（夹取到合理区间并持久化） */
+  function setPanelWidth(width: number): void {
+    const next = Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, Math.round(width)))
+    panelWidth.value = next
+    localStorage.setItem(PANEL_STORAGE_KEY, String(next))
+  }
+
+  /* 恢复子菜单栏默认宽度（双击拖拽手柄触发） */
+  function resetPanelWidth(): void {
+    panelWidth.value = PANEL_DEFAULT_WIDTH
+    localStorage.setItem(PANEL_STORAGE_KEY, String(PANEL_DEFAULT_WIDTH))
   }
 
   /* 设置右侧侧栏宽度（夹取到合理区间并持久化） */
@@ -104,19 +125,23 @@ export const useLayoutStore = defineStore('layout', () => {
 
   return {
     sidebarCollapsed,
-    sidebarWidth,
+    panelWidth,
+    settingsTab,
     terminalVisible,
     rightPanelVisible,
     rightPanelTool,
     rightPanelMaximized,
     rightPanelWidth,
     toggleSidebar,
+    expandSidebar,
+    setSettingsTab,
+    setPanelWidth,
+    resetPanelWidth,
     toggleTerminal,
     openTerminal,
     toggleRightPanel,
     openRightPanelTool,
     toggleRightPanelMaximized,
-    setSidebarWidth,
     setRightPanelWidth
   }
 })

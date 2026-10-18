@@ -3,6 +3,7 @@
 import { onBeforeUnmount, onMounted } from 'vue'
 import Sidebar from '@renderer/modules/chat/components/Sidebar.vue'
 import ApprovalDialog from '@renderer/components/ApprovalDialog.vue'
+import AppTopbar from '@renderer/components/AppTopbar.vue'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useChatStore } from '@renderer/stores/chat'
 import { useProjectStore } from '@renderer/stores/project'
@@ -71,10 +72,16 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="desk-shell">
-    <Sidebar />
-    <div class="desk-main">
-      <RouterView />
+    <!-- 全局顶栏：红黄绿（系统）+ 后退/前进 + 折叠按钮；页面标题/操作随路由展示 -->
+    <AppTopbar />
+
+    <div class="desk-body">
+      <Sidebar />
+      <div class="desk-main">
+        <RouterView />
+      </div>
     </div>
+
     <!-- 越界访问审批：全局应用内对话框 -->
     <ApprovalDialog />
 

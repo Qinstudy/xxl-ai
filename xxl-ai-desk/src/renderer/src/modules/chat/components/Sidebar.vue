@@ -1,19 +1,20 @@
 <script setup lang="ts">
 /* 左侧会话栏：新建 / 搜索 / 项目分组（项目下挂会话）/ 底部操作 */
 import { computed, nextTick, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useChatStore } from '@renderer/stores/chat'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useProjectStore } from '@renderer/stores/project'
 import { useLayoutStore } from '@renderer/stores/layout'
 import { useQuickAction } from '@renderer/composables/useQuickAction'
+import { usePanelResize } from '@renderer/composables/usePanelResize'
 import { t } from '@renderer/i18n'
 import { formatShortcut } from '@renderer/utils/shortcut'
-import logo from '@renderer/assets/icon.png'
 import type { ProjectDTO, QuickAction, SessionDTO } from '@shared/ipc'
 
 const router = useRouter()
+const route = useRoute()
 const chat = useChatStore()
 const settings = useSettingsStore()
 const project = useProjectStore()
@@ -244,27 +245,74 @@ async function onDelete(id: string): Promise<void> {
   }
 }
 
-/* 跳转设置页 */
-function goSettings(): void {
-  router.push('/settings')
+/* 当前所属一级板块：首页 / 插件 / 系统设置（决定图标栏高亮与子菜单内容） */
+const section = computed<'home' | 'plugin' | 'settings'>(() => {
+  if (route.path.startsWith('/settings')) {
+    return 'settings'
+  }
+  if (route.path.startsWith('/plugin')) {
+    return 'plugin'
+  }
+  return 'home'
+})
+
+/* 系统设置子菜单：设置分类（与设置页共享 layout.settingsTab） */
+const settingsTabs = [
+  { name: 'general', label: 'settings.general' },
+  { name: 'personalization', label: 'settings.personalization' },
+  { name: 'providers', label: 'settings.providers' },
+  { name: 'about', label: 'settings.about' }
+]
+
+/* 图标栏点击「首页」：展开子菜单栏并回到对话页 */
+function onRailHome(): void {
+  layout.expandSidebar()
+  if (route.path !== '/') {
+    router.push('/')
+  }
 }
 
-/* 拖拽右边缘调整侧栏宽度（拖拽期间禁用过渡与选中） */
-function startResize(event: MouseEvent): void {
-  event.preventDefault()
-  const startX = event.clientX
-  const startWidth = layout.sidebarWidth
-  const onMove = (e: MouseEvent): void => {
-    layout.setSidebarWidth(startWidth + (e.clientX - startX))
+/* 图标栏点击「插件」：展开子菜单栏并进入插件板块 */
+function onRailPlugin(): void {
+  layout.expandSidebar()
+  if (!route.path.startsWith('/plugin')) {
+    router.push('/plugin/mcp')
   }
-  const onUp = (): void => {
-    window.removeEventListener('mousemove', onMove)
-    window.removeEventListener('mouseup', onUp)
-    document.body.classList.remove('resizing')
+}
+
+/* 图标栏点击「系统设置」：展开子菜单栏并进入系统设置 */
+function onRailSettings(): void {
+  layout.expandSidebar()
+  if (!route.path.startsWith('/settings')) {
+    router.push('/settings')
   }
-  window.addEventListener('mousemove', onMove)
-  window.addEventListener('mouseup', onUp)
-  document.body.classList.add('resizing')
+}
+
+/* 插件子菜单：切换 MCP插件 / SKILL技能 正文 */
+function goPlugin(path: string): void {
+  if (route.path !== path) {
+    router.push(path)
+  }
+}
+
+/* 系统设置子菜单：切换设置分类并进入系统设置 */
+function goSettingsTab(name: string): void {
+  layout.setSettingsTab(name)
+  if (route.path !== '/settings') {
+    router.push('/settings')
+  }
+}
+
+/* 拖拽右边缘调整子菜单栏宽度（统一复用 usePanelResize） */
+const { startResize } = usePanelResize({
+  getWidth: () => layout.panelWidth,
+  setWidth: layout.setPanelWidth,
+  edge: 'left'
+})
+
+/* 双击拖拽手柄：恢复子菜单栏默认宽度 */
+function resetPanelWidth(): void {
+  layout.resetPanelWidth()
 }
 </script>
 
@@ -272,27 +320,77 @@ function startResize(event: MouseEvent): void {
   <aside
     class="desk-sidebar"
     :class="{ collapsed: layout.sidebarCollapsed }"
-    :style="{ width: layout.sidebarCollapsed ? '0px' : `${layout.sidebarWidth}px` }"
+    :style="{
+      width: layout.sidebarCollapsed
+        ? 'var(--desk-rail-width)'
+        : `calc(var(--desk-rail-width) + ${layout.panelWidth}px)`
+    }"
   >
-    <!-- 右边缘拖拽手柄：调整侧栏宽度 -->
-    <div v-if="!layout.sidebarCollapsed" class="sidebar-resizer" @mousedown="startResize"></div>
+    <!-- 常驻图标栏（活动栏）：首页 / 插件 / 底部系统设置 -->
+    <nav class="sidebar-rail">
+      <div class="rail-group">
+        <button
+          class="rail-btn"
+          :class="{ active: section === 'home' }"
+          :title="t('chat.home')"
+          @click="onRailHome"
+        >
+          <el-icon><HomeFilled /></el-icon>
+        </button>
+        <button
+          class="rail-btn"
+          :class="{ active: section === 'plugin' }"
+          :title="t('plugin.title')"
+          @click="onRailPlugin"
+        >
+          <!-- 插件：带插头的图标 -->
+          <svg class="rail-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 22v-5" />
+            <path d="M9 8V2" />
+            <path d="M15 8V2" />
+            <path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z" />
+          </svg>
+        </button>
+      </div>
+      <div class="rail-group">
+        <button
+          class="rail-btn"
+          :class="{ active: section === 'settings' }"
+          :title="t('settings.title')"
+          @click="onRailSettings"
+        >
+          <el-icon><Setting /></el-icon>
+        </button>
+      </div>
+    </nav>
 
-    <div class="sidebar-head" :class="{ mac: settings.platform === 'darwin' }">
-      <div class="brand">
-        <img class="brand-logo" :src="logo" alt="logo" />
-        <div class="brand-text">
-          <div class="brand-name">{{ settings.settings.appName || t('app.name') }}</div>
+    <!-- 列表面板：折叠时隐藏，仅保留左侧图标栏 -->
+    <div v-show="!layout.sidebarCollapsed" class="sidebar-panel">
+      <!-- 右边缘拖拽手柄：拖拽调整面板宽度，双击恢复默认宽度 -->
+      <div
+        class="sidebar-resizer"
+        :title="t('chat.resetPanelWidth')"
+        @mousedown="startResize"
+        @dblclick="resetPanelWidth"
+      ></div>
+
+      <!-- 首页子菜单：项目 / 会话 -->
+      <template v-if="section === 'home'">
+      <div class="sidebar-head">
+        <div class="brand">
+          <div class="brand-text">
+            <div class="brand-name">{{ settings.settings.appName || t('app.name') }}</div>
+          </div>
+          <!-- 搜索入口：位于标题右侧，打开命令面板 -->
+          <el-icon class="brand-search" :title="t('common.search')" @click="openSearch">
+            <Search />
+          </el-icon>
         </div>
-        <!-- 搜索入口：位于 Logo 区域右侧，打开命令面板 -->
-        <el-icon class="brand-search" :title="t('common.search')" @click="openSearch">
-          <Search />
-        </el-icon>
+        <div class="new-btn" @click="onNew">
+          <el-icon class="new-icon"><Edit /></el-icon>
+          <span class="new-btn-label">{{ t('chat.newChatAction') }}</span>
+        </div>
       </div>
-      <div class="new-btn" @click="onNew">
-        <el-icon class="new-icon"><Edit /></el-icon>
-        <span class="new-btn-label">{{ t('chat.newChatAction') }}</span>
-      </div>
-    </div>
 
     <!-- 「项目:」标题：右侧 排序（...）与 + 新建项目，鼠标悬浮展示 -->
     <div class="project-head">
@@ -378,12 +476,48 @@ function startResize(event: MouseEvent): void {
       </div>
       <el-empty v-if="projectGroups.length === 0" :description="t('project.empty')" :image-size="60" />
     </el-scrollbar>
+      </template>
 
-    <div class="sidebar-foot">
-      <el-button text class="foot-btn" :title="t('settings.title')" @click="goSettings">
-        <el-icon><Setting /></el-icon>
-        <span class="foot-label">{{ t('settings.title') }}</span>
-      </el-button>
+      <!-- 插件子菜单：MCP插件 / SKILL技能 -->
+      <template v-else-if="section === 'plugin'">
+        <div class="panel-head">
+          <div class="panel-title">{{ t('plugin.title') }}</div>
+        </div>
+        <el-scrollbar class="sidebar-list">
+          <div
+            class="menu-item"
+            :class="{ active: route.path === '/plugin/mcp' }"
+            @click="goPlugin('/plugin/mcp')"
+          >
+            <span class="menu-label">{{ t('plugin.mcp') }}</span>
+          </div>
+          <div
+            class="menu-item"
+            :class="{ active: route.path === '/plugin/skill' }"
+            @click="goPlugin('/plugin/skill')"
+          >
+            <span class="menu-label">{{ t('plugin.skill') }}</span>
+          </div>
+        </el-scrollbar>
+      </template>
+
+      <!-- 系统设置子菜单：设置分类 -->
+      <template v-else>
+        <div class="panel-head">
+          <div class="panel-title">{{ t('settings.title') }}</div>
+        </div>
+        <el-scrollbar class="sidebar-list">
+          <div
+            v-for="tab in settingsTabs"
+            :key="tab.name"
+            class="menu-item"
+            :class="{ active: layout.settingsTab === tab.name }"
+            @click="goSettingsTab(tab.name)"
+          >
+            <span class="menu-label">{{ t(tab.label) }}</span>
+          </div>
+        </el-scrollbar>
+      </template>
     </div>
 
     <!-- 搜索命令面板：项目/会话关键字搜索 + 推荐入口 -->
@@ -464,13 +598,122 @@ function startResize(event: MouseEvent): void {
 </template>
 
 <style scoped lang="scss">
-.sidebar-head {
-  padding: 10px 16px 12px;
-  /* macOS 隐藏标题栏后，顶部区域需可拖拽移动窗口（系统红黄绿按钮不受影响） */
-  -webkit-app-region: drag;
+/* 常驻图标栏（活动栏）：固定宽度，顶部入口组 + 底部设置；与顶部栏同色（最深） */
+.sidebar-rail {
+  flex-shrink: 0;
+  width: var(--desk-rail-width);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0 8px;
+  background: var(--desk-chrome-bg);
 }
 
-/* 右边缘拖拽手柄：调整侧栏宽度 */
+.rail-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.rail-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--desk-text-secondary);
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.rail-btn:hover {
+  background: var(--desk-primary-soft);
+  color: var(--desk-text);
+}
+
+.rail-btn.active {
+  background: var(--desk-primary-soft);
+  color: var(--desk-text);
+}
+
+/* 插件图标（内联 SVG）：随按钮文字色着色 */
+.rail-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 子菜单标题（插件 / 系统设置）：字体与首页标题保持一致 */
+.panel-head {
+  padding: 10px 16px 12px;
+}
+
+.panel-title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 32px;
+  color: var(--desk-text);
+}
+
+/* 子菜单项：插件 / 系统设置 分类 */
+.menu-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  margin-bottom: 2px;
+  border-radius: 10px;
+  cursor: pointer;
+  color: var(--desk-text-secondary);
+  font-size: 14px;
+  transition: background 0.15s ease;
+}
+
+.menu-item:hover {
+  background: var(--desk-primary-soft);
+}
+
+.menu-item.active {
+  background: var(--desk-primary-soft);
+  color: var(--desk-text);
+}
+
+.menu-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 列表面板：图标栏右侧，折叠时隐藏；与右侧正文之间保留间隔线 */
+.sidebar-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--desk-border);
+}
+
+.sidebar-head {
+  padding: 10px 16px 12px;
+}
+
+/* 右边缘拖拽手柄：调整面板宽度 */
 .sidebar-resizer {
   position: absolute;
   top: 0;
@@ -487,11 +730,6 @@ body.resizing .sidebar-resizer {
   background: var(--desk-primary-soft);
 }
 
-/* macOS：顶部让出系统红黄绿按钮，并使品牌 Logo 顶部与右侧正文区顶部对齐 */
-.sidebar-head.mac {
-  padding-top: var(--desk-header-height);
-}
-
 .brand {
   display: flex;
   align-items: center;
@@ -506,14 +744,6 @@ body.resizing .sidebar-resizer {
   min-width: 0;
 }
 
-.brand-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  object-fit: contain;
-  flex-shrink: 0;
-}
-
 .brand-name {
   font-size: 18px;
   font-weight: 600;
@@ -523,7 +753,7 @@ body.resizing .sidebar-resizer {
   white-space: nowrap;
 }
 
-/* Logo 区域右侧搜索入口 */
+/* 标题右侧搜索入口 */
 .brand-search {
   flex-shrink: 0;
   font-size: 16px;
@@ -569,7 +799,7 @@ body.resizing .sidebar-resizer {
 }
 
 .project-label {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--desk-text-tertiary);
 }
@@ -826,58 +1056,5 @@ body.resizing .sidebar-resizer {
 
 .op:hover {
   color: var(--desk-primary);
-}
-
-.sidebar-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 12px;
-  border-top: 1px solid var(--desk-border);
-}
-
-.foot-btn {
-  color: var(--desk-text-secondary);
-}
-
-/* --- 折叠为窄图标栏：隐藏文字与列表，仅保留图标操作 --- */
-.desk-sidebar.collapsed .sidebar-head {
-  padding-left: 8px;
-  padding-right: 8px;
-}
-
-.desk-sidebar.collapsed .brand {
-  justify-content: center;
-  padding-left: 0;
-  margin-bottom: 12px;
-}
-
-.desk-sidebar.collapsed .brand-text,
-.desk-sidebar.collapsed .new-btn-label,
-.desk-sidebar.collapsed .foot-label,
-.desk-sidebar.collapsed .project-head,
-.desk-sidebar.collapsed .sidebar-list {
-  display: none;
-}
-
-.desk-sidebar.collapsed .new-btn {
-  width: 36px;
-  margin: 0 auto;
-  padding: 0;
-  height: 36px;
-  justify-content: center;
-}
-
-.desk-sidebar.collapsed .sidebar-foot {
-  /* 折叠态列表隐藏后无占位，靠 margin-top 将操作区压到左下角 */
-  margin-top: auto;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 4px 8px;
-}
-
-.desk-sidebar.collapsed .foot-btn {
-  padding: 6px;
 }
 </style>

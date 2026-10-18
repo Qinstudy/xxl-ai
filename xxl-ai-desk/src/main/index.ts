@@ -40,8 +40,8 @@ function createWindow(): void {
     ...(isMac
       ? {
           titleBarStyle: 'hidden' as const,
-          /* 红黄绿窗口按钮垂直居中于右侧标题栏高度（45px），水平位置与侧栏左内边距对齐 */
-          trafficLightPosition: { x: 14, y: 16 }
+          /* 红黄绿窗口按钮垂直居中于顶部栏（38px），水平位置与左内边距对齐 */
+          trafficLightPosition: { x: 14, y: 13 }
         }
       : appIconPath
         ? { icon: appIconPath }

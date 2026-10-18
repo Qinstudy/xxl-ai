@@ -161,6 +161,53 @@ com/xxl/ai/api/business/harness          ← 运行时支撑层：无 controller
 - Vue：界面文件 `modules/{framework|business}/{domain}/{module}/pages/{xxx}(/index).vue` 建好后，登录后由 `/getRouters` 按当前用户角色下发菜单资源构建动态路由；`url` 同时充当路由 path 与前端组件定位 key，前端 `loadView` 按 `modules/` 下相对路径（自动剥离 `framework/`/`business/` 与 `pages/` 段）映射对应页面（如 `/system/user` → `modules/framework/system/user/pages/index.vue`）。
 - 新增平台菜单：在 `XxlRoleEnum#buildRoleResources` 对应角色分支中追加 `Resource` 项（`url` 指向页面路径），即可对该角色可见、无需改路由与数据库。
 
+### 4.5 Desk 本地版界面外壳规范
+
+本地版（`xxl-ai-desk`，Electron + Vue3）采用「**全局顶栏 + 常驻图标栏 + 子菜单栏 + 正文**」三段式外壳，新增/改造界面须遵循：
+
+**布局结构**
+
+```
+desk-shell（纵向）
+├─ AppTopbar   全局顶栏（贯通整窗、固定最顶部）
+└─ desk-body（横向）
+   ├─ Sidebar  左侧栏 = 常驻图标栏(活动栏) + 子菜单栏(可折叠/可拖拽)
+   └─ desk-main 正文区
+```
+
+**全局顶栏（`components/AppTopbar.vue`）**
+
+- 贯通整窗、固定最顶部，内容：macOS 红黄绿预留（mac 下 `padding-left: 80px`）+ `NavControls`（后退/前进/折叠）+ 路由相关标题与操作。
+- 标题/操作随路由：首页=会话标题+重命名/删除、右侧终端/侧栏开关；插件=「插件」；系统设置=「系统设置」。
+- 标题与 `NavControls` 之间以细分隔线（｜）分隔，**仅在有标题时展示**（`hasTitle` 判定）。
+- 顶栏整体为窗口拖拽区（`-webkit-app-region: drag`），交互控件一律 `no-drag`。
+
+**左侧栏（`modules/chat/components/Sidebar.vue`）**
+
+- **常驻图标栏（活动栏，`--desk-rail-width`）**：首页 / 插件 /（底部）系统设置；三个板块**功能隔离**，各自独立子菜单与正文。
+- **子菜单栏**（可折叠、可拖拽宽度）：按板块渲染——首页→项目/会话；插件→MCP插件 / SKILL技能；系统设置→通用/个性化/供应商/关于；**三个板块共用同一宽度**（`layout.panelWidth` 持久化，一处拖拽调整即全局生效），**双击拖拽手柄恢复默认宽度**。
+- 折叠按钮收起「子菜单栏」，图标栏**常驻**；板块切换时展开子菜单栏。
+- 子菜单顶部标题字体统一（18px/600），**不展示 Logo**；子菜单内文案（分组标题如「项目:」、条目名、新建对话）**字号一致**（14px）。
+
+**配色分层（靠颜色区分，不用分隔线）**
+
+| 区域 | 令牌 |
+|---|---|
+| 图标栏 + 顶部栏（最深，且同色） | `--desk-chrome-bg` |
+| 子菜单栏（略浅于图标栏） | `--desk-panel-bg` |
+| 正文（白色） | `--desk-bg` |
+
+- 图标栏 / 顶栏 / 子菜单栏之间**不加带颜色的分隔线**，仅靠底色深浅区分；仅「子菜单栏 ↔ 正文」保留 1px `--desk-border` 间隔线。
+
+**尺寸令牌**（`styles/tokens.scss`）
+
+- `--desk-header-height`：顶栏高度；`--desk-rail-width`：图标栏宽度。
+
+**新增板块/页面**
+
+- 新增板块：图标栏加按钮（含选中态）+ `Sidebar` 加子菜单分支 + `router/index.ts` 登记路由 + 正文模块页 `modules/{module}/pages/index.vue`。
+- 图标：折叠按钮用「侧栏面板」SVG，插件入口用「插头」SVG；文案一律 `t()` 引用，zh/en 成对。
+
 ## 五、新功能开发标准流程
 
 1. **建表**：数据库新建 `xxl_ai_*` 业务表（规范见 6.5）。

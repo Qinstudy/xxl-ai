@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* 设置页：常规 + 个性化 + 供应商管理 */
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useLayoutStore } from '@renderer/stores/layout'
@@ -18,14 +18,11 @@ import type {
 } from '@shared/ipc'
 
 const route = useRoute()
-const router = useRouter()
 const settings = useSettingsStore()
 const layout = useLayoutStore()
-/* 当前选中的设置标签页 */
-const activeTab = ref('general')
-/* 支持从对话页「+新建供应商」跳转直达供应商 TAB */
+/* 支持从对话页「+新建供应商」跳转直达供应商 TAB（选中项由左侧子菜单共享） */
 if (typeof route.query.tab === 'string' && route.query.tab) {
-  activeTab.value = route.query.tab
+  layout.setSettingsTab(route.query.tab)
 }
 
 /* --- 常规：主题 / 语言切换后立即生效（无需保存） --- */
@@ -444,36 +441,13 @@ async function removeProvider(row: ProviderDTO): Promise<void> {
 async function toggleProvider(row: ProviderDTO, value: boolean): Promise<void> {
   await settings.saveProvider({ id: row.id, enabled: value })
 }
-
-/* 返回对话页 */
-function back(): void {
-  router.push('/')
-}
 </script>
 
 <template>
   <div class="settings-page">
-    <header
-      class="settings-header"
-      :class="{ 'mac-collapsed': settings.platform === 'darwin' && layout.sidebarCollapsed }"
-    >
-      <button
-        class="sidebar-toggle"
-        :title="layout.sidebarCollapsed ? t('chat.expandSidebar') : t('chat.collapseSidebar')"
-        @click="layout.toggleSidebar"
-      >
-        <el-icon><Expand v-if="layout.sidebarCollapsed" /><Fold v-else /></el-icon>
-      </button>
-      <el-button text @click="back">
-        <el-icon><ArrowLeft /></el-icon>
-        {{ t('settings.back') }}
-      </el-button>
-      <div class="settings-title">{{ t('settings.title') }}</div>
-    </header>
-
     <el-scrollbar class="settings-body">
       <div class="settings-inner">
-        <el-tabs v-model="activeTab">
+        <el-tabs v-model="layout.settingsTab" class="settings-tabs">
           <!-- 通用 -->
           <el-tab-pane :label="t('settings.general')" name="general">
             <el-form label-position="top" class="settings-form">
@@ -835,34 +809,14 @@ function back(): void {
   --el-font-size-base: 14px;
 }
 
-.settings-header {
-  height: var(--desk-header-height);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--desk-border);
-  /* 顶栏可拖拽移动窗口（返回按钮除外） */
-  -webkit-app-region: drag;
-}
-
-/* 侧栏折叠后标题栏顶到窗口最左侧：macOS 下为红黄绿按钮预留宽度，避免与折叠按钮重叠 */
-.settings-header.mac-collapsed {
-  padding-left: 80px;
-}
-
-.settings-header :deep(.el-button) {
-  -webkit-app-region: no-drag;
-}
-
-.settings-title {
-  font-size: 16px;
-  font-weight: 600;
-}
-
+/* 顶栏可拖拽移动窗口（导航控件除外） */
 .settings-body {
   flex: 1;
+}
+
+/* 设置分类已移至左侧子菜单：隐藏内嵌 Tabs 头部，仅渲染当前分类内容 */
+.settings-tabs :deep(.el-tabs__header) {
+  display: none;
 }
 
 .settings-inner {

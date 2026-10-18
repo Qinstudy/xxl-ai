@@ -18,6 +18,16 @@ const router = createRouter({
       component: () => import('@renderer/modules/settings/pages/index.vue')
     },
     {
+      path: '/plugin/mcp',
+      name: 'plugin-mcp',
+      component: () => import('@renderer/modules/plugin/pages/index.vue')
+    },
+    {
+      path: '/plugin/skill',
+      name: 'plugin-skill',
+      component: () => import('@renderer/modules/plugin/pages/index.vue')
+    },
+    {
       /* 未匹配路由兜底到对话首页 */
       path: '/:pathMatch(.*)*',
       redirect: '/'

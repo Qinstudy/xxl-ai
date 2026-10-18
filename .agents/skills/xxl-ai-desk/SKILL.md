@@ -362,6 +362,49 @@ export const useWidgetStore = defineStore('widget', () => {
 - 组件导入名与模板标签统一 PascalCase；用户可见文案一律 `t('key')`，禁止硬编码中文（注释除外）。
 - i18n 单一来源 `i18n/locales/{zh,en}.json`（`vue-i18n` 组合式），语言由设置驱动（`setLanguage`，重启/切换后生效）；zh/en 成对提交。
 
+## 界面外壳与导航规范（Desk UI）
+
+新建/改造页面须遵循既有「**全局顶栏 + 常驻图标栏 + 子菜单栏 + 正文**」三段式外壳，勿另起结构。
+
+```
+desk-shell（纵向）
+├─ AppTopbar   全局顶栏（贯通整窗、固定最顶部）
+└─ desk-body（横向）
+   ├─ Sidebar  左侧栏 = 常驻图标栏(活动栏) + 子菜单栏(可折叠/可拖拽)
+   └─ desk-main 正文区
+```
+
+### 全局顶栏（`components/AppTopbar.vue`）
+
+- 贯通整窗、固定最顶部：macOS 红黄绿预留（mac 下 `padding-left: 80px`）+ `NavControls`（后退/前进/折叠）+ 路由相关标题与操作。
+- 标题/操作随路由：首页=会话标题 + 重命名/删除、右侧终端/侧栏开关；插件=「插件」；系统设置=「系统设置」。
+- 标题与 `NavControls` 之间以细分隔线（｜）分隔，**仅在有标题时展示**（`hasTitle` 判定）；其他需要标题的场景同理。
+- 顶栏整体为窗口拖拽区（`-webkit-app-region: drag`），交互控件一律 `no-drag`。
+
+### 左侧栏（`modules/chat/components/Sidebar.vue`）
+
+- **常驻图标栏（活动栏，`--desk-rail-width`）**：首页 / 插件 /（底部）系统设置；三个板块**功能隔离**，各自独立子菜单与正文，互不复用子菜单内容。
+- **子菜单栏**（可折叠、可拖拽宽度）：按板块渲染——首页→项目/会话；插件→MCP插件 / SKILL技能；系统设置→通用/个性化/供应商/关于；**三个板块共用同一宽度**（`layout.panelWidth` 持久化，一处拖拽调整即全局生效），**双击拖拽手柄恢复默认宽度**。
+- 折叠按钮收起「子菜单栏」，图标栏**常驻**；点击任一板块展开子菜单栏并切换正文。
+- 子菜单顶部标题字体统一（18px/600），**不展示 Logo**；子菜单内文案（分组标题如「项目:」、条目名、新建对话）**字号一致**（14px）。
+
+### 配色分层（靠颜色区分，不用分隔线）
+
+| 区域 | 令牌（`styles/tokens.scss`） |
+|---|---|
+| 图标栏 + 顶部栏（最深，且同色） | `--desk-chrome-bg` |
+| 子菜单栏（略浅于图标栏） | `--desk-panel-bg` |
+| 正文（白色） | `--desk-bg` |
+
+- 图标栏 / 顶栏 / 子菜单栏之间**不加带颜色的分隔线**，仅靠底色深浅区分；仅「子菜单栏 ↔ 正文」保留 1px `--desk-border` 间隔线。
+- 尺寸令牌：`--desk-header-height`（顶栏高度）、`--desk-rail-width`（图标栏宽度）。
+
+### 新增板块 / 页面
+
+- 新增板块：图标栏加按钮（含选中态）+ `Sidebar` 加子菜单分支 + `router/index.ts` 登记路由 + 正文模块页 `modules/{module}/pages/index.vue`；板块选中态按路由判定。
+- 拆分享状态：跨「左侧子菜单 ↔ 页面」的选中态收敛到 store（如设置分类 `layout.settingsTab`），勿各自维护。
+- 图标：折叠按钮用「侧栏面板」SVG，插件入口用「插头」SVG（Element Plus 无对应图标，内联 SVG 随 `currentColor` 着色）。
+
 ## Agent 运行时（新增内置工具 / 沙箱能力）
 
 新增 Agent 能力落在 `src/main/agent/`，**不改 IPC**；注意按进程归属落位：主进程侧能力入 `agent/host/`，运行时进程侧入 `agent/worker/`。
