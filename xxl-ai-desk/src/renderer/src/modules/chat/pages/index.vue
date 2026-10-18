@@ -274,11 +274,13 @@ async function onRemoveMessage(message: { id: string }): Promise<void> {
         :class="{ maximized: layout.rightPanelMaximized }"
         :style="layout.rightPanelMaximized ? undefined : { width: `${layout.rightPanelWidth}px` }"
       >
-        <!-- 左边缘拖拽手柄：调整侧栏宽度（放大态下不可拖拽） -->
+        <!-- 左边缘拖拽手柄：拖拽调整侧栏宽度，双击恢复默认宽度（放大态下不可拖拽） -->
         <div
           v-if="!layout.rightPanelMaximized"
           class="side-panel-resizer"
+          :title="t('layout.resetPanelWidth')"
           @mousedown="startPanelResize"
+          @dblclick="layout.resetRightPanelWidth"
         ></div>
         <RightPanel :root="terminalProject?.path" :project-name="terminalProject?.name" />
       </aside>

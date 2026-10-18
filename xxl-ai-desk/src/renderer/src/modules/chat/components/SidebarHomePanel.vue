@@ -469,16 +469,17 @@ async function onDelete(id: string): Promise<void> {
   color: var(--desk-primary);
 }
 
-/* 新建对话：与会话条目同款列表行（同字号/内边距/圆角），悬浮高亮 */
+/* 新建对话：与会话条目同款列表行，文字色/字重对齐选中项目名（近黑 + 加粗） */
 .new-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 6px 12px 6px 0;
   border-radius: 10px;
   cursor: pointer;
-  color: var(--desk-text-secondary);
+  color: var(--desk-text);
   font-size: 14px;
+  font-weight: 600;
   transition: background 0.15s ease;
   -webkit-app-region: no-drag;
 }

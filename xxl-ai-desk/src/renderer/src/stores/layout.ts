@@ -86,6 +86,7 @@ export const useLayoutStore = defineStore('layout', () => {
     rightPanelTool,
     rightPanelMaximized,
     rightPanelWidth: rightPanel.width,
+    resetRightPanelWidth: rightPanel.resetWidth,
     toggleSidebar,
     expandSidebar,
     toggleTerminal,

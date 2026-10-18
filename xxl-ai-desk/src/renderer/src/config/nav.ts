@@ -6,10 +6,11 @@
 /* 一级板块标识 */
 export type SectionKey = 'home' | 'plugin' | 'settings'
 
-/* 子菜单项：path 用于路由跳转；tab 用于设置分类切换（二者取其一） */
+/* 子菜单项：icon 为已全局注册的图标组件名；path 用于路由跳转；tab 用于设置分类切换 */
 export interface NavItem {
   key: string
   labelKey: string
+  icon?: string
   path?: string
   tab?: string
 }
@@ -29,8 +30,8 @@ export const NAV_SECTIONS: Record<'plugin' | 'settings', NavSection> = {
     titleKey: 'plugin.title',
     entryPath: '/plugin/mcp',
     items: [
-      { key: 'mcp', labelKey: 'plugin.mcp', path: '/plugin/mcp' },
-      { key: 'skill', labelKey: 'plugin.skill', path: '/plugin/skill' }
+      { key: 'mcp', labelKey: 'plugin.mcp', icon: 'Connection', path: '/plugin/mcp' },
+      { key: 'skill', labelKey: 'plugin.skill', icon: 'MagicStick', path: '/plugin/skill' }
     ]
   },
   settings: {
@@ -38,10 +39,15 @@ export const NAV_SECTIONS: Record<'plugin' | 'settings', NavSection> = {
     titleKey: 'settings.title',
     entryPath: '/settings',
     items: [
-      { key: 'general', labelKey: 'settings.general', tab: 'general' },
-      { key: 'personalization', labelKey: 'settings.personalization', tab: 'personalization' },
-      { key: 'providers', labelKey: 'settings.providers', tab: 'providers' },
-      { key: 'about', labelKey: 'settings.about', tab: 'about' }
+      { key: 'general', labelKey: 'settings.general', icon: 'Setting', tab: 'general' },
+      {
+        key: 'personalization',
+        labelKey: 'settings.personalization',
+        icon: 'User',
+        tab: 'personalization'
+      },
+      { key: 'providers', labelKey: 'settings.providers', icon: 'Cpu', tab: 'providers' },
+      { key: 'about', labelKey: 'settings.about', icon: 'InfoFilled', tab: 'about' }
     ]
   }
 }

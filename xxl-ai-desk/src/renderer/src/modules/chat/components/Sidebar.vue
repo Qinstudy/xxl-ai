@@ -85,6 +85,7 @@ function onSubmenuSelect(item: NavItem): void {
         :title-key="submenu.titleKey"
         :items="submenu.items"
         :active-key="activeKey"
+        :bold="section === 'plugin'"
         @select="onSubmenuSelect"
       />
     </div>

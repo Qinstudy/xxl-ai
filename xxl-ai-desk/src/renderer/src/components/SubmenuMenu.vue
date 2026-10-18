@@ -6,7 +6,8 @@
 import { t } from '@renderer/i18n'
 import type { NavItem } from '@renderer/config/nav'
 
-defineProps<{ titleKey: string; items: NavItem[]; activeKey: string }>()
+/* bold：子菜单名是否加粗（插件板块为 true，系统设置板块为 false） */
+defineProps<{ titleKey: string; items: NavItem[]; activeKey: string; bold?: boolean }>()
 const emit = defineEmits<{ select: [item: NavItem] }>()
 </script>
 
@@ -19,9 +20,10 @@ const emit = defineEmits<{ select: [item: NavItem] }>()
       v-for="item in items"
       :key="item.key"
       class="menu-item"
-      :class="{ active: item.key === activeKey }"
+      :class="{ active: item.key === activeKey, 'is-bold': bold }"
       @click="emit('select', item)"
     >
+      <el-icon v-if="item.icon" class="menu-icon"><component :is="item.icon" /></el-icon>
       <span class="menu-label">{{ t(item.labelKey) }}</span>
     </div>
   </el-scrollbar>
@@ -40,17 +42,23 @@ const emit = defineEmits<{ select: [item: NavItem] }>()
   color: var(--desk-text);
 }
 
-/* 子菜单项 */
+/* 子菜单项：颜色对齐「新建对话」（近黑），加粗由 bold 决定 */
 .menu-item {
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 8px 12px;
   margin-bottom: 2px;
   border-radius: 10px;
   cursor: pointer;
-  color: var(--desk-text-secondary);
+  color: var(--desk-text);
   font-size: 14px;
+  font-weight: 400;
   transition: background 0.15s ease;
+}
+
+.menu-item.is-bold {
+  font-weight: 600;
 }
 
 .menu-item:hover {
@@ -60,6 +68,11 @@ const emit = defineEmits<{ select: [item: NavItem] }>()
 .menu-item.active {
   background: var(--desk-primary-soft);
   color: var(--desk-text);
+}
+
+.menu-icon {
+  flex-shrink: 0;
+  font-size: 15px;
 }
 
 .menu-label {
