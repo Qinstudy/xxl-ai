@@ -5,80 +5,35 @@
 */
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
 import NavControls from '@renderer/components/NavControls.vue'
+import ChatTopbarActions from '@renderer/modules/chat/components/ChatTopbarActions.vue'
 import { useChatStore } from '@renderer/stores/chat'
-import { useLayoutStore } from '@renderer/stores/layout'
 import { useSettingsStore } from '@renderer/stores/settings'
+import { useSessionActions } from '@renderer/modules/chat/composables/useSessionActions'
+import { NAV_SECTIONS, sectionOfPath } from '@renderer/config/nav'
 import { t } from '@renderer/i18n'
 
 const route = useRoute()
 const chat = useChatStore()
-const layout = useLayoutStore()
 const settings = useSettingsStore()
+/* 会话操作（重命名 / 删除） */
+const { onChatCommand } = useSessionActions()
 
-/* 是否为对话页（对话页展示会话标题与终端/侧栏开关） */
-const isChat = computed(() => route.path === '/')
+/* 当前所属板块 */
+const section = computed(() => sectionOfPath(route.path))
 
-/* 是否为插件页（顶栏展示「插件」标题） */
-const isPlugin = computed(() => route.path.startsWith('/plugin'))
+/* 是否对话页（对话页展示会话标题与终端/侧栏开关） */
+const isChat = computed(() => section.value === 'home')
 
-/* 对话页标题：当前会话标题，无会话时展示「新对话」 */
-const title = computed(() => chat.currentSession?.title || t('chat.newChat'))
-
-/* 非对话页标题（插件 / 系统设置） */
-const pageTitle = computed(() => (isPlugin.value ? t('plugin.title') : t('settings.title')))
-
-/* 是否有标题：仅在有标题时才展示标题前的分隔线 */
-const hasTitle = computed(() =>
-  (isChat.value ? title.value : pageTitle.value).trim().length > 0
+/* 顶栏标题：对话页取当前会话标题（无会话回落「新对话」）；其余取板块标题 */
+const pageTitle = computed(() =>
+  section.value === 'home'
+    ? chat.currentSession?.title || t('chat.newChat')
+    : t(NAV_SECTIONS[section.value].titleKey)
 )
 
-/* 会话操作下拉命令分发 */
-function onChatCommand(command: string): void {
-  if (command === 'rename') {
-    void onRenameCurrent()
-  } else if (command === 'delete') {
-    void onDeleteCurrent()
-  }
-}
-
-/* 重命名当前会话 */
-async function onRenameCurrent(): Promise<void> {
-  const session = chat.currentSession
-  if (!session) {
-    return
-  }
-  try {
-    const { value } = await ElMessageBox.prompt('', t('chat.renameSession'), {
-      inputValue: session.title,
-      confirmButtonText: t('common.confirm'),
-      cancelButtonText: t('common.cancel')
-    })
-    await chat.renameSession(session.id, value || session.title)
-  } catch {
-    /* 取消 */
-  }
-}
-
-/* 删除当前会话 */
-async function onDeleteCurrent(): Promise<void> {
-  const session = chat.currentSession
-  if (!session) {
-    return
-  }
-  try {
-    await ElMessageBox.confirm(t('chat.deleteConfirm'), t('chat.deleteSession'), {
-      type: 'warning',
-      confirmButtonText: t('common.delete'),
-      cancelButtonText: t('common.cancel')
-    })
-    await chat.removeSession(session.id)
-    ElMessage.success(t('common.deleted'))
-  } catch {
-    /* 取消 */
-  }
-}
+/* 是否有标题：仅在有标题时才展示标题前的分隔线 */
+const hasTitle = computed(() => pageTitle.value.trim().length > 0)
 </script>
 
 <template>
@@ -90,7 +45,7 @@ async function onDeleteCurrent(): Promise<void> {
       <div v-if="hasTitle" class="desk-topbar-context">
         <template v-if="isChat">
           <div class="chat-title-wrap">
-            <div class="chat-title">{{ title }}</div>
+            <div class="chat-title">{{ pageTitle }}</div>
             <!-- 会话操作：重命名 / 删除（悬浮标题文案展示） -->
             <el-dropdown
               v-if="chat.currentId"
@@ -118,29 +73,7 @@ async function onDeleteCurrent(): Promise<void> {
 
     <!-- 对话页操作：底部终端 / 右侧侧栏（侧边任务）显隐开关 -->
     <div v-if="isChat" class="desk-topbar-actions">
-      <button
-        class="sidebar-toggle"
-        :class="{ active: layout.terminalVisible }"
-        :title="layout.terminalVisible ? t('chat.hideTerminal') : t('chat.showTerminal')"
-        @click="layout.toggleTerminal"
-      >
-        <svg class="panel-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
-          <path d="M7.5 10l2.5 2.5-2.5 2.5" />
-          <path d="M12.5 15H17" />
-        </svg>
-      </button>
-      <button
-        class="sidebar-toggle"
-        :class="{ active: layout.rightPanelVisible }"
-        :title="layout.rightPanelVisible ? t('chat.hideSidePanel') : t('chat.showSidePanel')"
-        @click="layout.toggleRightPanel"
-      >
-        <svg class="panel-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
-          <path d="M15 4.5v15" />
-        </svg>
-      </button>
+      <ChatTopbarActions />
     </div>
   </header>
 </template>
@@ -194,26 +127,9 @@ async function onDeleteCurrent(): Promise<void> {
   color: var(--desk-text);
 }
 
-/* 设置页标题 */
+/* 非对话页标题（插件 / 系统设置） */
 .topbar-title {
   font-size: 16px;
   font-weight: 600;
-}
-
-/* 面板开关激活态：高亮当前已展开的面板 */
-.sidebar-toggle.active {
-  background: var(--desk-primary-soft);
-  color: var(--desk-text);
-}
-
-/* 面板图标：随文字色着色（悬浮/激活态生效） */
-.panel-icon {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 </style>

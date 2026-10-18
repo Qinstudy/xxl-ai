@@ -48,6 +48,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const updateInfo = ref<UpdateInfo | null>(null)
   const updateChecking = ref(false)
 
+  /* 系统设置子菜单当前分类（UI 选中态，供左侧子菜单与设置页共享） */
+  const activeTab = ref('general')
+
   /* 已启用的供应商 */
   const enabledProviders = computed(() => providers.value.filter((item) => item.enabled))
   /* 当前选中供应商（未选中为 null） */
@@ -217,6 +220,7 @@ export const useSettingsStore = defineStore('settings', () => {
     detectExecutable,
     updateInfo,
     updateChecking,
+    activeTab,
     checkUpdate,
     openUpdate,
     dismissUpdate,

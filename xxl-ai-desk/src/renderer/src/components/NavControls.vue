@@ -30,24 +30,24 @@ function goForward(): void {
 
 <template>
   <div class="nav-controls">
-    <button class="sidebar-toggle" :disabled="!canBack" :title="t('chat.back')" @click="goBack">
+    <button class="sidebar-toggle" :disabled="!canBack" :title="t('layout.back')" @click="goBack">
       <el-icon><ArrowLeft /></el-icon>
     </button>
     <button
       class="sidebar-toggle"
       :disabled="!canForward"
-      :title="t('chat.forward')"
+      :title="t('layout.forward')"
       @click="goForward"
     >
       <el-icon><ArrowRight /></el-icon>
     </button>
     <button
       class="sidebar-toggle"
-      :title="layout.sidebarCollapsed ? t('chat.expandSidebar') : t('chat.collapseSidebar')"
+      :title="layout.sidebarCollapsed ? t('layout.expandSidebar') : t('layout.collapseSidebar')"
       @click="layout.toggleSidebar"
     >
       <!-- 侧栏面板图标：圆角矩形 + 左侧竖线，表示左侧栏的收起/展开 -->
-      <svg class="panel-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <svg class="desk-svg-icon panel-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
         <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
         <path d="M9 4.5v15" />
       </svg>
@@ -65,14 +65,9 @@ function goForward(): void {
   -webkit-app-region: no-drag;
 }
 
-/* 侧栏折叠图标：随按钮文字色着色 */
+/* 侧栏折叠图标尺寸（着色/描边由 .desk-svg-icon 统一提供） */
 .panel-toggle-icon {
   width: 17px;
   height: 17px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 </style>

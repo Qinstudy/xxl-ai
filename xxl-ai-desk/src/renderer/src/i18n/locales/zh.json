@@ -31,15 +31,17 @@
     "copy": "复制",
     "copied": "已复制"
   },
+  "layout": {
+    "home": "首页",
+    "back": "后退",
+    "forward": "前进",
+    "collapseSidebar": "收起侧栏",
+    "expandSidebar": "展开侧栏",
+    "resetPanelWidth": "双击恢复默认宽度"
+  },
   "chat": {
     "newChat": "新对话",
     "newChatAction": "新建对话",
-    "collapseSidebar": "收起侧栏",
-    "expandSidebar": "展开侧栏",
-    "resetPanelWidth": "双击恢复默认宽度",
-    "back": "后退",
-    "forward": "前进",
-    "home": "首页",
     "sessions": "会话",
     "recentSessions": "最近会话",
     "searchSession": "搜索会话",

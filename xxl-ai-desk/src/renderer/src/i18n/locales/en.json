@@ -31,15 +31,17 @@
     "copy": "Copy",
     "copied": "Copied"
   },
+  "layout": {
+    "home": "Home",
+    "back": "Back",
+    "forward": "Forward",
+    "collapseSidebar": "Collapse sidebar",
+    "expandSidebar": "Expand sidebar",
+    "resetPanelWidth": "Double-click to reset width"
+  },
   "chat": {
     "newChat": "New chat",
     "newChatAction": "New chat",
-    "collapseSidebar": "Collapse sidebar",
-    "expandSidebar": "Expand sidebar",
-    "resetPanelWidth": "Double-click to reset width",
-    "back": "Back",
-    "forward": "Forward",
-    "home": "Home",
     "sessions": "Chats",
     "recentSessions": "Recent chats",
     "searchSession": "Search chats",

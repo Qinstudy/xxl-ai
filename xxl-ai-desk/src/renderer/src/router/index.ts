@@ -18,13 +18,8 @@ const router = createRouter({
       component: () => import('@renderer/modules/settings/pages/index.vue')
     },
     {
-      path: '/plugin/mcp',
-      name: 'plugin-mcp',
-      component: () => import('@renderer/modules/plugin/pages/index.vue')
-    },
-    {
-      path: '/plugin/skill',
-      name: 'plugin-skill',
+      path: '/plugin/:tool(mcp|skill)',
+      name: 'plugin',
       component: () => import('@renderer/modules/plugin/pages/index.vue')
     },
     {

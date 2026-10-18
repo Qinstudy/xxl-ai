@@ -97,6 +97,21 @@ body.resizing {
   user-select: none;
 }
 
+/* 自绘 SVG 图标：统一随文字色着色（尺寸由使用处覆盖） */
+.desk-svg-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 左侧栏子菜单列表容器（首页面板 / 通用子菜单共用） */
+.sidebar-list {
+  flex: 1;
+  padding: 0 10px;
+}
+
 body.resizing .desk-sidebar {
   transition: none;
 }

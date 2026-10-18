@@ -381,12 +381,21 @@ desk-shell（纵向）
 - 标题与 `NavControls` 之间以细分隔线（｜）分隔，**仅在有标题时展示**（`hasTitle` 判定）；其他需要标题的场景同理。
 - 顶栏整体为窗口拖拽区（`-webkit-app-region: drag`），交互控件一律 `no-drag`。
 
-### 左侧栏（`modules/chat/components/Sidebar.vue`）
+### 左侧栏（外壳 `Sidebar.vue` + 域面板）
 
-- **常驻图标栏（活动栏，`--desk-rail-width`）**：首页 / 插件 /（底部）系统设置；三个板块**功能隔离**，各自独立子菜单与正文，互不复用子菜单内容。
-- **子菜单栏**（可折叠、可拖拽宽度）：按板块渲染——首页→项目/会话；插件→MCP插件 / SKILL技能；系统设置→通用/个性化/供应商/关于；**三个板块共用同一宽度**（`layout.panelWidth` 持久化，一处拖拽调整即全局生效），**双击拖拽手柄恢复默认宽度**。
+- 外壳 `modules/chat/components/Sidebar.vue` 只做「活动栏 + 子菜单栏容器 + 板块切换」，不含域逻辑。
+- **常驻图标栏（活动栏，`--desk-rail-width`）**：`components/ActivityRail.vue`（首页 / 插件 /（底部）系统设置）；三板块**功能隔离**，各自子菜单与正文。
+- **子菜单栏**（可折叠、可拖拽宽度）：按板块渲染——首页→`modules/chat/components/SidebarHomePanel.vue`（项目/会话）；插件/系统设置→`components/SubmenuMenu.vue`（数据来自 `config/nav.ts#NAV_SECTIONS`）。
 - 折叠按钮收起「子菜单栏」，图标栏**常驻**；点击任一板块展开子菜单栏并切换正文。
-- 子菜单顶部标题字体统一（18px/600），**不展示 Logo**；子菜单内文案（分组标题如「项目:」、条目名、新建对话）**字号一致**（14px）。
+- 子菜单顶部标题字体统一（18px/600），**不展示 Logo**；子菜单内文案（分组标题如「项目:」、条目名、新建对话）**字号一致**（14px）；三板块共用同一子菜单宽度 `layout.panelWidth`（一处调整全局生效，双击手柄复位）。
+
+### 复用与边界（重要）
+
+- **导航映射单一来源**：板块 ↔ 入口路径 ↔ 顶栏标题 ↔ 子菜单项 全部定义在 `config/nav.ts`；`ActivityRail` / `Sidebar` / `AppTopbar` 只读同一份，**新增板块只改此处**。
+- **shell 不承载域逻辑**：`AppTopbar` / `Sidebar` 仅做外壳与路由上下文；域内逻辑下沉到 `modules/{module}/`（如会话操作 `modules/chat/composables/useSessionActions.ts`、顶栏对话操作 `modules/chat/components/ChatTopbarActions.vue`）。
+- **面板交互统一复用**：拖拽用 `composables/usePanelResize.ts`（`edge` 区分左右缘）；宽度状态用 `utils/persistedWidth.ts#createPersistedWidth`（读取/夹取/持久化/复位），左侧栏与右侧栏共用，**禁止各写一套**。
+- **共享选中态归属域**：跨「左侧子菜单 ↔ 页面」的选中态放所属域 store（如设置分类 `settings.activeTab`），勿塞进 `layout`。
+- **自绘 SVG 图标**：统一加 `.desk-svg-icon`（`styles/index.scss`，提供 `currentColor` 描边），尺寸由使用处覆盖。
 
 ### 配色分层（靠颜色区分，不用分隔线）
 
@@ -401,9 +410,8 @@ desk-shell（纵向）
 
 ### 新增板块 / 页面
 
-- 新增板块：图标栏加按钮（含选中态）+ `Sidebar` 加子菜单分支 + `router/index.ts` 登记路由 + 正文模块页 `modules/{module}/pages/index.vue`；板块选中态按路由判定。
-- 拆分享状态：跨「左侧子菜单 ↔ 页面」的选中态收敛到 store（如设置分类 `layout.settingsTab`），勿各自维护。
-- 图标：折叠按钮用「侧栏面板」SVG，插件入口用「插头」SVG（Element Plus 无对应图标，内联 SVG 随 `currentColor` 着色）。
+- 新增板块：`config/nav.ts` 加 section/子菜单 + `ActivityRail` 加按钮 + `router/index.ts` 登记路由 + 正文模块页 `modules/{module}/pages/index.vue`；同域多页可合并为 `/{module}/:tool` 单路由；板块选中态按路由判定。
+- 图标：折叠按钮用「侧栏面板」SVG，插件入口用「插头」SVG（Element Plus 无对应图标，内联 SVG 加 `.desk-svg-icon`）；shell 文案归 `layout.*`，zh/en 成对。
 
 ## Agent 运行时（新增内置工具 / 沙箱能力）
 

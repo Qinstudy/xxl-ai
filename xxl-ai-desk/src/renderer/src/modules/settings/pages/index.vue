@@ -4,7 +4,6 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useSettingsStore } from '@renderer/stores/settings'
-import { useLayoutStore } from '@renderer/stores/layout'
 import { t } from '@renderer/i18n'
 import ShortcutInput from '@renderer/components/ShortcutInput.vue'
 import { DEFAULT_SHORTCUTS } from '@shared/ipc'
@@ -19,10 +18,9 @@ import type {
 
 const route = useRoute()
 const settings = useSettingsStore()
-const layout = useLayoutStore()
 /* 支持从对话页「+新建供应商」跳转直达供应商 TAB（选中项由左侧子菜单共享） */
 if (typeof route.query.tab === 'string' && route.query.tab) {
-  layout.setSettingsTab(route.query.tab)
+  settings.activeTab = route.query.tab
 }
 
 /* --- 常规：主题 / 语言切换后立即生效（无需保存） --- */
@@ -447,7 +445,7 @@ async function toggleProvider(row: ProviderDTO, value: boolean): Promise<void> {
   <div class="settings-page">
     <el-scrollbar class="settings-body">
       <div class="settings-inner">
-        <el-tabs v-model="layout.settingsTab" class="settings-tabs">
+        <el-tabs v-model="settings.activeTab" class="settings-tabs">
           <!-- 通用 -->
           <el-tab-pane :label="t('settings.general')" name="general">
             <el-form label-position="top" class="settings-form">
