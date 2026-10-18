@@ -311,7 +311,6 @@ npm run pack                                  # 免安装打包（当前平台�
 
 npm run build:mac                             # 打包对应平台安装包
 npm run build:win
-npm run build:linux
 ```
 
 客户端启动顺序：`app.whenReady → 初始化数据库 → 预置供应商 → 注册 IPC → 创建窗口`；单实例锁防止多开争库。
