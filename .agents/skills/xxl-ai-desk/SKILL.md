@@ -33,7 +33,7 @@ xxl-ai-desk/src/
 │   ├── index.ts                 入口：DB 初始化 → 种子 → IPC → 建窗
 │   ├── ipc.ts                   全部 IPC handler（薄网关）
 │   ├── config/paths.ts          数据目录 / DB 路径（基础设施）
-│   ├── db/{schema.ts,index.ts}  Drizzle 表结构 / better-sqlite3 + DDL + migrate
+│   ├── db/{schema.ts,index.ts}  Drizzle 表结构 / better-sqlite3 + DDL + 内置种子
 │   ├── services/*Service.ts     业务 CRUD 与编排（唯一 getDb 出口）
 │   └── agent/
 │       ├── host/                主进程侧：runtimeHost / approval / community（社区抓取）
@@ -97,7 +97,7 @@ xxl-ai-desk/src/
 - 只传可结构化克隆的纯数据：不传 Error、类实例、Vue 响应式代理；必要时深拷贝。
 - **单一数据源**：同一配置只有一处权威存储；派生字段保存时统一重生，不允许两处并存。
 - **写库结构必须合法**：写入前保证下游可消费；历史脏数据在读取边界归一化。
-- 结构变更三处同步：`db/schema.ts`、`db/index.ts` 的 `DDL`、`migrate()`。
+- 结构变更两处同步：`db/schema.ts` 与 `db/index.ts` 的 `DDL`（仅面向全新安装，不做旧库迁移）。
 - 敏感值不落明文、不进日志；列表脱敏，编辑态才解密。
 
 ### 2.2 运行时与资源 [硬]
@@ -142,7 +142,7 @@ xxl-ai-desk/src/
 
 1. **需求确认（必须）**：模块命名、字段与校验、系统能力（对话框/shell/终端/文件）、页面形态、改动范围、验证范围；确认后写入需求目录的 `方案.md`。
 2. **需求落盘**：`xxl-ai-spec/{yyyyMMdd}-{module}/` 建 `方案.md` 与建表 SQL（SQLite DDL）。
-3. **数据结构**：同步 `db/schema.ts` + `db/index.ts` 的 `DDL` / `migrate()`。
+3. **数据结构**：同步 `db/schema.ts` + `db/index.ts` 的 `DDL`。
 4. **主进程落位**：`services/{module}Service.ts` + 契约 + IPC + preload；需要运行时再加 `{module}RuntimeService.ts` 与 `agent/*` 实现。
 5. **渲染进程落位**：store + 页面/组件 + 路由 + i18n。
 6. **验证**：`npm run type-check` → `npm run build` → 必要时 `npm run dev` 联调；涉及 IPC/运行时/生命周期必须做端到端验证（真实 UI + 真实调用 + 进程残留检查），完成后清理测试数据并恢复用户状态。
@@ -156,7 +156,7 @@ xxl-ai-desk/src/
 | 文件 | 位置 | 说明 |
 |---|---|---|
 | `schema.ts` | `src/main/db/schema.ts` | `sqliteTable('desk_widget', {...})` |
-| `index.ts` | `src/main/db/index.ts` | DDL 建表；新列在 `migrate()` 用 `ensureColumn` |
+| `index.ts` | `src/main/db/index.ts` | DDL 建表 + 内置种子（全新安装生效，不做旧库迁移） |
 | `WidgetService.ts` | `src/main/services/widgetService.ts` | CRUD/编排；唯一 `getDb()` 出口 |
 | handler | `src/main/ipc.ts` | `ipcMain.handle(IPC.widget*, ...)`，薄网关 |
 | 契约 | `src/shared/contracts/widget.ts` + `src/shared/ipc.ts` | DTO + `IPC.widget*` + `DeskApi.widget` |
@@ -277,7 +277,7 @@ desk-shell（纵向）
 ## 7. 校验清单
 
 - [ ] 需求目录 `xxl-ai-spec/{yyyyMMdd}-{module}/` 存在，`方案.md` 与 SQL 同步。
-- [ ] 结构三处一致：`schema.ts` / `DDL` / `migrate()`。
+- [ ] 结构一致：`schema.ts` / `DDL`。
 - [ ] `services/*` 是唯一 `getDb()` 出口；`ipc.ts` 仅网关；契约 / IPC 常量 / `DeskApi` / preload 齐备。
 - [ ] 依赖方向符合 §1.3；配置与运行时未耦合；运行时使用官方方案。
 - [ ] 通道 `desk:{module}:{action}`；时间 ISO；布尔归一。

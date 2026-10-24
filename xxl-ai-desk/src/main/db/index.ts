@@ -1,9 +1,10 @@
 /*
  * 本地数据库初始化：better-sqlite3 + Drizzle，桌面端单文件库、无需外部服务。
- *   - 打开数据库后执行建表 DDL，再对旧库做兼容迁移。
+ *   - 打开数据库后执行建表 DDL，并写入内置 MCP 种子。
  */
 
 import { mkdirSync } from 'fs'
+import { homedir } from 'os'
 import { dirname } from 'path'
 import Database from 'better-sqlite3'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
@@ -90,34 +91,83 @@ export function initDatabase(): void {
   sqlite = new Database(file)
   sqlite.pragma('journal_mode = WAL')
   sqlite.exec(DDL)
-  migrate(sqlite)
+  seedMcpServers(sqlite)
   database = drizzle(sqlite, { schema })
 }
 
-/*
- * 兼容旧库的结构迁移：SQLite 无 ADD COLUMN IF NOT EXISTS，用 PRAGMA 检测缺失列后补列。
- *   新增列须同时更新上方 DDL（新库直建）与此处（旧库补齐）。
- */
-function migrate(db: Database.Database): void {
-  ensureColumn(db, 'desk_session', 'mode', "TEXT NOT NULL DEFAULT 'build'")
-  /* 系统指令改为实时读取全局设置，废弃会话级 system_prompt 列 */
-  dropColumn(db, 'desk_session', 'system_prompt')
-}
+/* 内置 MCP 初始化标记：写入成功后不再重置，避免用户删除后被重新写回 */
+const MCP_SEED_KEY = 'seed.mcp'
 
-/* 检测并补充缺失列（已存在则跳过） */
-function ensureColumn(db: Database.Database, table: string, column: string, definition: string): void {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
-  if (!columns.some((item) => item.name === column)) {
-    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`)
+/* 内置 MCP 种子：首次初始化写入 3 个常用 MCP（Fetch / Filesystem / Playwright） */
+function seedMcpServers(db: Database.Database): void {
+  const seeded = db.prepare('SELECT 1 FROM desk_setting WHERE key = ?').get(MCP_SEED_KEY)
+  if (seeded) {
+    return
   }
-}
 
-/* 检测并删除废弃列（不存在则跳过；SQLite 3.35+ 支持 DROP COLUMN） */
-function dropColumn(db: Database.Database, table: string, column: string): void {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>
-  if (columns.some((item) => item.name === column)) {
-    db.exec(`ALTER TABLE ${table} DROP COLUMN ${column}`)
-  }
+  const now = new Date().toISOString()
+  /* Filesystem 服务限定用户主目录，随安装机器自动适配 */
+  const servers = [
+    {
+      id: 'seed-mcp-fetch',
+      name: 'Fetch MCP Server',
+      command: 'uvx',
+      args: ['mcp-server-fetch'],
+      sort: 1,
+      remark:
+        '网页抓取：获取网页内容并转换为 Markdown 返回给 Agent，适合阅读和总结网页。依赖本机可用的 uv/uvx。'
+    },
+    {
+      id: 'seed-mcp-filesystem',
+      name: 'Filesystem MCP Server',
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', homedir()],
+      sort: 2,
+      remark:
+        '本地文件：支持读取、写入、编辑、移动与搜索文件，访问范围仅限当前用户主目录，防止越界访问。依赖 Node.js/npx。'
+    },
+    {
+      id: 'seed-mcp-playwright',
+      name: 'Playwright MCP Server',
+      command: 'npx',
+      args: ['@playwright/mcp@latest'],
+      sort: 3,
+      remark:
+        '浏览器自动化：支持打开网页、点击、填表、截图并读取页面内容，由 Microsoft 官方维护。首次运行会下载 Chromium，依赖 Node.js/npx。'
+    }
+  ]
+
+  /* 幂等写入：主键或名称已存在时跳过，不覆盖用户已修改的配置 */
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO desk_mcp
+      (id, name, type, transport, url, headers, command, args, env, cwd, config, remark, enabled, sort, health, add_time, update_time)
+    VALUES (?, ?, 'local', 'stdio', '', '{}', ?, ?, '{}', '', ?, ?, 1, ?, '', ?, ?)
+  `)
+  const markSeeded = db.prepare('INSERT OR REPLACE INTO desk_setting (key, value) VALUES (?, ?)')
+
+  db.transaction(() => {
+    for (const server of servers) {
+      const config = JSON.stringify({
+        transport: 'stdio',
+        command: server.command,
+        args: server.args,
+        env: {},
+        cwd: ''
+      })
+      insert.run(
+        server.id,
+        server.name,
+        server.command,
+        JSON.stringify(server.args),
+        config,
+        server.remark,
+        server.sort,
+        now,
+        now
+      )
+    }
+    markSeeded.run(MCP_SEED_KEY, now)
+  })()
 }
 
 /* 获取 Drizzle 实例 */
