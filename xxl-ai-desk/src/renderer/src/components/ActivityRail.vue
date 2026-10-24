@@ -16,12 +16,14 @@ const layout = useLayoutStore()
 /* 当前所属板块（高亮对应入口） */
 const section = computed(() => sectionOfPath(route.path))
 
-/* 切换板块：展开子菜单栏并跳转到板块入口 */
+/* 切换板块：展开子菜单栏并跳转到板块入口；重复点击当前板块则折叠/展开子菜单栏（与顶栏按钮一致） */
 function go(key: SectionKey): void {
-  layout.expandSidebar()
-  if (section.value !== key) {
-    router.push(SECTION_ENTRY[key])
+  if (section.value === key) {
+    layout.toggleSidebar()
+    return
   }
+  layout.expandSidebar()
+  router.push(SECTION_ENTRY[key])
 }
 </script>
 
