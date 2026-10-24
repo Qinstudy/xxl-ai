@@ -16,6 +16,8 @@ export const useProjectStore = defineStore('project', () => {
   const currentId = ref('')
   /* 项目列表是否已首次加载 */
   const loaded = ref(false)
+  /* 项目展开状态（按项目 id 记录，切换板块/页面后保留） */
+  const expanded = ref<Record<string, boolean>>({})
 
   /* 当前项目对象（未选中为 null） */
   const currentProject = computed(
@@ -36,6 +38,21 @@ export const useProjectStore = defineStore('project', () => {
     currentId.value = id
   }
 
+  /* 项目是否展开 */
+  function isExpanded(id: string): boolean {
+    return Boolean(expanded.value[id])
+  }
+
+  /* 设置项目展开状态 */
+  function setExpanded(id: string, value: boolean): void {
+    expanded.value = { ...expanded.value, [id]: value }
+  }
+
+  /* 折叠/展开项目 */
+  function toggleExpanded(id: string): void {
+    setExpanded(id, !isExpanded(id))
+  }
+
   /*
    * 新建项目：弹出系统目录选择对话框，选中的目录自动生成项目。
    *   取消返回 null；目录重复等错误由调用方捕获提示。
@@ -45,6 +62,7 @@ export const useProjectStore = defineStore('project', () => {
     if (created) {
       projects.value = [created, ...projects.value]
       currentId.value = created.id
+      setExpanded(created.id, true)
     }
     return created
   }
@@ -62,6 +80,12 @@ export const useProjectStore = defineStore('project', () => {
   async function removeProject(id: string): Promise<void> {
     await api.project.remove(id)
     projects.value = projects.value.filter((item) => item.id !== id)
+    /* 同步清理已删除项目的展开状态 */
+    if (expanded.value[id] !== undefined) {
+      const next = { ...expanded.value }
+      delete next[id]
+      expanded.value = next
+    }
     if (currentId.value === id) {
       currentId.value = ''
     }
@@ -76,9 +100,13 @@ export const useProjectStore = defineStore('project', () => {
     projects,
     currentId,
     loaded,
+    expanded,
     currentProject,
     loadProjects,
     selectProject,
+    isExpanded,
+    setExpanded,
+    toggleExpanded,
     createProject,
     renameProject,
     removeProject,

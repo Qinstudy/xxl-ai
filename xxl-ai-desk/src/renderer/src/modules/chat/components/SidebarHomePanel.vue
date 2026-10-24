@@ -21,8 +21,7 @@ const project = useProjectStore()
 /* 快捷操作执行器（命令面板「快捷操作」） */
 const runQuickAction = useQuickAction()
 
-/* 项目展开状态（默认收起；选中/新建时自动展开） */
-const expanded = ref<Record<string, boolean>>({})
+/* 项目展开状态由 project store 统一维护（切换板块不会丢失） */
 
 /* 搜索面板状态与关键字 */
 const searchVisible = ref(false)
@@ -91,9 +90,9 @@ const visibleSessions = computed(() =>
   hasKeyword.value ? matchedSessions.value : chat.sessions.slice(0, 5)
 )
 
-/* 展开状态 */
+/* 展开状态（由 project store 维护，组件重挂载后仍保留） */
 function isExpanded(projectId: string): boolean {
-  return Boolean(expanded.value[projectId])
+  return project.isExpanded(projectId)
 }
 
 /* 打开搜索面板（居中弹框） */
@@ -123,7 +122,7 @@ function onQuickAction(action: QuickAction): void {
 /* 点击项目：选中并折叠/展开 */
 function toggleProject(projectId: string): void {
   project.selectProject(projectId)
-  expanded.value[projectId] = !expanded.value[projectId]
+  project.toggleExpanded(projectId)
 }
 
 /* 当前项目变化时自动展开（点击会话/新建项目同步选中） */
@@ -131,7 +130,7 @@ watch(
   () => project.currentId,
   (id) => {
     if (id) {
-      expanded.value[id] = true
+      project.setExpanded(id, true)
     }
   }
 )
@@ -147,13 +146,10 @@ const revealLabel = computed(() => {
   return t('project.revealLinux')
 })
 
-/* 新建项目：选择本地目录并自动生成项目 */
+/* 新建项目：选择本地目录并自动生成项目（store 内自动选中并展开） */
 async function onCreateProject(): Promise<void> {
   try {
-    const created = await project.createProject()
-    if (created) {
-      expanded.value[created.id] = true
-    }
+    await project.createProject()
   } catch (error) {
     ElMessage.error((error as Error).message)
   }
