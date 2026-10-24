@@ -227,6 +227,9 @@ function handleRequest(message: WorkerRequest): void {  switch (message.type) {
       void closeAllMcpClients()
       break
     }
+    case 'shutdown':
+      void shutdownWorker()
+      break
     case 'approval-response': {
       const resolve = pendingApprovals.get(message.requestId)
       if (resolve) {
@@ -237,6 +240,17 @@ function handleRequest(message: WorkerRequest): void {  switch (message.type) {
     }
     default:
       break
+  }
+}
+
+/* 退出前优雅关闭：先释放全部 MCP stdio 子进程（npx/node），再退出自身 */
+async function shutdownWorker(): Promise<void> {
+  try {
+    await closeAllMcpClients()
+  } catch (error) {
+    log.warn('[agent-runtime] 退出前关闭 MCP 连接失败', error)
+  } finally {
+    process.exit(0)
   }
 }
 

@@ -84,6 +84,7 @@ export type WorkerRequest =
   | { type: 'evict'; sessionId: string } /* 释放会话缓存 */
   | { type: 'clear-permissions'; sessionId: string } /* 清空会话越界白名单 */
   | { type: 'reset' } /* 重置全部运行时状态 */
+  | { type: 'shutdown' } /* 退出前优雅关闭：释放 MCP 子进程后自行退出 */
   | { type: 'approval-response'; requestId: string; choice: ApprovalChoice } /* 回传越界审批结果 */
   | { type: 'mcp-test'; requestId: string; server: McpRuntimeConfig; runtimePath: string } /* 连通测试（临时连接） */
   | { type: 'mcp-tools'; requestId: string; server: McpRuntimeConfig; runtimePath: string } /* 列举工具（复用连接缓存） */

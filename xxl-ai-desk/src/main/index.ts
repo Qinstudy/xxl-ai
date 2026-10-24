@@ -138,10 +138,19 @@ if (!gotLock) {
     app.quit()
   })
 
-  /* 退出前回收托管运行时进程、全部终端与目录监听，避免残留 */
-  app.on('before-quit', () => {
-    disposeAgentRuntime()
-    disposeAllTerminals()
-    disposeAllFsWatch()
+  /* 退出前回收托管运行时进程、全部终端与目录监听，避免残留（含 MCP 的 npx/node 子进程） */
+  let quitting = false
+  app.on('before-quit', (event) => {
+    if (quitting) {
+      return
+    }
+    /* 先阻塞退出，等待运行时进程优雅关闭后再统一清理并真正退出 */
+    event.preventDefault()
+    quitting = true
+    void disposeAgentRuntime().finally(() => {
+      disposeAllTerminals()
+      disposeAllFsWatch()
+      app.quit()
+    })
   })
 }

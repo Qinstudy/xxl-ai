@@ -209,10 +209,24 @@ export function listMcpToolsByRuntime(
   }))
 }
 
-/* 退出时终止运行时进程 */
-export function disposeAgentRuntime(): void {
-  worker?.postMessage({ type: 'reset' } satisfies WorkerRequest)
-  worker?.kill()
+/* 退出时终止运行时进程：先请求优雅关闭（释放 MCP 子进程），超时则强杀兜底 */
+export function disposeAgentRuntime(timeout = 3000): Promise<void> {
+  const proc = worker
   worker = null
   workerReady = null
+  if (!proc) {
+    return Promise.resolve()
+  }
+  return new Promise<void>((resolve) => {
+    /* 超时兜底：MCP 关闭卡住时强杀，避免退出流程被无限阻塞 */
+    const timer = setTimeout(() => {
+      proc.kill()
+      resolve()
+    }, timeout)
+    proc.once('exit', () => {
+      clearTimeout(timer)
+      resolve()
+    })
+    proc.postMessage({ type: 'shutdown' } satisfies WorkerRequest)
+  })
 }
