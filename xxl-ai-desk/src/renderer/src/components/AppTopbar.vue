@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
-* 全局顶栏：贯通整窗，固定承载「后退/前进 + 折叠」并展示当前页面标题与操作
+* 全局顶栏：贯通整窗，固定承载「后退/前进 + 首页（对话）」并展示当前页面标题与操作
 * @author xuxueli 2026-10-18
 */
 import { computed } from 'vue'

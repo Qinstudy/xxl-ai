@@ -32,7 +32,6 @@
     "copied": "已复制"
   },
   "layout": {
-    "home": "首页",
     "back": "后退",
     "forward": "前进",
     "collapseSidebar": "收起侧栏",
@@ -41,6 +40,7 @@
     "resetPanelHeight": "双击恢复默认高度"
   },
   "chat": {
+    "title": "对话",
     "newChat": "新对话",
     "newChatAction": "新建对话",
     "sessions": "会话",

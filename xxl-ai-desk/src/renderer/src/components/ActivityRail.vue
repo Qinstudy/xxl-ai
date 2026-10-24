@@ -16,14 +16,14 @@ const layout = useLayoutStore()
 /* 当前所属板块（高亮对应入口） */
 const section = computed(() => sectionOfPath(route.path))
 
-/* 切换板块：展开子菜单栏并跳转到板块入口；重复点击当前板块则折叠/展开子菜单栏（与顶栏按钮一致） */
+/* 切换板块：点击其它板块展开子菜单栏并跳转入口地址；点击当前板块则折叠/展开子菜单栏 */
 function go(key: SectionKey): void {
   if (section.value === key) {
     layout.toggleSidebar()
     return
   }
   layout.expandSidebar()
-  router.push(SECTION_ENTRY[key])
+  void router.push(SECTION_ENTRY[key])
 }
 </script>
 
@@ -33,11 +33,11 @@ function go(key: SectionKey): void {
       <button
         class="rail-btn"
         :class="{ active: section === 'home' }"
-        :title="t('layout.home')"
+        :title="t('chat.title')"
         @click="go('home')"
       >
-        <!-- 首页：房子轮廓 -->
-        <el-icon><House /></el-icon>
+        <!-- 首页：会话气泡 -->
+        <el-icon><ChatDotRound /></el-icon>
       </button>
       <button
         class="rail-btn"
@@ -45,8 +45,8 @@ function go(key: SectionKey): void {
         :title="t('plugin.title')"
         @click="go('plugin')"
       >
-        <!-- 插件：九宫格（扩展集） -->
-        <el-icon><Grid /></el-icon>
+        <!-- 插件：装配/扩展 -->
+        <el-icon><SetUp /></el-icon>
       </button>
     </div>
     <div class="rail-group">
