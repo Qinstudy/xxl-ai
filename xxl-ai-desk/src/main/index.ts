@@ -8,6 +8,7 @@ import { IPC } from '@shared/ipc'
 import { initDatabase } from './db'
 import { registerIpc } from './ipc'
 import { ensureSeedProviders } from './services/providerService'
+import { registerLocalFileProtocol } from './services/localFileProtocolService'
 import { disposeAllTerminals } from './services/terminalService'
 import { disposeAllFsWatch } from './services/fsWatchService'
 import { disposeAgentRuntime } from './agent/host/runtimeHost'
@@ -102,6 +103,7 @@ if (!gotLock) {
     log.initialize()
     initDatabase()
     ensureSeedProviders()
+    registerLocalFileProtocol()
     registerIpc(() => mainWindow)
 
     /*

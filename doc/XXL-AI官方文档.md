@@ -1196,6 +1196,7 @@ docker compose down
 ### v1.2.1 Release Notes[ING]
 - 1、【新增】MCP工具（Desk版）：新增支持MCP工具管理，支持远程（Streamable HTTP）/ 本地（stdio）MCP服务在线管理、检索发现及连通测试，Agent运行时自动装配可用工具；
 - 2、【优化】工具组件（Desk版）：工具组件交互升级，操作体验及可用性升级；
+- 3、【新增】会话渲染增强（Desk版）：Markdown渲染升级，支持远程图片、本地图片及文件预览，提升会话内容可读性；
 - 3、【ING】SKILL技能：
 
 - 【TODO】Desk版本：记忆；

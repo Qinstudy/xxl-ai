@@ -25,7 +25,7 @@ export const useLayoutStore = defineStore('layout', () => {
   const rightPanelVisible = ref(false)
 
   /* 右侧侧栏当前工具：默认文件，顶部 Tab 切换 files / browser */
-  const rightPanelTool = ref<'' | 'files' | 'browser'>('files')
+  const rightPanelTool = ref<'files' | 'browser'>('files')
 
   /* 右侧侧栏是否放大占满正文区 */
   const rightPanelMaximized = ref(false)

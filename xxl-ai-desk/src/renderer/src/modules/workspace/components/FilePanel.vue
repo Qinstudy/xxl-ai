@@ -442,6 +442,12 @@ function onOpenCommand(command: string): void {
   cursor: not-allowed;
 }
 
+/* 无文件时保持按钮静止，不响应悬浮高亮 */
+.open-split.disabled:hover {
+  background: var(--desk-bg);
+  color: var(--desk-text-secondary);
+}
+
 .open-split-main,
 .open-split-toggle {
   display: inline-flex;

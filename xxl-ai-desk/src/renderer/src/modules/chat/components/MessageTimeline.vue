@@ -8,11 +8,22 @@ import { renderMarkdown } from '@renderer/composables/useMarkdown'
 import { onCodeCopyClick } from '@renderer/composables/useCodeCopy'
 import { toolArgsText, toolView } from '@renderer/composables/useToolView'
 import { useNow } from '@renderer/composables/useNow'
+import { useChatStore } from '@renderer/stores/chat'
+import { useProjectStore } from '@renderer/stores/project'
 import { t } from '@renderer/i18n'
 import { formatDuration } from '../utils/format'
 import type { ToolCallState, UiMessage } from '@renderer/types'
 
 const props = defineProps<{ message: UiMessage }>()
+
+const chat = useChatStore()
+const project = useProjectStore()
+
+/* 相对图片基准目录：当前会话所属项目的根目录，用于解析 Markdown 中的相对图片路径 */
+const baseDir = computed(() => {
+  const projectId = chat.currentSession?.projectId
+  return project.projects.find((item) => item.id === projectId)?.path ?? ''
+})
 
 /* 生成中：共享秒级时钟，实时刷新耗时展示 */
 const now = useNow(() => Boolean(props.message.pending))
@@ -137,7 +148,7 @@ function toolDuration(tool: ToolCallState): string {
         class="step step-text markdown-body"
         :class="{ 'is-error': message.error && isLastPart(index) }"
         @click="onCodeCopyClick"
-        v-html="renderMarkdown(part.text)"
+        v-html="renderMarkdown(part.text, baseDir)"
       ></div>
     </template>
 

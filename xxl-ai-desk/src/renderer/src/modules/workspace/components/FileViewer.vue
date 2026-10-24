@@ -7,6 +7,7 @@ import { computed, nextTick, ref } from 'vue'
 import { renderMarkdown } from '@renderer/composables/useMarkdown'
 import { onCodeCopyClick } from '@renderer/composables/useCodeCopy'
 import { escapeHtml, highlightCode, languageOf } from '@renderer/composables/useHighlight'
+import { parentDir } from '../utils/path'
 import { t } from '@renderer/i18n'
 import type { FileContent } from '@shared/ipc'
 
@@ -109,7 +110,7 @@ function syncGutter(): void {
         v-else-if="showPreview && isMarkdown"
         class="viewer-markdown markdown-body"
         @click="onCodeCopyClick"
-        v-html="renderMarkdown(file.content)"
+        v-html="renderMarkdown(file.content, parentDir(file.path))"
       ></div>
       <div v-else-if="file.binary" class="viewer-empty">{{ t('panel.binary') }}</div>
       <!-- 可编辑：带行号的纯文本编辑器（⌘/Ctrl+S 保存），高亮层置于文本域下方 -->
