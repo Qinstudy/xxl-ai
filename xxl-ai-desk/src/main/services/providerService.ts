@@ -9,7 +9,7 @@ import { eq } from 'drizzle-orm'
 import { getDb } from '../db'
 import { providerTable } from '../db/schema'
 import { decryptSecret, encryptSecret } from './securityService'
-import { normalizeBaseUrl, USER_AGENT } from '../agent/worker/models'
+import { normalizeBaseUrl, USER_AGENT } from '@shared/providerUrl'
 import { getSettings, saveSettings } from './settingsService'
 import type { ProviderDTO, ProviderModelQuery } from '@shared/ipc'
 

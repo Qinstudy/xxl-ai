@@ -197,30 +197,36 @@ onBeforeUnmount(() => {
       @mousedown="startResize"
       @dblclick="layout.resetTerminalHeight"
     ></div>
-    <!-- 标签栏：切换/关闭终端标签，右侧为新建与隐藏面板 -->
+    <!-- 标签栏：切换/关闭终端标签，标签右侧为新建，最右侧为隐藏面板 -->
     <div class="terminal-header">
-      <div class="terminal-tabs">
+      <div class="terminal-tabs-bar">
+        <div class="terminal-tabs">
+          <button
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="terminal-tab"
+            :class="{ active: tab.id === activeId }"
+            :title="tab.title"
+            @click="activate(tab.id)"
+          >
+            <svg class="panel-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
+              <path d="M7.5 10l2.5 2.5-2.5 2.5" />
+              <path d="M12.5 15H17" />
+            </svg>
+            <span class="terminal-tab-name">{{ tab.title }}</span>
+            <el-icon class="terminal-tab-close" @click.stop="disposeTab(tab.id)"><Close /></el-icon>
+          </button>
+        </div>
         <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          class="terminal-tab"
-          :class="{ active: tab.id === activeId }"
-          :title="tab.title"
-          @click="activate(tab.id)"
+          class="sidebar-toggle terminal-new"
+          :title="t('chat.newTerminal')"
+          @click="openTerminal"
         >
-          <svg class="panel-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
-            <path d="M7.5 10l2.5 2.5-2.5 2.5" />
-            <path d="M12.5 15H17" />
-          </svg>
-          <span class="terminal-tab-name">{{ tab.title }}</span>
-          <el-icon class="terminal-tab-close" @click.stop="disposeTab(tab.id)"><Close /></el-icon>
+          <el-icon><Plus /></el-icon>
         </button>
       </div>
       <div class="terminal-actions">
-        <button class="sidebar-toggle" :title="t('chat.newTerminal')" @click="openTerminal">
-          <el-icon><Plus /></el-icon>
-        </button>
         <button class="sidebar-toggle" :title="t('chat.hideTerminal')" @click="emit('close')">
           <el-icon><Close /></el-icon>
         </button>
@@ -286,6 +292,15 @@ body.resizing-vertical .terminal-resizer {
   gap: 8px;
   padding: 0 10px 0 14px;
   border-bottom: 1px solid var(--desk-border);
+}
+
+/* 左侧分组：标签区 + 新建按钮，新建紧随标签右侧且不随标签滚动 */
+.terminal-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
 }
 
 .terminal-tabs {

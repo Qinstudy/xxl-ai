@@ -36,7 +36,8 @@ function go(key: SectionKey): void {
         :title="t('layout.home')"
         @click="go('home')"
       >
-        <el-icon><HomeFilled /></el-icon>
+        <!-- 首页：房子轮廓 -->
+        <el-icon><House /></el-icon>
       </button>
       <button
         class="rail-btn"
@@ -44,13 +45,8 @@ function go(key: SectionKey): void {
         :title="t('plugin.title')"
         @click="go('plugin')"
       >
-        <!-- 插件：带插头的图标 -->
-        <svg class="desk-svg-icon rail-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 22v-5" />
-          <path d="M9 8V2" />
-          <path d="M15 8V2" />
-          <path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z" />
-        </svg>
+        <!-- 插件：九宫格（扩展集） -->
+        <el-icon><Grid /></el-icon>
       </button>
     </div>
     <div class="rail-group">
@@ -113,10 +109,5 @@ function go(key: SectionKey): void {
 .rail-btn.active {
   background: var(--desk-primary-soft);
   color: var(--desk-text);
-}
-
-.rail-icon {
-  width: 18px;
-  height: 18px;
 }
 </style>

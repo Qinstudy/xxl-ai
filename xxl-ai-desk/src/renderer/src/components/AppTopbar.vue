@@ -6,10 +6,9 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import NavControls from '@renderer/components/NavControls.vue'
-import ChatTopbarActions from '@renderer/modules/chat/components/ChatTopbarActions.vue'
+import { ChatTopbarActions, useSessionActions } from '@renderer/modules/chat'
 import { useChatStore } from '@renderer/stores/chat'
 import { useSettingsStore } from '@renderer/stores/settings'
-import { useSessionActions } from '@renderer/modules/chat/composables/useSessionActions'
 import { NAV_SECTIONS, sectionOfPath } from '@renderer/config/nav'
 import { t } from '@renderer/i18n'
 

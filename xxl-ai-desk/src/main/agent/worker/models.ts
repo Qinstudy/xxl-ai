@@ -4,6 +4,7 @@
  */
 
 import type { Model, MutableModels } from '@earendil-works/pi-ai'
+import { normalizeBaseUrl, USER_AGENT } from '@shared/providerUrl'
 import type { ProviderModelConfig } from '@shared/agentProtocol'
 
 /* 构建 Pi Models 所需的供应商配置：统一取自运行时协议定义 */
@@ -12,31 +13,8 @@ export type { ProviderModelConfig }
 /* 请求头中的会话占位符：按实际会话 ID 替换 */
 const SESSION_PLACEHOLDER = '{session}'
 
-/* 对外请求 User-Agent（覆盖 Pi 默认的 pi (os ...)，语义同平台 LlmModelFactory） */
-export const USER_AGENT = 'XXL-AI-Desk'
-
 /* 默认计费（供应商未提供时用零值占位，不影响本地对话） */
 const DEFAULT_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }
-
-/*
- * 归一化供应商 BaseURL：结尾去斜杠；裸地址（无路径前缀，如 Ollama http://host:11434）
- * 自动补 /v1 OpenAI 兼容版本前缀（语义同平台 LlmModelFactory）。
- */
-export function normalizeBaseUrl(baseUrl: string): string {
-  let url = (baseUrl ?? '').trim()
-  if (url.endsWith('/')) {
-    url = url.slice(0, -1)
-  }
-  try {
-    const path = new URL(url).pathname
-    if (!path || path === '/') {
-      url = `${url}/v1`
-    }
-  } catch {
-    /* 非法 URL 按原值使用，交由后续请求报错 */
-  }
-  return url
-}
 
 /*
  * 解析请求Header：{session} 占位符按会话ID替换（语义同平台 LlmModelFactory）。

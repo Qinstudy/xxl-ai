@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /* 应用外壳：左侧会话栏（可折叠）+ 右侧内容区 + 全局快捷键 */
 import { onBeforeUnmount, onMounted } from 'vue'
-import Sidebar from '@renderer/modules/chat/components/Sidebar.vue'
+import { ChatSidebar } from '@renderer/modules/chat'
 import ApprovalDialog from '@renderer/components/ApprovalDialog.vue'
 import AppTopbar from '@renderer/components/AppTopbar.vue'
 import { useSettingsStore } from '@renderer/stores/settings'
@@ -71,7 +71,7 @@ onBeforeUnmount(() => {
     <AppTopbar />
 
     <div class="desk-body">
-      <Sidebar />
+      <ChatSidebar />
       <div class="desk-main">
         <RouterView />
       </div>
