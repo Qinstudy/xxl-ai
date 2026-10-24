@@ -1,11 +1,10 @@
 <script setup lang="ts">
 /*
-* 全局顶栏：贯通整窗，固定承载「后退/前进 + 首页（新建对话）」并展示当前页面标题与操作
+* 全局顶栏：贯通整窗，左侧依次为首页入口、软件名称，其后展示页面标题与操作
 * @author xuxueli 2026-10-18
 */
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import NavControls from '@renderer/components/NavControls.vue'
 import {
   ChatCommandPalette,
   ChatTopbarActions,
@@ -14,6 +13,7 @@ import {
 } from '@renderer/modules/chat'
 import { useChatStore } from '@renderer/stores/chat'
 import { useSettingsStore } from '@renderer/stores/settings'
+import { useLayoutStore } from '@renderer/stores/layout'
 import { NAV_SECTIONS, sectionOfPath } from '@renderer/config/nav'
 import { t } from '@renderer/i18n'
 
@@ -21,6 +21,7 @@ const route = useRoute()
 const router = useRouter()
 const chat = useChatStore()
 const settings = useSettingsStore()
+const layout = useLayoutStore()
 /* 会话操作（重命名 / 删除） */
 const { onChatCommand } = useSessionActions()
 /* 搜索命令面板显隐（顶栏入口与面板共享） */
@@ -47,13 +48,28 @@ const pageTitle = computed(() =>
 
 /* 是否有标题：仅在有标题时才展示标题前的分隔线 */
 const hasTitle = computed(() => pageTitle.value.trim().length > 0)
+
+/* 软件名称：优先取用户自定义名称，未设置时回落应用默认名称 */
+const appName = computed(() => settings.settings.appName || t('app.name'))
+
+/* 回到对话模块：展开子菜单栏并进入新建对话页面 */
+function goHome(): void {
+  layout.expandSidebar()
+  chat.startNewChat()
+  void router.push('/')
+}
 </script>
 
 <template>
   <header class="desk-topbar" :class="{ mac: settings.platform === 'darwin' }">
     <div class="desk-topbar-left">
-      <NavControls />
-      <!-- 有标题时展示分隔线（｜），分隔导航控件与标题 -->
+      <!-- 首页入口：回到对话模块新建对话页（软件名称左侧） -->
+      <button class="sidebar-toggle" :title="t('chat.newChatAction')" @click="goHome">
+        <el-icon><HomeFilled /></el-icon>
+      </button>
+      <!-- 软件名称：原导航按钮位置 -->
+      <div class="topbar-brand">{{ appName }}</div>
+      <!-- 有标题时展示分隔线（｜），分隔软件名称与标题 -->
       <span v-if="hasTitle" class="topbar-sep" aria-hidden="true"></span>
       <div v-if="hasTitle" class="desk-topbar-context">
         <template v-if="isChat">
@@ -95,7 +111,23 @@ const hasTitle = computed(() => pageTitle.value.trim().length > 0)
 </template>
 
 <style scoped lang="scss">
-/* 标题前分隔线（｜）：区分导航控件与标题，仅在存在标题时渲染 */
+/* 首页入口与软件名称：按钮内含内边距，用负外边距收紧至视觉约 9px */
+.desk-topbar-left > .sidebar-toggle {
+  margin-right: -6px;
+}
+
+/* 软件名称：顶栏左侧（首页入口右侧） */
+.topbar-brand {
+  flex-shrink: 0;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 标题前分隔线（｜）：区分软件名称与标题，仅在存在标题时渲染 */
 .topbar-sep {
   flex-shrink: 0;
   width: 1px;

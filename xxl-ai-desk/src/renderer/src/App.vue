@@ -94,7 +94,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="desk-shell">
-    <!-- 全局顶栏：红黄绿（系统）+ 后退/前进 + 折叠按钮；页面标题/操作随路由展示 -->
+    <!-- 全局顶栏：软件名称 + 页面标题/操作随路由展示 -->
     <AppTopbar />
 
     <div class="desk-body">

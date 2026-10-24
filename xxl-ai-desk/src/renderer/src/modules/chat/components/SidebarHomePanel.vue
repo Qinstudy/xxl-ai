@@ -7,7 +7,6 @@ import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@renderer/stores/chat'
-import { useSettingsStore } from '@renderer/stores/settings'
 import { useProjectStore } from '@renderer/stores/project'
 import { t } from '@renderer/i18n'
 import ProjectGroup from './ProjectGroup.vue'
@@ -15,7 +14,6 @@ import type { SessionDTO } from '@shared/ipc'
 
 const router = useRouter()
 const chat = useChatStore()
-const settings = useSettingsStore()
 const project = useProjectStore()
 
 /* 项目展开状态由 project store 统一维护（切换板块不会丢失） */
@@ -106,7 +104,7 @@ async function onSelect(id: string): Promise<void> {
   <div class="sidebar-head">
     <div class="brand">
       <div class="brand-text">
-        <div class="brand-name">{{ settings.settings.appName || t('app.name') }}</div>
+        <div class="brand-name">{{ t('chat.title') }}</div>
       </div>
     </div>
   </div>

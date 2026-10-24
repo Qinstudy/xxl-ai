@@ -59,6 +59,13 @@ export const SECTION_ENTRY: Record<SectionKey, string> = {
   settings: NAV_SECTIONS.settings.entryPath
 }
 
+/* 各板块图标（全局注册的图标组件名）：图标栏与顶栏标题共用同一来源 */
+export const SECTION_ICON: Record<SectionKey, string> = {
+  home: 'ChatDotRound',
+  plugin: 'SetUp',
+  settings: 'Setting'
+}
+
 /* 由路由路径解析所属一级板块 */
 export function sectionOfPath(path: string): SectionKey {
   if (path.startsWith('/plugin')) {

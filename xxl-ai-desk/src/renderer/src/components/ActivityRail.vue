@@ -6,7 +6,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useLayoutStore } from '@renderer/stores/layout'
-import { SECTION_ENTRY, sectionOfPath, type SectionKey } from '@renderer/config/nav'
+import { SECTION_ENTRY, SECTION_ICON, sectionOfPath, type SectionKey } from '@renderer/config/nav'
 import { t } from '@renderer/i18n'
 
 const route = useRoute()
@@ -37,7 +37,7 @@ function go(key: SectionKey): void {
         @click="go('home')"
       >
         <!-- 首页：会话气泡 -->
-        <el-icon><ChatDotRound /></el-icon>
+        <el-icon><component :is="SECTION_ICON.home" /></el-icon>
       </button>
       <button
         class="rail-btn"
@@ -46,7 +46,7 @@ function go(key: SectionKey): void {
         @click="go('plugin')"
       >
         <!-- 插件：装配/扩展 -->
-        <el-icon><SetUp /></el-icon>
+        <el-icon><component :is="SECTION_ICON.plugin" /></el-icon>
       </button>
     </div>
     <div class="rail-group">
@@ -56,7 +56,7 @@ function go(key: SectionKey): void {
         :title="t('settings.title')"
         @click="go('settings')"
       >
-        <el-icon><Setting /></el-icon>
+        <el-icon><component :is="SECTION_ICON.settings" /></el-icon>
       </button>
     </div>
   </nav>
