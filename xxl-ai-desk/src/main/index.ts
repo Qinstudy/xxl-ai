@@ -1,4 +1,4 @@
-/* XXL-AI Desk 主进程入口：窗口、生命周期、IPC 装配 */
+/* XXL-AI-Desk 主进程入口：窗口、生命周期、IPC 装配 */
 
 import { app, BrowserWindow, nativeImage, shell } from 'electron'
 import { existsSync } from 'fs'
@@ -35,7 +35,7 @@ function createWindow(): void {
     minHeight: 720,
     show: false,
     autoHideMenuBar: true,
-    title: 'XXL-AI Desk',
+    title: 'XXL-AI-Desk',
     backgroundColor: '#ffffff',
     ...(isMac
       ? {

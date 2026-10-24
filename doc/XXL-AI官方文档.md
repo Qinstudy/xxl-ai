@@ -1103,12 +1103,12 @@ xxl-ai-desk/
 
 打包产物由 electron-builder 生成（mac：`dmg` + `zip`；win：`nsis`；linux：`AppImage` + `deb`），输出目录 `xxl-ai-desk/release/{version}/`。
 
-**macOS 提示「文件损坏」的临时处理**：当前 macOS 包未做代码签名与公证，在其他电脑安装时会被 Gatekeeper 打上隔离标记，提示「XXL-AI Desk 已损坏，无法打开，你应该将它移到废纸篓」。但是，实际上文件并未损坏，去除隔离标记即可：
+**macOS 提示「文件损坏」的临时处理**：当前 macOS 包未做代码签名与公证，在其他电脑安装时会被 Gatekeeper 打上隔离标记，提示「XXL-AI-Desk 已损坏，无法打开，你应该将它移到废纸篓」。但是，实际上文件并未损坏，去除隔离标记即可：
 
 ```
 # 1、把 App 拖入 /Applications（先不要双击运行）
 # 2、终端去除隔离标记（sudo 需输入密码）
-sudo xattr -rd com.apple.quarantine "/Applications/XXL-AI\ Desk.app"
+sudo xattr -rd com.apple.quarantine "/Applications/XXL-AI-Desk.app"
 ```
 
 去除后正常打开；若首次仍被拦截，进入「系统设置 → 隐私与安全性 → 仍要打开」放行一次即可。
@@ -1167,7 +1167,7 @@ docker compose down
 
 **【本地版（Desk 桌面端）】**
 
-> 本地版（Desk 桌面端）以·与云版零依赖、独立构建发布；详细安装与操作见《XXL-AI-DESK 官方文档》。
+> 本地版（Desk 桌面端）以·与云版零依赖、独立构建发布；详细安装与操作见官方文档。
 
 - 1、【重点】Desk/客户端上线：基于 Electron + Vue3 + TypeScript 构建跨平台桌面客户端，支持 mac / win / linux 一键安装及应用，本地优先、开箱即用；
 - 2、【新增】多供应商模型接入：兼容 OpenAI 协议，供应商 + 模型本地配置；首次启动自动预置 OpenCodeGo / Ollama / Deepseek / 智谱GLM；
@@ -1194,7 +1194,9 @@ docker compose down
 - 7、【升级】项目前后端依赖版本升级，提升稳定性和安全性；
 
 ### v1.2.1 Release Notes[ING]
-- 【TODO】Desk版本：支持SKILL/MCP，记忆；
+- 【TODO】Desk版本：MCP；
+- 【TODO】Desk版本：支持SKILL；
+- 【TODO】Desk版本：记忆；
 - 【TODO】Desk版本：支持浏览器工具操作；
 
 

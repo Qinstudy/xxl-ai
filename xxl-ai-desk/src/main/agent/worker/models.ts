@@ -13,7 +13,7 @@ export type { ProviderModelConfig }
 const SESSION_PLACEHOLDER = '{session}'
 
 /* 对外请求 User-Agent（覆盖 Pi 默认的 pi (os ...)，语义同平台 LlmModelFactory） */
-export const USER_AGENT = 'XXL-AI-DESK'
+export const USER_AGENT = 'XXL-AI-Desk'
 
 /* 默认计费（供应商未提供时用零值占位，不影响本地对话） */
 const DEFAULT_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }

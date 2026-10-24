@@ -1,7 +1,7 @@
-# XXL-AI Desk 打包配置：Electron Builder 产物定义（win/mac/linux 安装包、asar 与原生依赖重编译）
+# XXL-AI-Desk 打包配置：Electron Builder 产物定义（win/mac/linux 安装包、asar 与原生依赖重编译）
 # 应用标识与展示名
 appId: com.xxl.ai.desk
-productName: XXL-AI Desk
+productName: XXL-AI-Desk
 directories:
   output: release/${version}          # 安装包输出目录（按版本分目录）
 files:

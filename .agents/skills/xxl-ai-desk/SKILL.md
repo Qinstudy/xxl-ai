@@ -3,7 +3,7 @@ name: xxl-ai-desk
 description: 在 XXL-AI 本地版（Desk 桌面客户端，xxl-ai-desk，Electron + Vue3 + Pi + SQLite/Drizzle 三进程架构）下新增或改造业务模块。当任务涉及修改 xxl-ai-desk/src/main（services/db/agent/ipc）、xxl-ai-desk/src/shared、xxl-ai-desk/src/preload 或 xxl-ai-desk/src/renderer/src（stores/modules/components/i18n）时加载本技能。
 ---
 
-# XXL-AI Desk · 本地版（桌面客户端）开发 Skill
+# XXL-AI-Desk · 本地版（桌面客户端）开发 Skill
 
 目标：把 XXL-AI 的 **本地版 `xxl-ai-desk`**（Electron + Vue3 + Pi + SQLite/Drizzle）当作脚手架，规范、快速地新增/改造一个本地业务能力。本 Skill 覆盖「需求确认 → 数据结构 → 主进程 → 渲染进程 → i18n → 验证」全流程，含落位清单、代码骨架与校验清单。
 

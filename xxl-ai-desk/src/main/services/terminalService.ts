@@ -70,7 +70,7 @@ function prepareRuntimeShell(shellPath: string): {
     writeFileSync(
       join(dir, '.zshenv'),
       [
-        '# XXL-AI Desk: 转发用户 .zshenv',
+        '# XXL-AI-Desk: 转发用户 .zshenv',
         `[ -f ${singleQuote(join(home, '.zshenv'))} ] && . ${singleQuote(join(home, '.zshenv'))}`,
         ''
       ].join('\n'),
@@ -79,7 +79,7 @@ function prepareRuntimeShell(shellPath: string): {
     writeFileSync(
       join(dir, '.zshrc'),
       [
-        '# XXL-AI Desk: 加载用户配置后按「命令运行环境」覆盖 PATH',
+        '# XXL-AI-Desk: 加载用户配置后按「命令运行环境」覆盖 PATH',
         `[ -f ${singleQuote(join(home, '.zshrc'))} ] && . ${singleQuote(join(home, '.zshrc'))}`,
         exportLine,
         ''
@@ -95,7 +95,7 @@ function prepareRuntimeShell(shellPath: string): {
     writeFileSync(
       rcFile,
       [
-        '# XXL-AI Desk: 加载用户配置后按「命令运行环境」覆盖 PATH',
+        '# XXL-AI-Desk: 加载用户配置后按「命令运行环境」覆盖 PATH',
         `[ -f ${singleQuote(join(home, '.bashrc'))} ] && . ${singleQuote(join(home, '.bashrc'))}`,
         exportLine,
         ''

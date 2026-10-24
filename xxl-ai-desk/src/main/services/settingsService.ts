@@ -13,7 +13,7 @@ const DEFAULTS: AppSettings = {
   language: 'zh',
   providerId: '',
   modelId: '',
-  systemPrompt: '你是 XXL-AI Desk 智能助手，回答简洁、准确、有条理。',
+  systemPrompt: '你是 XXL-AI-Desk 智能助手，回答简洁、准确、有条理。',
   appName: '',
   slogan: '',
   shortcuts: DEFAULT_SHORTCUTS,
