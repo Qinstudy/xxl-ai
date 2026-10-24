@@ -20,6 +20,8 @@ XXL-AI 是 AI应用开发平台，采用 Monorepo 统一托管「后端服务」
 
 本项目按交付形态提供两个 Skill：云版 `xxl-ai`（`.agents/skills/xxl-ai/SKILL.md`，服务 `xxl-ai-api` + `xxl-ai-ui`）与本地版 `xxl-ai-desk`（`.agents/skills/xxl-ai-desk/SKILL.md`，服务 Electron 桌面客户端 `xxl-ai-desk`），分别描述对应模式「新增/改造一个业务模块」的完整落位与模板；本项目已内置可复现的执行环境会自动发现并加载匹配的 Skill。启动项目前先看第三节，写代码前先加载对应模式的 Skill。
 
+分工：本文件只保留**跨端原则与索引**；Desk 的架构映射、落位模板、界面外壳、运行时与约束阈值，**一律以 `xxl-ai-desk` skill 为准**。
+
 ## 三、快速开始
 
 前置环境：JDK 17+、Maven 3.6+、Node 22+、MySQL 8、Redis（RAG 向量化另需 Milvus）。
@@ -163,66 +165,21 @@ com/xxl/ai/api/business/harness          ← 运行时支撑层：无 controller
 
 ### 4.5 Desk 本地版界面外壳规范
 
-本地版（`xxl-ai-desk`，Electron + Vue3）采用「**全局顶栏 + 常驻图标栏 + 子菜单栏 + 正文**」三段式外壳，新增/改造界面须遵循：
+本地版采用「**全局顶栏 + 常驻图标栏 + 子菜单栏 + 正文**」三段式外壳。此处只保留跨端硬规则：
 
-**布局结构**
+- **shell 不承载域逻辑**：`AppTopbar` / `Sidebar` 只做外壳与路由上下文，域内逻辑下沉 `modules/{module}`。
+- **导航单一来源**：板块 ↔ 入口路径 ↔ 顶栏标题 ↔ 子菜单项统一在 `config/nav.ts`，新增板块只改此处。
+- **交互统一复用**：面板拖拽用 `composables/usePanelResize.ts`，尺寸用 `utils/persistedWidth.ts#createPersistedWidth`，左右侧栏与底部终端共用，禁止各写一套。
+- **弹层安全**：弹层统一 `append-to-body`，并处理 `-webkit-app-region` 拖拽区，避免关闭按钮点击被窗口拖动吞掉。
 
-```
-desk-shell（纵向）
-├─ AppTopbar   全局顶栏（贯通整窗、固定最顶部）
-└─ desk-body（横向）
-   ├─ Sidebar  左侧栏 = 常驻图标栏(活动栏) + 子菜单栏(可折叠/可拖拽)
-   └─ desk-main 正文区
-```
-
-**全局顶栏（`components/AppTopbar.vue`）**
-
-- 贯通整窗、固定最顶部，内容：macOS 红黄绿预留（mac 下 `padding-left: 80px`）+ `NavControls`（后退/前进/折叠）+ 路由相关标题与操作。
-- 标题/操作随路由：首页=会话标题+重命名/删除、右侧终端/侧栏开关；插件=「插件」；系统设置=「系统设置」。
-- 标题与 `NavControls` 之间以细分隔线（｜）分隔，**仅在有标题时展示**（`hasTitle` 判定）。
-- 顶栏整体为窗口拖拽区（`-webkit-app-region: drag`），交互控件一律 `no-drag`。
-
-**左侧栏（外壳 `Sidebar.vue` + 域面板）**
-
-- 外壳 `modules/chat/components/Sidebar.vue` 只做「活动栏 + 子菜单栏容器 + 板块切换」，不含域逻辑。
-- **常驻图标栏（活动栏，`--desk-rail-width`）**：`components/ActivityRail.vue`（首页 / 插件 /（底部）系统设置）；三板块**功能隔离**，各自子菜单与正文。
-- **子菜单栏**（可折叠、可拖拽宽度）：按板块渲染——首页→`modules/chat/components/SidebarHomePanel.vue`（项目/会话）；插件/系统设置→`components/SubmenuMenu.vue`（数据来自 `config/nav.ts#NAV_SECTIONS`）。
-- 折叠按钮收起「子菜单栏」，图标栏**常驻**；板块切换时展开子菜单栏。
-- 子菜单顶部标题字体统一（18px/600），**不展示 Logo**；子菜单内文案（分组标题如「项目:」、条目名、新建对话）**字号一致**（14px）。插件子菜单名加粗（对齐「新建对话」），系统设置子菜单名常规字重；子菜单项支持左侧图标（`NavItem.icon`，取已全局注册的图标组件名）。
-
-**复用与边界（重要）**
-
-- **导航映射单一来源**：板块 ↔ 入口路径 ↔ 顶栏标题 ↔ 子菜单项 全部定义在 `config/nav.ts`；`ActivityRail` / `Sidebar` / `AppTopbar` 只读同一份，**新增板块只改此处**。
-- **shell 不承载域逻辑**：`AppTopbar` / `Sidebar` 仅做外壳与路由上下文；域内逻辑下沉到 `modules/{module}/`（如会话操作 `modules/chat/composables/useSessionActions.ts`、顶栏对话操作 `modules/chat/components/ChatTopbarActions.vue`）。
-- **面板交互统一复用**：拖拽用 `composables/usePanelResize.ts`（`edge` 区分左右缘/上下缘）；尺寸状态用 `utils/persistedWidth.ts#createPersistedWidth`（读取/夹取/持久化/复位），左侧栏、右侧栏与底部终端共用，**禁止各写一套**。
-- **共享选中态归属域**：跨「左侧子菜单 ↔ 页面」的选中态放所属域 store（如设置分类 `settings.activeTab`），勿塞进 `layout`。三个板块**共用同一子菜单宽度** `layout.panelWidth`（一处调整全局生效，双击手柄复位）。
-- **自绘 SVG 图标**：统一加 `.desk-svg-icon`（`styles/index.scss`，提供 `currentColor` 描边），尺寸由使用处覆盖。
-
-**配色分层（靠颜色区分，不用分隔线）**
-
-| 区域 | 令牌 |
-|---|---|
-| 图标栏 + 顶部栏（最深，且同色） | `--desk-chrome-bg` |
-| 子菜单栏（略浅于图标栏） | `--desk-panel-bg` |
-| 正文（白色） | `--desk-bg` |
-
-- 图标栏 / 顶栏 / 子菜单栏之间**不加带颜色的分隔线**，仅靠底色深浅区分；仅「子菜单栏 ↔ 正文」保留 1px `--desk-border` 间隔线。
-
-**尺寸令牌**（`styles/tokens.scss`）
-
-- `--desk-header-height`：顶栏高度；`--desk-rail-width`：图标栏宽度。
-
-**新增板块/页面**
-
-- 新增板块：`config/nav.ts` 加 section/子菜单 + `ActivityRail` 加按钮 + `router/index.ts` 登记路由 + 正文模块页 `modules/{module}/pages/index.vue`；同域多页可合并为 `/{module}/:tool` 单路由。
-- 图标：折叠按钮用「侧栏面板」SVG，插件入口用「插头」SVG；文案一律 `t()` 引用，zh/en 成对（shell 文案归 `layout.*`）。
+布局结构、顶栏/子菜单细则、配色与尺寸令牌、新增板块步骤等实现细节，**以 `.agents/skills/xxl-ai-desk/SKILL.md` §5 为唯一权威**。
 
 ## 五、新功能开发标准流程
 
 1. **建表**：数据库新建 `xxl_ai_*` 业务表（规范见 6.5）。
 2. **生成/手写代码**：按对应 Skill 模板直接生成等价代码。
 3. **落位与权限**：按对应 Skill 落位后端/前端文件；在 `XxlRoleEnum#buildRoleResources` 对应角色分支追加菜单/按钮项。
-4. **联调验证**：起后端 + 前端，验证菜单可见、CRUD 可用、权限生效。
+4. **联调验证**：按对应 Skill 的验证章节执行（Desk：`npm run type-check` / `build` / `dev` + 端到端验证）。
 5. **规范复核**：对照第六节规范与 Skill 内「校验清单」过一遍再提交。
 
 > 标准动作在开发前加载对应模式 Skill：云版 `xxl-ai`、本地版（Desk）`xxl-ai-desk`。
@@ -236,6 +193,7 @@ desk-shell（纵向）
 - 布尔属性不使用 `isXxx` 前缀命名，避免与 getter 冲突。
 - 注释覆盖 Java 与前端文件：文件顶部一行功能描述，间隔一行加 `@author 作者 yyyy-mm-dd`；方法注释用 `/* xxx */` 多行；属性注释在右侧 `/* xxx */` 垂直对齐；方法内部分支逻辑也需注释；已有注释需符合上述要求。
 - 避免过度设计，注重复用、易理解、易维护；同一类场景保持同一套实现方案。
+- Desk 专项约束（依赖方向、模块边界、硬/软约束、规模阈值、官方运行时优先）见 `xxl-ai-desk` skill §1–§2。
 
 ### 6.2 后端分层与接口规范
 
@@ -285,6 +243,7 @@ desk-shell（纵向）
 - 语言由 `default-settings.ts` 的 `language: 'zh' | 'en'` 配置控制，**不支持运行时切换**；element-plus 组件语言随该配置。
 - key 复用约定：通用词（新增/修改/删除/搜索/重置/操作/状态/备注/全部/正常/停用/保存成功/删除成功…）统一走 `common.*`，`modal.*`（系统提示/确定/取消）、`request.*`（错误/超时提示）；模块特有词建 `{domain}.{module}.*`。新增文案必须 zh/en **成对**提交，缺失键回退中文再回退 key。
 - 插值：`t('key', [v])`（占位 `{0}` 下标）或 `t('key', { name })`（占位 `{name}`），禁止字符串拼接。
+- Desk 渲染层：文案集中在 `src/renderer/src/i18n/locales/{zh,en}.json`，语言由设置驱动、不支持运行时切换（详见 desk skill §4.2）。
 - 后端下发的菜单名与 enum 标签不属于前端文案，不进 i18n 文件。
 
 ## 七、代码生成策略
@@ -296,9 +255,10 @@ desk-shell（纵向）
 
 - 后端：`mvn -q compile` 通过；接口用页面/接口工具自测（pageList/load/insert/update/delete、权限、空参数）。
 - 前端：Vue `npm run build`（或 eslint）+ 菜单可见 + CRUD 正常。
+- Desk 本地版：`npm run type-check` / `build` 通过 + 端到端验证，详见 `xxl-ai-desk` skill §7。
 - 提交：只提交任务相关文件，不提交 target/dist/node_modules 等产物；提交信息简洁符合仓库风格。
 
 ---
 
 - 基础规范条款源参考：xxl-ai 现有 `xxl-ai-api`、`xxl-ai-ui` 各模块既有实现。
-- 作业细则、落位清单、模板骨架与校验清单在 `.agents/skills/xxl-ai/SKILL.md`；模型与 Agent harness 运行时统一归口 `business/harness`（见 4.3）。
+- 作业细则、落位清单、模板骨架与校验清单：云版 `.agents/skills/xxl-ai/SKILL.md`，本地版 `.agents/skills/xxl-ai-desk/SKILL.md`；模型与 Agent harness 运行时（云版）统一归口 `business/harness`（见 4.3）。

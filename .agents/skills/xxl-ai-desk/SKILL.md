@@ -66,6 +66,8 @@ xxl-ai-desk/src/
 
 判定：`services` import `agent/worker` 违规；组件里出现 `spawn / 协议 / DB` 违规；反向依赖一律违规。
 
+> 通用分层原则（business / harness）见 `AGENTS.md` §4.3；本节只列 Desk 的三进程映射。
+
 补充：
 
 - **唯一持久化出口**：`getDb()` 只在 `services/*`；`agent/*` 可经 service 读配置，不写业务表。
@@ -111,15 +113,12 @@ xxl-ai-desk/src/
 - `AppTopbar` / `Sidebar` 只做外壳与路由上下文，域逻辑下沉 `modules/{module}`。
 - 颜色/尺寸只用 tokens；组件样式 scoped；全局选择器（`:global`、`:has`、`body ...`）必须写明影响面并验证。
 - 弹层统一 `append-to-body`，并处理 `-webkit-app-region` 拖拽区，避免关闭按钮点击被窗口拖动吞掉。
-- 文案一律 `t()`，zh/en 成对；通用词复用 `common.*`。
 - 列表/表格复用统一规范（字号、列宽、操作按钮间距），禁止各页面自行一套。
 
 ### 2.4 可读性与规模 [软]
 
-- 文件顶部一句话职责；注释解释「为什么」；沿用 `/* */` 风格。
-- 命名表达领域语义，禁止拼音/无意义缩写；布尔值不使用 `isXxx`。
+- 命名、注释、类型与死代码规范以 `AGENTS.md` §6.1 为准；本节只列 Desk 规模阈值。
 - 早返回代替深层嵌套；边界处禁止 `any`，强制转换必须紧邻注释说明原因。
-- 禁止死代码、调试残留、注释掉的旧实现、临时测试脚本。
 
 | 对象 | 阈值 | 依据 |
 |---|---|---|
@@ -237,8 +236,8 @@ export const useWidgetStore = defineStore('widget', () => {
 - 能力访问统一 `import { api } from '@renderer/api'`；禁止直接 `window.desk`。
 - 引用优先别名：`@renderer/*`、`@shared/*`；禁止 3 层以上 `../`。
 - `utils/*` 无 Vue 依赖；`composables/*` 含响应式；单模块专用不放公共目录。
-- 组件 PascalCase；文案 `t()`，禁止硬编码中文（注释除外）。
-- i18n 单一文件，语言由设置驱动（不支持运行时切换），zh/en 成对。
+- 组件 PascalCase；文案规范（`t()`、zh/en 成对、`common.*` 复用）以 `AGENTS.md` §6.7 为准。
+- i18n 单一文件 `i18n/locales/{zh,en}.json`；语言由设置驱动，不支持运行时切换。
 
 ## 5. 界面外壳
 
