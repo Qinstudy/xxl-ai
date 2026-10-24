@@ -127,9 +127,9 @@ function seedMcpServers(db: Database.Database): void {
       id: 'seed-mcp-playwright',
       name: 'Playwright MCP Server',
       command: 'npx',
-      args: ['@playwright/mcp@latest'],
+      args: ['@playwright/mcp@latest', '--headless'],
       remark:
-        '浏览器自动化：支持打开网页、点击、填表、截图并读取页面内容，由 Microsoft 官方维护。首次运行会下载 Chromium，依赖 Node.js/npx。'
+        '浏览器自动化：支持打开网页、点击、填表、截图并读取页面内容，由 Microsoft 官方维护。默认无头模式（不弹出浏览器窗口），移除 --headless 参数即可改为可见窗口。首次运行会下载 Chromium，依赖 Node.js/npx。'
     }
   ]
 
