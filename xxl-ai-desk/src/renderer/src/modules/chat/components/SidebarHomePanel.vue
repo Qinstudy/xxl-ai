@@ -205,7 +205,7 @@ async function onSelect(id: string): Promise<void> {
   margin-bottom: 2px;
   border-radius: 10px;
   cursor: pointer;
-  color: var(--desk-text);
+  color: var(--desk-text-secondary);
   font-size: 14px;
   font-weight: 400;
   transition: background 0.15s ease;
@@ -214,14 +214,14 @@ async function onSelect(id: string): Promise<void> {
 
 .new-btn:hover {
   background: var(--desk-primary-soft);
-  color: var(--desk-text);
+  color: var(--desk-text-secondary);
 }
 
 /* 选中态（新建对话草稿态）：与插件/设置子菜单选中样式一致 */
 .new-btn.active {
   background: var(--desk-primary-soft);
-  color: var(--desk-text);
-  font-weight: 600;
+  color: var(--desk-text-secondary);
+  font-weight: 500;
 }
 
 .new-icon {
@@ -234,7 +234,8 @@ async function onSelect(id: string): Promise<void> {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px 6px;
+  /* 左内边距对齐项目行文件夹图标（10px 列表内边距 + 12px 行内边距） */
+  padding: 0 16px 6px 22px;
 }
 
 /* 「项目」分组标签：小号加粗，区别于同级条目 */

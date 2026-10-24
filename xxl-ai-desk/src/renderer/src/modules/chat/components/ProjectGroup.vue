@@ -192,7 +192,8 @@ async function onDeleteSession(id: string): Promise<void> {
 }
 
 .project-item.active {
-  color: var(--desk-text);
+  /* 选中态仅用底色与字重区分，文字保持次级灰，避免与未选中形成过强的黑白反差 */
+  color: var(--desk-text-secondary);
   font-weight: 600;
 }
 
@@ -242,8 +243,9 @@ async function onDeleteSession(id: string): Promise<void> {
 
 .session-item.active {
   background: var(--desk-primary-soft);
-  color: var(--desk-text);
-  font-weight: 600;
+  /* 选中态文字保持次级灰，仅用底色与轻字重区分，避免过黑 */
+  color: var(--desk-text-secondary);
+  font-weight: 500;
 }
 
 .session-title {

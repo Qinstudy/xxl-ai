@@ -103,11 +103,11 @@ function go(key: SectionKey): void {
 
 .rail-btn:hover {
   background: var(--desk-primary-soft);
-  color: var(--desk-text);
+  color: var(--desk-text-secondary);
 }
 
 .rail-btn.active {
   background: var(--desk-primary-soft);
-  color: var(--desk-text);
+  color: var(--desk-text-secondary);
 }
 </style>

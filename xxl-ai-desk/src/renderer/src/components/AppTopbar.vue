@@ -115,7 +115,7 @@ const hasTitle = computed(() => pageTitle.value.trim().length > 0)
 }
 
 .chat-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   min-width: 0;
   white-space: nowrap;
@@ -145,7 +145,7 @@ const hasTitle = computed(() => pageTitle.value.trim().length > 0)
 
 /* 非对话页标题（插件 / 系统设置） */
 .topbar-title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
 }
 </style>

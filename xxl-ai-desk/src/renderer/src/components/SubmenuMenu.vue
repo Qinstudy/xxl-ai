@@ -42,7 +42,7 @@ const emit = defineEmits<{ select: [item: NavItem] }>()
   color: var(--desk-text);
 }
 
-/* 子菜单项：默认常规字重，选中项加粗并高亮底色 */
+/* 子菜单项：统一次级灰，选中项以浅底色 + 轻字重区分，避免黑白反差过强 */
 .menu-item {
   display: flex;
   align-items: center;
@@ -51,7 +51,7 @@ const emit = defineEmits<{ select: [item: NavItem] }>()
   margin-bottom: 2px;
   border-radius: 10px;
   cursor: pointer;
-  color: var(--desk-text);
+  color: var(--desk-text-secondary);
   font-size: 14px;
   font-weight: 400;
   transition: background 0.15s ease;
@@ -63,8 +63,8 @@ const emit = defineEmits<{ select: [item: NavItem] }>()
 
 .menu-item.active {
   background: var(--desk-primary-soft);
-  color: var(--desk-text);
-  font-weight: 600;
+  color: var(--desk-text-secondary);
+  font-weight: 500;
 }
 
 .menu-icon {

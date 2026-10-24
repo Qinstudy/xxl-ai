@@ -239,7 +239,7 @@ function onQuickAction(action: QuickAction): void {
 
 .palette-item:hover {
   background: var(--desk-primary-soft);
-  color: var(--desk-text);
+  color: var(--desk-text-secondary);
 }
 
 .palette-item-icon {
