@@ -19,6 +19,9 @@ import type {
 
 type McpRow = typeof mcpTable.$inferSelect
 
+/* MCP 名称排序：自然排序（数字按数值比较，如 Server 2 在 Server 10 前） */
+const NAME_COLLATOR = new Intl.Collator('zh-Hans-CN', { numeric: true, sensitivity: 'base' })
+
 /* 解析字符串 Map（headers/env）：值按需解密 */
 function parseSecretMap(raw: string, decode: boolean): Record<string, string> {
   try {
@@ -93,7 +96,6 @@ function toDTO(row: McpRow): McpDTO {
     config: row.config,
     remark: row.remark,
     enabled: row.enabled === 1,
-    sort: row.sort,
     health: parseHealth(row.health),
     addTime: row.addTime,
     updateTime: row.updateTime
@@ -127,12 +129,10 @@ function buildConfig(input: {
   return JSON.stringify(config)
 }
 
-/* MCP 列表（排序值 + 更新时间） */
+/* MCP 列表：按名称自然排序 */
 export function listMcps(): McpDTO[] {
   const rows = getDb().select().from(mcpTable).all()
-  return rows
-    .map(toDTO)
-    .sort((a, b) => a.sort - b.sort || b.updateTime.localeCompare(a.updateTime))
+  return rows.map(toDTO).sort((a, b) => NAME_COLLATOR.compare(a.name, b.name))
 }
 
 /* 按主键读取 MCP */
@@ -206,7 +206,6 @@ function normalizeInput(input: Partial<McpDTO>, existing: McpDTO | null): Omit<M
     config,
     remark: (input.remark ?? existing?.remark ?? '').trim(),
     enabled: (input.enabled ?? existing?.enabled ?? false) ? 1 : 0,
-    sort: input.sort ?? existing?.sort ?? 0,
     /* 本次测试结果或未变更配置的历史结果；配置已变更则清空，避免展示过期状态 */
     health: providedHealth || (unchangedConfig && existing?.health ? JSON.stringify(existing.health) : '')
   }
@@ -309,7 +308,6 @@ export function buildRuntimeConfig(input: Partial<McpDTO>): McpRuntimeConfig {
       config: '',
       remark: '',
       enabled: false,
-      sort: 0,
       health: null,
       addTime: '',
       updateTime: ''
