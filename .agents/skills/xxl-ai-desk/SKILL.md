@@ -251,7 +251,7 @@ desk-shell（纵向）
 
 - **导航单一来源**：板块 ↔ 入口路径 ↔ 顶栏标题 ↔ 子菜单项均在 `config/nav.ts`；新增板块只改此处（ActivityRail 加按钮 + 注册路由 + 正文页）。
 - **顶栏**：标题/操作随路由（首页=会话标题，插件=「插件」，设置=「系统设置」）；标题与 NavControls 间的细线仅在有标题时展示；交互控件 `no-drag`。
-- **子菜单**：标题 18px/600，条目不超 14px；插件子菜单名加粗、设置常规；不展示 Logo；点击当前板块按钮切换子菜单栏折叠/展开，图标栏常驻。
+- **子菜单**：标题 18px/600，条目 14px/400，选中项 600 + 浅底；不展示 Logo；点击当前板块按钮切换子菜单栏折叠/展开，图标栏常驻。
 - **shell 不承载域逻辑**：域内逻辑下沉 `modules/{module}`。
 - **面板交互统一复用**：拖拽用 `composables/usePanelResize.ts`（edge：左右缘/上下缘）；尺寸用 `utils/persistedWidth.ts#createPersistedWidth`（读取/夹取/持久化/复位），左侧栏、右侧栏、底部终端共用。
 - **共享选中态归属域**：跨「子菜单 ↔ 页面」的选中态放所属域 store（如 `settings.activeTab`），不塞进 `layout`。

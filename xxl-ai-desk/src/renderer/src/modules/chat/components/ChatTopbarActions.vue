@@ -1,15 +1,20 @@
 <script setup lang="ts">
 /*
-* 顶栏对话操作：底部终端 / 右侧侧栏（侧边任务）显隐开关
+* 顶栏对话操作：搜索面板 / 底部终端 / 右侧侧栏（侧边任务）显隐开关
 * @author xuxueli 2026-10-18
 */
 import { useLayoutStore } from '@renderer/stores/layout'
+import { useCommandPalette } from '../composables/useCommandPalette'
 import { t } from '@renderer/i18n'
 
 const layout = useLayoutStore()
+const { openPalette } = useCommandPalette()
 </script>
 
 <template>
+  <button class="sidebar-toggle" :title="t('common.search')" @click="openPalette">
+    <el-icon class="search-icon"><Search /></el-icon>
+  </button>
   <button
     class="sidebar-toggle"
     :class="{ active: layout.terminalVisible }"
@@ -46,5 +51,10 @@ const layout = useLayoutStore()
 .panel-icon {
   width: 16px;
   height: 16px;
+}
+
+/* 搜索图标尺寸：与面板图标保持一致 */
+.search-icon {
+  font-size: 16px;
 }
 </style>

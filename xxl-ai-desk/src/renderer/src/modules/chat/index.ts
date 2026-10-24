@@ -6,4 +6,6 @@
 
 export { default as ChatSidebar } from './components/Sidebar.vue'
 export { default as ChatTopbarActions } from './components/ChatTopbarActions.vue'
+export { default as ChatCommandPalette } from './components/CommandPalette.vue'
+export { useCommandPalette } from './composables/useCommandPalette'
 export { useSessionActions } from './composables/useSessionActions'

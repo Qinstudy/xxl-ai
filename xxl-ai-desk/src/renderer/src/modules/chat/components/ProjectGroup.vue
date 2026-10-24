@@ -174,12 +174,12 @@ async function onDeleteSession(id: string): Promise<void> {
   margin-bottom: 2px;
 }
 
-/* 项目行：与折叠箭头/图标同排，悬浮显示操作 */
+/* 项目行：图标/文字位置与「新建对话」行对齐（同缩进、同间距） */
 .project-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 10px 6px 6px;
+  gap: 8px;
+  padding: 8px 12px;
   border-radius: 10px;
   cursor: pointer;
   color: var(--desk-text-secondary);
@@ -198,6 +198,7 @@ async function onDeleteSession(id: string): Promise<void> {
 
 .project-icon {
   flex-shrink: 0;
+  font-size: 15px;
 }
 
 .project-name {
@@ -242,6 +243,7 @@ async function onDeleteSession(id: string): Promise<void> {
 .session-item.active {
   background: var(--desk-primary-soft);
   color: var(--desk-text);
+  font-weight: 600;
 }
 
 .session-title {

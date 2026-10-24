@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
-* 首页子菜单面板：新建对话 / 项目分组（项目下挂会话）/ 搜索命令面板
+* 首页子菜单面板：新建对话 / 项目分组（项目下挂会话）
 * @author xuxueli 2026-10-18
 */
 import { computed, ref, watch } from 'vue'
@@ -10,7 +10,6 @@ import { useChatStore } from '@renderer/stores/chat'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useProjectStore } from '@renderer/stores/project'
 import { t } from '@renderer/i18n'
-import CommandPalette from './CommandPalette.vue'
 import ProjectGroup from './ProjectGroup.vue'
 import type { SessionDTO } from '@shared/ipc'
 
@@ -20,9 +19,6 @@ const settings = useSettingsStore()
 const project = useProjectStore()
 
 /* 项目展开状态由 project store 统一维护（切换板块不会丢失） */
-
-/* 搜索命令面板显隐 */
-const searchVisible = ref(false)
 
 /* 排序方式：名称 / 更新时间（默认按名称排序） */
 const sortBy = ref<'time' | 'name'>('name')
@@ -65,11 +61,6 @@ function onSortCommand(command: string): void {
 /* 展开状态（由 project store 维护，组件重挂载后仍保留） */
 function isExpanded(projectId: string): boolean {
   return project.isExpanded(projectId)
-}
-
-/* 打开搜索面板（居中弹框） */
-function openSearch(): void {
-  searchVisible.value = true
 }
 
 /* 点击项目：选中并折叠/展开 */
@@ -117,10 +108,6 @@ async function onSelect(id: string): Promise<void> {
       <div class="brand-text">
         <div class="brand-name">{{ settings.settings.appName || t('app.name') }}</div>
       </div>
-      <!-- 搜索入口：位于标题右侧，打开命令面板 -->
-      <el-icon class="brand-search" :title="t('common.search')" @click="openSearch">
-        <Search />
-      </el-icon>
     </div>
   </div>
 
@@ -134,7 +121,7 @@ async function onSelect(id: string): Promise<void> {
 
   <!-- 「项目:」标题：右侧 排序（...）与 + 新建项目，鼠标悬浮展示 -->
   <div class="project-head">
-    <span class="project-label">{{ t('project.label') }}:</span>
+    <span class="project-label">{{ t('project.label') }}</span>
     <span class="project-head-actions">
       <el-dropdown trigger="click" popper-class="sort-dropdown" @command="onSortCommand">
         <el-icon class="project-icon-btn" :title="t('common.actions')"><MoreFilled /></el-icon>
@@ -174,9 +161,6 @@ async function onSelect(id: string): Promise<void> {
     />
     <el-empty v-if="projectGroups.length === 0" :description="t('project.empty')" :image-size="60" />
   </el-scrollbar>
-
-  <!-- 搜索命令面板：项目/会话关键字搜索 + 快捷操作入口 -->
-  <CommandPalette v-model:visible="searchVisible" @select="onSelect" />
 </template>
 
 <style scoped lang="scss">
@@ -206,20 +190,6 @@ async function onSelect(id: string): Promise<void> {
   white-space: nowrap;
 }
 
-/* 标题右侧搜索入口 */
-.brand-search {
-  flex-shrink: 0;
-  font-size: 16px;
-  color: var(--desk-text-secondary);
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-  transition: color 0.15s ease;
-}
-
-.brand-search:hover {
-  color: var(--desk-primary);
-}
-
 /* 新建对话：容器与子菜单列表同宽（左右各 10px），行内边距对齐 .menu-item */
 .new-chat {
   padding: 0 10px;
@@ -237,7 +207,7 @@ async function onSelect(id: string): Promise<void> {
   cursor: pointer;
   color: var(--desk-text);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 400;
   transition: background 0.15s ease;
   -webkit-app-region: no-drag;
 }
@@ -251,6 +221,7 @@ async function onSelect(id: string): Promise<void> {
 .new-btn.active {
   background: var(--desk-primary-soft);
   color: var(--desk-text);
+  font-weight: 600;
 }
 
 .new-icon {
@@ -266,8 +237,9 @@ async function onSelect(id: string): Promise<void> {
   padding: 0 16px 6px;
 }
 
+/* 「项目」分组标签：小号加粗，区别于同级条目 */
 .project-label {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--desk-text-tertiary);
 }

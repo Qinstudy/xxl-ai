@@ -6,8 +6,8 @@
 import { t } from '@renderer/i18n'
 import type { NavItem } from '@renderer/config/nav'
 
-/* bold：子菜单名是否加粗（插件板块为 true，系统设置板块为 false） */
-defineProps<{ titleKey: string; items: NavItem[]; activeKey: string; bold?: boolean }>()
+/* 子菜单项列表：选中项加粗由组件内 active 样式统一处理 */
+defineProps<{ titleKey: string; items: NavItem[]; activeKey: string }>()
 const emit = defineEmits<{ select: [item: NavItem] }>()
 </script>
 
@@ -20,7 +20,7 @@ const emit = defineEmits<{ select: [item: NavItem] }>()
       v-for="item in items"
       :key="item.key"
       class="menu-item"
-      :class="{ active: item.key === activeKey, 'is-bold': bold }"
+      :class="{ active: item.key === activeKey }"
       @click="emit('select', item)"
     >
       <el-icon v-if="item.icon" class="menu-icon"><component :is="item.icon" /></el-icon>
@@ -42,7 +42,7 @@ const emit = defineEmits<{ select: [item: NavItem] }>()
   color: var(--desk-text);
 }
 
-/* 子菜单项：颜色对齐「新建对话」（近黑），加粗由 bold 决定 */
+/* 子菜单项：默认常规字重，选中项加粗并高亮底色 */
 .menu-item {
   display: flex;
   align-items: center;
@@ -57,10 +57,6 @@ const emit = defineEmits<{ select: [item: NavItem] }>()
   transition: background 0.15s ease;
 }
 
-.menu-item.is-bold {
-  font-weight: 600;
-}
-
 .menu-item:hover {
   background: var(--desk-primary-soft);
 }
@@ -68,6 +64,7 @@ const emit = defineEmits<{ select: [item: NavItem] }>()
 .menu-item.active {
   background: var(--desk-primary-soft);
   color: var(--desk-text);
+  font-weight: 600;
 }
 
 .menu-icon {

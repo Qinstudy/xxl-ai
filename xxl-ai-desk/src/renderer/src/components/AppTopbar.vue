@@ -4,19 +4,33 @@
 * @author xuxueli 2026-10-18
 */
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import NavControls from '@renderer/components/NavControls.vue'
-import { ChatTopbarActions, useSessionActions } from '@renderer/modules/chat'
+import {
+  ChatCommandPalette,
+  ChatTopbarActions,
+  useCommandPalette,
+  useSessionActions
+} from '@renderer/modules/chat'
 import { useChatStore } from '@renderer/stores/chat'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { NAV_SECTIONS, sectionOfPath } from '@renderer/config/nav'
 import { t } from '@renderer/i18n'
 
 const route = useRoute()
+const router = useRouter()
 const chat = useChatStore()
 const settings = useSettingsStore()
 /* 会话操作（重命名 / 删除） */
 const { onChatCommand } = useSessionActions()
+/* 搜索命令面板显隐（顶栏入口与面板共享） */
+const { visible: commandPaletteVisible } = useCommandPalette()
+
+/* 搜索面板选中会话：定位会话并回到对话页 */
+async function onPickSession(sessionId: string): Promise<void> {
+  await chat.selectSession(sessionId)
+  void router.push('/')
+}
 
 /* 当前所属板块 */
 const section = computed(() => sectionOfPath(route.path))
@@ -70,10 +84,13 @@ const hasTitle = computed(() => pageTitle.value.trim().length > 0)
       </div>
     </div>
 
-    <!-- 对话页操作：底部终端 / 右侧侧栏（侧边任务）显隐开关 -->
+    <!-- 对话页操作：搜索 / 底部终端 / 右侧侧栏（侧边任务）显隐开关 -->
     <div v-if="isChat" class="desk-topbar-actions">
       <ChatTopbarActions />
     </div>
+
+    <!-- 会话搜索命令面板：由顶栏搜索入口唤起 -->
+    <ChatCommandPalette v-model:visible="commandPaletteVisible" @select="onPickSession" />
   </header>
 </template>
 
@@ -98,7 +115,7 @@ const hasTitle = computed(() => pageTitle.value.trim().length > 0)
 }
 
 .chat-title {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   min-width: 0;
   white-space: nowrap;
