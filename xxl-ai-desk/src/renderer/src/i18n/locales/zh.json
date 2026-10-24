@@ -111,8 +111,6 @@
     "approvalDeny": "拒绝"
   },
   "panel": {
-    "title": "工具",
-    "backToTools": "工具列表",
     "files": "文件",
     "browser": "浏览器",
     "needProject": "请先在对话中选择一个项目",

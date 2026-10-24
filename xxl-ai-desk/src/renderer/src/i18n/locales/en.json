@@ -111,8 +111,6 @@
     "approvalDeny": "Deny"
   },
   "panel": {
-    "title": "Tools",
-    "backToTools": "Tools",
     "files": "Files",
     "browser": "Browser",
     "needProject": "Select a project in the chat first",

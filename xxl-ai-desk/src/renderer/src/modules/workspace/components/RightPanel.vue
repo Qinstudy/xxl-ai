@@ -1,21 +1,18 @@
 <script setup lang="ts">
 /*
- * 右侧「侧边任务」面板：未选工具时展示菜单（文件 / 浏览器），
+ * 右侧「工具」面板：顶部横向 Tab（文件 / 浏览器）切换工具，
  * 选定后承载对应面板；支持放大占满正文区与收起。
  */
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { useLayoutStore } from '@renderer/stores/layout'
-import { useSettingsStore } from '@renderer/stores/settings'
 import { t } from '@renderer/i18n'
-import { formatShortcut } from '@renderer/utils/shortcut'
 import FilePanel from './FilePanel.vue'
 import BrowserPanel from './BrowserPanel.vue'
 
 const props = defineProps<{ root?: string; projectName?: string }>()
 
-/* 布局与设置 store：提供面板显隐/放大状态与快捷键配置 */
+/* 布局 store：提供面板显隐/放大状态与当前工具 */
 const layout = useLayoutStore()
-const settings = useSettingsStore()
 
 /* 面板首次打开后保持挂载（切换工具用 v-show），保留文件树/浏览器页面状态 */
 const filesOpened = ref(false)
@@ -34,45 +31,39 @@ watch(
   { immediate: true }
 )
 
-/* 当前工具标题 */
-const toolTitle = computed(() =>
-  layout.rightPanelTool === 'files'
-    ? t('panel.files')
-    : layout.rightPanelTool === 'browser'
-      ? t('panel.browser')
-      : t('panel.title')
-)
-
-/* 快捷键展示（读取用户配置的快捷操作快捷键） */
-const filesKey = computed(() => formatShortcut(settings.settings.shortcuts?.files))
-const browserKey = computed(() => formatShortcut(settings.settings.shortcuts?.browser))
-
-/* 打开指定工具 */
+/* 打开指定工具（顶部 Tab 点击） */
 function openTool(tool: 'files' | 'browser'): void {
   layout.openRightPanelTool(tool)
-}
-
-/* 返回工具菜单 */
-function backToMenu(): void {
-  layout.rightPanelTool = ''
 }
 </script>
 
 <template>
   <div class="right-panel">
     <div class="rp-header">
-      <div class="rp-title-wrap">
-        <span class="rp-title">{{ toolTitle }}</span>
+      <!-- 工具 Tab：横向摆放，点击直接切换到对应工具内容 -->
+      <div class="rp-tabs">
+        <button
+          class="rp-tab"
+          :class="{ active: layout.rightPanelTool === 'files' }"
+          @click="openTool('files')"
+        >
+          <el-icon><Folder /></el-icon>
+          <span>{{ t('panel.files') }}</span>
+        </button>
+        <button
+          class="rp-tab"
+          :class="{ active: layout.rightPanelTool === 'browser' }"
+          @click="openTool('browser')"
+        >
+          <svg class="rp-tab-icon globe" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M3 12h18" />
+            <path d="M12 3c2.5 2.6 4 5.6 4 9s-1.5 6.4-4 9c-2.5-2.6-4-5.6-4-9s1.5-6.4 4-9z" />
+          </svg>
+          <span>{{ t('panel.browser') }}</span>
+        </button>
       </div>
       <div class="rp-actions">
-        <button
-          v-if="layout.rightPanelTool"
-          class="sidebar-toggle"
-          :title="t('panel.backToTools')"
-          @click="backToMenu"
-        >
-          <el-icon><ArrowLeft /></el-icon>
-        </button>
         <button
           class="sidebar-toggle"
           :title="layout.rightPanelMaximized ? t('panel.restore') : t('panel.maximize')"
@@ -88,24 +79,6 @@ function backToMenu(): void {
     </div>
 
     <div class="rp-body">
-      <!-- 工具菜单 -->
-      <div v-if="!layout.rightPanelTool" class="rp-menu">
-        <button class="rp-menu-item" @click="openTool('files')">
-          <el-icon class="rp-menu-icon"><Folder /></el-icon>
-          <span class="rp-menu-label">{{ t('panel.files') }}</span>
-          <span class="rp-menu-key">{{ filesKey }}</span>
-        </button>
-        <button class="rp-menu-item" @click="openTool('browser')">
-          <svg class="rp-menu-icon globe" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M3 12h18" />
-            <path d="M12 3c2.5 2.6 4 5.6 4 9s-1.5 6.4-4 9c-2.5-2.6-4-5.6-4-9s1.5-6.4 4-9z" />
-          </svg>
-          <span class="rp-menu-label">{{ t('panel.browser') }}</span>
-          <span class="rp-menu-key">{{ browserKey }}</span>
-        </button>
-      </div>
-
       <FilePanel
         v-if="filesOpened"
         v-show="layout.rightPanelTool === 'files'"
@@ -136,20 +109,52 @@ function backToMenu(): void {
   border-bottom: 1px solid var(--desk-border);
 }
 
-.rp-title-wrap {
+/* 工具 Tab：横向并排，选中项浅底高亮 */
+.rp-tabs {
   display: flex;
   align-items: center;
+  gap: 4px;
   min-width: 0;
+  -webkit-app-region: no-drag;
 }
 
-.rp-title {
+.rp-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--desk-text-secondary);
   font-size: 13px;
-  font-weight: 600;
-  color: var(--desk-text);
-  text-align: left;
+  cursor: pointer;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.rp-tab:hover {
+  background: var(--desk-primary-soft);
+  color: var(--desk-text);
+}
+
+.rp-tab.active {
+  background: var(--desk-primary-soft);
+  color: var(--desk-text);
+  font-weight: 600;
+}
+
+.rp-tab-icon.globe {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .rp-actions {
@@ -169,68 +174,5 @@ function backToMenu(): void {
 .rp-body > * {
   flex: 1;
   min-height: 0;
-}
-
-/* 工具菜单：列表行 + 右侧快捷键 */
-.rp-menu {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 10px;
-}
-
-.rp-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 9px 10px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--desk-text-secondary);
-  font-size: 14px;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-}
-
-.rp-menu-item:hover {
-  background: var(--desk-primary-soft);
-  color: var(--desk-text);
-}
-
-.rp-menu-icon {
-  flex-shrink: 0;
-  font-size: 16px;
-  color: var(--desk-text-tertiary);
-}
-
-.rp-menu-icon.globe {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  color: var(--desk-text-tertiary);
-}
-
-.rp-menu-item:hover .rp-menu-icon {
-  color: var(--desk-text);
-}
-
-.rp-menu-label {
-  flex: 1;
-}
-
-.rp-menu-key {
-  flex-shrink: 0;
-  font-size: 12px;
-  color: var(--desk-text-tertiary);
 }
 </style>

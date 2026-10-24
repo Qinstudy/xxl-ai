@@ -24,8 +24,8 @@ export const useLayoutStore = defineStore('layout', () => {
   /* 右侧侧栏（侧边任务）是否展示（默认隐藏） */
   const rightPanelVisible = ref(false)
 
-  /* 右侧侧栏当前工具：'' 表示未选择（展示工具菜单），files/browser 为具体面板 */
-  const rightPanelTool = ref<'' | 'files' | 'browser'>('')
+  /* 右侧侧栏当前工具：默认文件，顶部 Tab 切换 files / browser */
+  const rightPanelTool = ref<'' | 'files' | 'browser'>('files')
 
   /* 右侧侧栏是否放大占满正文区 */
   const rightPanelMaximized = ref(false)
