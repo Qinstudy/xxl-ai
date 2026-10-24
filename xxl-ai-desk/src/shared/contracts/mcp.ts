@@ -50,8 +50,6 @@ export interface McpDTO {
   remark: string
   /* 是否生效（开启后才参与对话） */
   enabled: boolean
-  /* 排序值（升序） */
-  sort: number
   /* 最近检测结果 */
   health: McpHealth | null
   /* 新增时间（ISO） */

@@ -71,7 +71,6 @@ CREATE TABLE IF NOT EXISTS desk_mcp (
   config      TEXT NOT NULL DEFAULT '{}',
   remark      TEXT NOT NULL DEFAULT '',
   enabled     INTEGER NOT NULL DEFAULT 0,
-  sort        INTEGER NOT NULL DEFAULT 0,
   health      TEXT NOT NULL DEFAULT '',
   add_time    TEXT NOT NULL DEFAULT '',
   update_time TEXT NOT NULL DEFAULT ''
