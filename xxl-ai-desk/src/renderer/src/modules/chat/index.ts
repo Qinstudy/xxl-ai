@@ -9,3 +9,4 @@ export { default as ChatTopbarActions } from './components/ChatTopbarActions.vue
 export { default as ChatCommandPalette } from './components/CommandPalette.vue'
 export { useCommandPalette } from './composables/useCommandPalette'
 export { useSessionActions } from './composables/useSessionActions'
+export { useTerminalTarget } from './composables/useTerminalTarget'

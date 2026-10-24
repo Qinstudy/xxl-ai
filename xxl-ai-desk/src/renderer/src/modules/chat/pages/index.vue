@@ -8,14 +8,14 @@ import ChatComposer from '@renderer/modules/chat/components/ChatComposer.vue'
 import ChatEmptyExtras from '@renderer/modules/chat/components/ChatEmptyExtras.vue'
 import EmptyState from '@renderer/components/EmptyState.vue'
 import {
-  WorkspaceRightPanel as RightPanel,
-  WorkspaceTerminalPanel as TerminalPanel
+  WorkspaceRightPanel as RightPanel
 } from '@renderer/modules/workspace'
 import { useChatStore } from '@renderer/stores/chat'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useLayoutStore } from '@renderer/stores/layout'
 import { useProjectStore } from '@renderer/stores/project'
 import { usePanelResize } from '@renderer/composables/usePanelResize'
+import { useTerminalTarget } from '../composables/useTerminalTarget'
 import { t } from '@renderer/i18n'
 import type { ChatMode } from '@shared/ipc'
 
@@ -24,6 +24,8 @@ const chat = useChatStore()
 const settings = useSettingsStore()
 const layout = useLayoutStore()
 const project = useProjectStore()
+/* 右侧面板与终端共用当前项目定位 */
+const { terminalProject } = useTerminalTarget()
 /* 消息滚动容器与输入框组件引用 */
 const scrollRef = ref<HTMLElement | null>(null)
 const composerRef = ref()
@@ -31,25 +33,6 @@ const composerRef = ref()
 /* 是否有消息、是否具备对话条件（存在启用的供应商） */
 const hasMessages = computed(() => chat.messages.length > 0)
 const canChat = computed(() => settings.enabledProviders.length > 0)
-
-/* 终端标签名与工作目录：优先当前会话所属项目，回落当前选择项目 */
-const terminalProject = computed(() => {
-  const id = chat.currentSession?.projectId || project.currentId
-  return project.projects.find((item) => item.id === id) || null
-})
-const terminalName = computed(() => terminalProject.value?.name || t('chat.terminal'))
-const terminalCwd = computed(() => terminalProject.value?.path || undefined)
-
-/* 终端面板首次打开后保持挂载（隐藏时仅 v-show，不销毁本地 PTY 会话） */
-const terminalOpened = ref(false)
-watch(
-  () => layout.terminalVisible,
-  (visible) => {
-    if (visible) {
-      terminalOpened.value = true
-    }
-  }
-)
 
 /* 拖拽右侧栏左边缘调整宽度（统一复用 usePanelResize） */
 const { startResize: startPanelResize } = usePanelResize({
@@ -235,16 +218,6 @@ async function onRemoveMessage(message: { id: string }): Promise<void> {
         <RightPanel :root="terminalProject?.path" :project-name="terminalProject?.name" />
       </aside>
     </div>
-
-    <!-- 底部终端面板：本地 PTY + xterm（首次打开后保持挂载） -->
-    <TerminalPanel
-      v-if="terminalOpened"
-      v-show="layout.terminalVisible"
-      :cwd="terminalCwd"
-      :title="terminalName"
-      :visible="layout.terminalVisible"
-      @close="layout.toggleTerminal"
-    />
   </div>
 </template>
 

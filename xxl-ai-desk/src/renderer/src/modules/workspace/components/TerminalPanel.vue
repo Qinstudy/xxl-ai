@@ -148,13 +148,18 @@ function disposeTab(id: string): void {
   }
 }
 
-/* 面板重新展示时（v-show 切换）重新自适应 */
+/* 面板重新展示时（v-show 切换）重新自适应；若标签已全部关闭则补开一个终端 */
 watch(
   () => props.visible,
   (visible) => {
-    if (visible) {
-      nextTick(() => fitTerminal(activeId.value))
+    if (!visible) {
+      return
     }
+    if (tabs.value.length === 0) {
+      void openTerminal()
+      return
+    }
+    nextTick(() => fitTerminal(activeId.value))
   }
 )
 
@@ -171,7 +176,10 @@ onMounted(() => {
       runtime.term.write(`\r\n${t('chat.terminalExited', [String(event.exitCode ?? 0)])}\r\n`)
     }
   })
-  void openTerminal()
+  /* 组件常驻应用外壳：仅首次展示时创建 PTY，隐藏/路由切换不再重建 */
+  if (props.visible) {
+    void openTerminal()
+  }
 })
 
 onBeforeUnmount(() => {

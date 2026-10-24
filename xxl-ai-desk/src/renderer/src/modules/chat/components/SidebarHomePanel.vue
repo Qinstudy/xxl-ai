@@ -238,11 +238,11 @@ async function onSelect(id: string): Promise<void> {
   padding: 0 16px 6px 22px;
 }
 
-/* 「项目」分组标签：小号加粗，区别于同级条目 */
+/* 「项目」分组标签：小号加粗，颜色比条目略浅 */
 .project-label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--desk-text-tertiary);
+  color: var(--desk-text-secondary);
 }
 
 /* 排序/新建入口：默认隐藏，悬浮「项目:」标题行时展示 */

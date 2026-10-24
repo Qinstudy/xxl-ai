@@ -182,7 +182,7 @@ async function onDeleteSession(id: string): Promise<void> {
   padding: 8px 12px;
   border-radius: 10px;
   cursor: pointer;
-  color: var(--desk-text-secondary);
+  color: var(--desk-text-submenu);
   font-size: 14px;
   transition: background 0.15s ease;
 }
@@ -232,7 +232,7 @@ async function onDeleteSession(id: string): Promise<void> {
   margin-bottom: 2px;
   border-radius: 10px;
   cursor: pointer;
-  color: var(--desk-text-secondary);
+  color: var(--desk-text-submenu);
   transition: background 0.15s ease;
   font-size: 14px;
 }

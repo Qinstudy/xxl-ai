@@ -1,21 +1,48 @@
 <script setup lang="ts">
 /* 应用外壳：左侧会话栏（可折叠）+ 右侧内容区 + 全局快捷键 */
-import { onBeforeUnmount, onMounted } from 'vue'
-import { ChatSidebar } from '@renderer/modules/chat'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { ChatSidebar, useTerminalTarget } from '@renderer/modules/chat'
+import { WorkspaceTerminalPanel } from '@renderer/modules/workspace/terminal'
 import ApprovalDialog from '@renderer/components/ApprovalDialog.vue'
 import AppTopbar from '@renderer/components/AppTopbar.vue'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useChatStore } from '@renderer/stores/chat'
 import { useProjectStore } from '@renderer/stores/project'
+import { useLayoutStore } from '@renderer/stores/layout'
 import { useQuickAction } from '@renderer/composables/useQuickAction'
+import { sectionOfPath } from '@renderer/config/nav'
 import { matchShortcut } from '@renderer/utils/shortcut'
 import { t } from './i18n'
 import type { QuickAction } from '@shared/ipc'
 
+const route = useRoute()
 const settings = useSettingsStore()
 const chat = useChatStore()
 const project = useProjectStore()
+const layout = useLayoutStore()
 const runQuickAction = useQuickAction()
+const { terminalCwd, terminalName } = useTerminalTarget()
+
+/* 终端面板是否已首次挂载：首次打开后常驻，避免路由切换导致 PTY 重建 */
+const terminalMounted = ref(false)
+
+/* 是否对话页（终端仅在对话页展示，但组件常驻以保留会话） */
+const isChat = computed(() => sectionOfPath(route.path) === 'home')
+
+/* 终端展示条件：对话页且用户已打开 */
+const terminalVisible = computed(() => isChat.value && layout.terminalVisible)
+
+/* 首次打开后挂载终端组件；此后仅 v-show 切换，PTY 与滚动历史保持 */
+watch(
+  terminalVisible,
+  (visible) => {
+    if (visible) {
+      terminalMounted.value = true
+    }
+  },
+  { immediate: true }
+)
 
 /* 启动后延迟检查更新的定时器（卸载时清理） */
 let updateTimer: ReturnType<typeof setTimeout> | null = null
@@ -73,7 +100,19 @@ onBeforeUnmount(() => {
     <div class="desk-body">
       <ChatSidebar />
       <div class="desk-main">
-        <RouterView />
+        <div class="desk-view">
+          <RouterView />
+        </div>
+
+        <!-- 底部终端：首次打开后常驻挂载，仅切换显隐，避免 PTY 随路由切换重建 -->
+        <WorkspaceTerminalPanel
+          v-if="terminalMounted"
+          v-show="terminalVisible"
+          :cwd="terminalCwd"
+          :title="terminalName"
+          :visible="terminalVisible"
+          @close="layout.toggleTerminal"
+        />
       </div>
     </div>
 
@@ -107,6 +146,14 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* 页面容器：占满终端以外的剩余高度，供各页面 height:100% 使用 */
+.desk-view {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .update-version {
   font-size: 15px;
   font-weight: 600;
