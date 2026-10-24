@@ -6,7 +6,7 @@
  * GUI 启动的进程默认 PATH 不含 Homebrew 等目录，故补充常见包管理器目录作为兜底。
  */
 
-import { execFile } from 'child_process'
+import { execFile, execFileSync } from 'child_process'
 import { chmodSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'fs'
 import { delimiter, dirname, isAbsolute, join } from 'path'
 import { getDataDir } from '../config/paths'
@@ -124,9 +124,43 @@ export function runtimePathPrefix(): string[] {
   return [...new Set(dirs.filter(Boolean))]
 }
 
-/* 依据当前设置组装完整运行时 PATH：前缀目录前置到原 PATH */
+/* 登录 shell 的 PATH 缓存（GUI 启动的进程默认不继承用户 shell 配置） */
+let cachedLoginPath: string | null = null
+
+/* 解析登录 shell 的 PATH：用于命中 nvm / volta 等安装在用户目录下的 npx、uvx */
+function loginShellPath(): string {
+  if (cachedLoginPath !== null) {
+    return cachedLoginPath
+  }
+  if (process.platform === 'win32') {
+    cachedLoginPath = ''
+    return cachedLoginPath
+  }
+  try {
+    const shell = process.env.SHELL || '/bin/zsh'
+    const output = execFileSync(shell, ['-ilc', 'printenv PATH'], {
+      timeout: 4000,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    })
+    /* 交互式 shell 可能有启动提示，取最后一行有效 PATH */
+    const line = output
+      .split('\n')
+      .map((item) => item.trim())
+      .filter((item) => item.includes('/'))
+      .pop()
+    cachedLoginPath = line ?? ''
+  } catch {
+    cachedLoginPath = ''
+  }
+  return cachedLoginPath
+}
+
+/* 依据当前设置组装完整运行时 PATH：前缀目录前置到原 PATH（并补充登录 shell PATH） */
 export function buildRuntimePath(basePath: string = process.env.PATH ?? ''): string {
-  return joinUniqueDirs(runtimePathPrefix(), basePath)
+  const extra = loginShellPath()
+  const merged = extra ? `${basePath}${delimiter}${extra}` : basePath
+  return joinUniqueDirs(runtimePathPrefix(), merged)
 }
 
 /* 终端 shell 包装脚本目录（按设置的优先级重排 PATH） */

@@ -15,6 +15,7 @@ import type {
 } from '@shared/agentProtocol'
 import { getSettings } from './settingsService'
 import { getProvider } from './providerService'
+import { listEnabledMcpServers } from './mcpService'
 import { getSession, listMessages, replaceMessages, updateSession } from './sessionService'
 import { getProject } from './projectService'
 import { buildRuntimePath } from './envService'
@@ -23,6 +24,9 @@ import { resolveApproval } from '../agent/host/approval'
 
 /* 下发到渲染层的对话事件负载（携带会话上下文） */
 export type ChatEventPayload = { sessionId: string } & HostEvent
+
+/* 已请求终止的会话：终止轮次不再展示/落库「调用失败」提示 */
+const abortRequested = new Set<string>()
 
 /* 将 Agent 消息内容归一化为纯文本（用于列表预览与检索） */
 function contentToText(message: unknown): string {
@@ -101,13 +105,55 @@ function persistFailureRound(sessionId: string, text: string, tip: string): void
   }))
   replaceMessages(sessionId, [
     ...existing,
-    { role: 'user', content: text, data: JSON.stringify({ role: 'user', content: text }) },
+    {
+      role: 'user',
+      content: text,
+      /* content 必须是数组（Pi 消息格式），否则下一轮会因无法迭代而报错 */
+      data: JSON.stringify({
+        role: 'user',
+        content: [{ type: 'text', text }],
+        timestamp: Date.now()
+      })
+    },
     {
       role: 'assistant',
       content: tip,
-      data: JSON.stringify({ role: 'assistant', stopReason: 'error', errorMessage: tip })
+      data: JSON.stringify({
+        role: 'assistant',
+        content: [{ type: 'text', text: tip }],
+        stopReason: 'error',
+        errorMessage: tip,
+        timestamp: Date.now()
+      })
     }
   ])
+}
+
+/*
+ * 归一化历史消息：兼容早期失败轮次落库的非数组 content（字符串 / 缺失），
+ * 避免 Pi 在请求时因 message.content 不可迭代而整轮失败。
+ */
+function normalizeHistoryMessage(raw: unknown): { role?: string; content?: unknown } | null {
+  if (!raw || typeof raw !== 'object') {
+    return null
+  }
+  const message = raw as { role?: string; content?: unknown; errorMessage?: unknown }
+  if (!message.role || message.role === 'system') {
+    return null
+  }
+  let content = message.content
+  if (typeof content === 'string') {
+    content = [{ type: 'text', text: content }]
+  }
+  if (!Array.isArray(content)) {
+    /* 失败提示消息可能缺失 content：用 errorMessage 兜底，否则跳过 */
+    if (typeof message.errorMessage === 'string' && message.errorMessage) {
+      content = [{ type: 'text', text: message.errorMessage }]
+    } else {
+      return null
+    }
+  }
+  return { ...(raw as Record<string, unknown>), content } as { role?: string; content?: unknown }
 }
 
 /* 模式说明：拼接到系统指令末尾，引导模型按当前模式行事（Plan 只读规划，Build 读写实施） */
@@ -140,6 +186,8 @@ export async function sendChat(
   emit: (payload: ChatEventPayload) => void
 ): Promise<void> {
   const { sessionId, text } = input
+  /* 新一轮开始：清除上一次的终止标记 */
+  abortRequested.delete(sessionId)
   /* 供应商/模型就绪后，错误提示统一带上「供应商 + 模型」上下文 */
   let providerName = ''
   let modelId = ''
@@ -147,6 +195,11 @@ export async function sendChat(
   /* 本轮是否已完整落库；异常兜底据此避免重复追加失败轮次 */
   let committed = false
   const emitEvent = (event: HostEvent): void => {
+    /* 用户已终止：错误事件转成正常结束，避免弹出「调用失败」 */
+    if (event.type === 'error' && abortRequested.has(sessionId)) {
+      emit({ sessionId, type: 'done' })
+      return
+    }
     const payload =
       event.type === 'error' && contextReady
         ? { ...event, message: describeError(event.message, providerName, modelId) }
@@ -197,12 +250,12 @@ export async function sendChat(
     const history = listMessages(sessionId)
       .map((message) => {
         try {
-          return JSON.parse(message.data) as { role?: string }
+          return normalizeHistoryMessage(JSON.parse(message.data))
         } catch {
           return null
         }
       })
-      .filter((item) => item !== null && item.role !== 'system')
+      .filter((item) => item !== null)
 
     /* 交运行时进程执行：流式事件回传渲染层，结束后回传完整上下文供落库 */
     const runInput: RunAgentInput = {
@@ -214,6 +267,8 @@ export async function sendChat(
       mode,
       rootDir,
       runtimePath: buildRuntimePath(),
+      /* MCP：仅下发已开启的服务，运行时进程按配置装配工具 */
+      mcpServers: listEnabledMcpServers(),
       text
     }
     const result = await runAgent(runInput, emitEvent)
@@ -232,7 +287,7 @@ export async function sendChat(
         const errorMessage = (message as { errorMessage?: string }).errorMessage
         let content = contentToText(message)
         /* 失败消息追加可读提示落库，避免切换会话后丢失错误信息（保留已生成的部分内容） */
-        if (role === 'assistant' && stopReason === 'error') {
+        if (role === 'assistant' && stopReason === 'error' && !abortRequested.has(sessionId)) {
           const tip = describeError(errorMessage ?? '', providerName, modelId)
           content = content ? `${content}\n\n${tip}` : tip
         }
@@ -249,6 +304,7 @@ export async function sendChat(
 
 /* 中止指定会话的当前生成 */
 export async function abortChat(sessionId: string): Promise<void> {
+  abortRequested.add(sessionId)
   await abortAgent(sessionId)
 }
 

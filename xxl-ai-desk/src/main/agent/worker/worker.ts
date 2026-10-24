@@ -5,8 +5,22 @@
  */
 
 import log from 'electron-log/main'
-import { abortAgent, evictAgent, getAgent, resetAgents, runPrompt } from './session'
+import {
+  abortAgent,
+  clearSessionAbort,
+  evictAgent,
+  getAgent,
+  isSessionAborted,
+  resetAgents,
+  runPrompt
+} from './session'
 import { setRuntimePath } from './tools'
+import {
+  closeAllMcpClients,
+  listServerTools,
+  setMcpRuntimePath,
+  testMcpServer
+} from './mcp/client'
 import { clearSessionPermissions, setApprovalRequester } from './sandbox'
 import type {
   ApprovalChoice,
@@ -15,6 +29,7 @@ import type {
   WorkerMessage,
   WorkerRequest
 } from '@shared/agentProtocol'
+import type { McpRuntimeConfig } from '@shared/ipc'
 
 /* 与主进程通信的端口（utilityProcess 中始终存在） */
 const port = process.parentPort
@@ -96,8 +111,12 @@ setApprovalRequester(
 /* 执行一轮对话：流式事件回传主进程，结束后回传完整上下文（供主进程落库） */
 async function handleRun(input: RunAgentInput): Promise<void> {
   try {
+    /* 新一轮开始：清除上一次的终止标记 */
+    clearSessionAbort(input.sessionId)
     /* 应用本轮运行时 PATH（设置中的 Node / Python 环境），供 run_command 使用 */
     setRuntimePath(input.runtimePath)
+    /* MCP stdio 与 run_command 共用同一 PATH，保证 npx / uvx 可解析 */
+    setMcpRuntimePath(input.runtimePath)
     const agent = await getAgent({
       sessionId: input.sessionId,
       provider: input.provider,
@@ -105,9 +124,28 @@ async function handleRun(input: RunAgentInput): Promise<void> {
       systemPrompt: input.systemPrompt,
       messages: input.messages,
       mode: input.mode,
-      rootDir: input.rootDir
+      rootDir: input.rootDir,
+      runtimePath: input.runtimePath,
+      mcpServers: input.mcpServers ?? [],
+      isAborted: () => isSessionAborted(input.sessionId)
     })
-    await runPrompt(agent, input.text, (event) => emitEvent(input.sessionId, event))
+    /* 创建 Agent 期间已被终止：不再发起模型请求，直接回传当前上下文 */
+    if (isSessionAborted(input.sessionId)) {
+      flushDelta(input.sessionId)
+      const messages = agent.state.messages.filter(
+        (message) => (message as { role?: string }).role !== 'system'
+      )
+      post({ type: 'run-done', sessionId: input.sessionId, messages })
+      return
+    }
+    await runPrompt(agent, input.text, (event) => {
+      /* 用户已终止：错误事件按正常结束下发，避免 UI 误报失败 */
+      const normalized =
+        event.type === 'error' && isSessionAborted(input.sessionId)
+          ? ({ type: 'done' } as HostEvent)
+          : event
+      emitEvent(input.sessionId, normalized)
+    })
     /* 结束前冲刷残余增量，保证文本完整落库/展示 */
     flushDelta(input.sessionId)
     const messages = agent.state.messages.filter(
@@ -122,11 +160,45 @@ async function handleRun(input: RunAgentInput): Promise<void> {
   }
 }
 
+/* 连通测试：临时连接 MCP 服务，返回服务信息与工具明细 */
+async function handleMcpTest(
+  requestId: string,
+  server: McpRuntimeConfig,
+  path: string
+): Promise<void> {
+  try {
+    const result = await testMcpServer(server, path)
+    post({ type: 'mcp-test-result', requestId, result })
+  } catch (error) {
+    post({ type: 'mcp-result-error', requestId, message: (error as Error).message })
+  }
+}
+
+/* 列举工具：复用连接缓存，返回工具元信息 */
+async function handleMcpTools(
+  requestId: string,
+  server: McpRuntimeConfig,
+  path: string
+): Promise<void> {
+  try {
+    setMcpRuntimePath(path)
+    const tools = await listServerTools(server)
+    post({ type: 'mcp-tools-result', requestId, tools })
+  } catch (error) {
+    post({ type: 'mcp-result-error', requestId, message: (error as Error).message })
+  }
+}
+
 /* 处理来自主进程的请求 */
-function handleRequest(message: WorkerRequest): void {
-  switch (message.type) {
+function handleRequest(message: WorkerRequest): void {  switch (message.type) {
     case 'run':
       void handleRun(message.input)
+      break
+    case 'mcp-test':
+      void handleMcpTest(message.requestId, message.server, message.runtimePath)
+      break
+    case 'mcp-tools':
+      void handleMcpTools(message.requestId, message.server, message.runtimePath)
       break
     case 'abort':
       void abortAgent(message.sessionId)
@@ -151,6 +223,8 @@ function handleRequest(message: WorkerRequest): void {
       }
       deltaBuffers.clear()
       resetAgents()
+      /* 配置变更/退出：关闭全部 MCP 连接，释放 stdio 子进程 */
+      void closeAllMcpClients()
       break
     }
     case 'approval-response': {

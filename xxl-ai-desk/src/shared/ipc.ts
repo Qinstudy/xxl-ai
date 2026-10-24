@@ -12,6 +12,7 @@ export * from './contracts/chat'
 export * from './contracts/terminal'
 export * from './contracts/fs'
 export * from './contracts/shell'
+export * from './contracts/mcp'
 
 import type {
   AppSettings,
@@ -27,6 +28,15 @@ import type { ChatApprovalChoice, ChatApprovalPrompt, ChatEvent } from './contra
 import type { TerminalCreateInput, TerminalDTO, TerminalEvent } from './contracts/terminal'
 import type { FileContent, FsEntry } from './contracts/fs'
 import type { OpenWithApp } from './contracts/shell'
+import type {
+  McpCategory,
+  McpDiscoverDetail,
+  McpDiscoverPage,
+  McpDiscoverQuery,
+  McpDTO,
+  McpTestResult,
+  McpToolMeta
+} from './contracts/mcp'
 
 /* 预加载暴露给渲染进程的 API */
 export interface DeskApi {
@@ -163,6 +173,25 @@ export interface DeskApi {
     /* 订阅新标签页请求（返回取消订阅函数） */
     onOpenTab(cb: (url: string) => void): () => void
   }
+  /* MCP 插件中心（在线管理 + 发现 MCP） */
+  mcp: {
+    /* MCP 服务列表 */
+    list(): Promise<McpDTO[]>
+    /* 新增或更新 MCP 服务（保存即生效） */
+    save(dto: Partial<McpDTO>): Promise<McpDTO>
+    /* 删除 MCP 服务 */
+    remove(id: string): Promise<void>
+    /* 连通测试（支持未保存草稿） */
+    test(dto: Partial<McpDTO>): Promise<McpTestResult>
+    /* 已保存服务的可用工具列表 */
+    tools(id: string): Promise<McpToolMeta[]>
+    /* 发现 MCP：在线检索 */
+    discover(query: McpDiscoverQuery): Promise<McpDiscoverPage>
+    /* 发现 MCP：社区分类列表 */
+    categories(): Promise<McpCategory[]>
+    /* 发现 MCP：详情 */
+    detail(slug: string): Promise<McpDiscoverDetail>
+  }
 }
 
 /* IPC 通道名（统一 desk:{module}:{action}；主进程经 ipcMain.handle 注册，preload 经 ipcRenderer.invoke/on 使用） */
@@ -227,5 +256,14 @@ export const IPC = {
   shellOpenWithApps: 'desk:shell:open-with-apps',
   shellOpenWith: 'desk:shell:open-with',
   /* 内嵌浏览器新窗口请求 → 渲染层新标签页 */
-  browserOpenTab: 'desk:browser:open-tab'
+  browserOpenTab: 'desk:browser:open-tab',
+  /* MCP 插件中心 */
+  mcpList: 'desk:mcp:list',
+  mcpSave: 'desk:mcp:save',
+  mcpRemove: 'desk:mcp:remove',
+  mcpTest: 'desk:mcp:test',
+  mcpTools: 'desk:mcp:tools',
+  mcpDiscover: 'desk:mcp:discover',
+  mcpCategories: 'desk:mcp:categories',
+  mcpDetail: 'desk:mcp:detail'
 } as const

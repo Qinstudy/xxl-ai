@@ -515,3 +515,19 @@ html.dark .el-button--primary {
 .el-dropdown-menu__item > .el-icon:first-child {
   margin-right: 8px;
 }
+
+/*
+ * 弹层与窗口拖拽区：抽屉/对话框右上角关闭按钮位于全局顶栏的拖拽区（-webkit-app-region: drag）内，
+ * 真实鼠标点击会被窗口拖动吞掉（表现为「点 X 没反应」）。
+ * 仅在弹层真正可见时禁用顶栏拖拽：Element Plus 的 .el-overlay 常驻 DOM（关闭时 display:none），
+ * 不能用 `:has(.el-overlay)` 判断，否则顶栏会永久失去拖拽能力。
+ */
+.el-overlay,
+.el-drawer,
+.el-dialog {
+  -webkit-app-region: no-drag;
+}
+
+body:has(.el-overlay:not([style*='display: none'])) .desk-topbar {
+  -webkit-app-region: no-drag;
+}

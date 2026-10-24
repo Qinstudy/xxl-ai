@@ -6,8 +6,11 @@
 import type { Agent } from '@earendil-works/pi-agent-core'
 import { buildModels, type ProviderModelConfig } from './models'
 import { createBuiltinTools } from './tools'
+import { createMcpTools } from './mcp/tools'
+import { setMcpRuntimePath } from './mcp/client'
 import type { ChatMode } from '@shared/ipc'
 import type { HostEvent } from '@shared/agentProtocol'
+import type { McpRuntimeConfig } from '@shared/ipc'
 
 /* 创建/获取会话 Agent 所需的运行时配置 */
 export interface AgentRuntimeOptions {
@@ -19,10 +22,29 @@ export interface AgentRuntimeOptions {
   /* 对话模式（plan 只读 / build 读写）与项目根目录（文件沙箱边界） */
   mode: ChatMode
   rootDir: string
+  /* 运行时 PATH（MCP stdio 与 run_command 共用） */
+  runtimePath: string
+  /* 已生效的 MCP 服务配置 */
+  mcpServers: McpRuntimeConfig[]
+  /* 会话是否已被终止（Agent 创建阶段用于提前跳出） */
+  isAborted?: () => boolean
 }
 
 /* 会话级 Agent 运行时缓存：同一会话复用上下文 */
 const runtimes = new Map<string, Promise<Agent>>()
+
+/* 已请求终止的会话：覆盖「Agent 尚未创建完成就点击终止」的场景 */
+const abortedSessions = new Set<string>()
+
+/* 标记会话开始新一轮（清除上一次终止标记） */
+export function clearSessionAbort(sessionId: string): void {
+  abortedSessions.delete(sessionId)
+}
+
+/* 会话是否已被请求终止 */
+export function isSessionAborted(sessionId: string): boolean {
+  return abortedSessions.has(sessionId)
+}
 
 /* 按配置动态加载 Pi Agent，装配模型与内置工具，注入系统提示与历史消息 */
 async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
@@ -37,12 +59,19 @@ async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
     rootDir: options.rootDir,
     sessionId: options.sessionId
   })
+  /* MCP 工具：随会话装配（未开启的服务不下发，连接失败的服务自动跳过） */
+  const mcpTools = await createMcpTools({
+    servers: options.mcpServers,
+    mode: options.mode,
+    runtimePath: options.runtimePath,
+    isAborted: options.isAborted
+  })
   /* 历史消息随 initialState 注入：Agent 会在其前自动补上系统指令（直接覆盖 state.messages 会把系统指令冲掉） */
   const agent = new AgentClass({
     initialState: {
       systemPrompt: options.systemPrompt,
       model,
-      tools,
+      tools: [...tools, ...mcpTools],
       messages: (options.messages ?? []) as never[]
     },
     streamFn: models.streamSimple.bind(models)
@@ -65,12 +94,17 @@ export function evictAgent(sessionId: string): void {
   runtimes.delete(sessionId)
 }
 
-/* 中断会话当前生成 */
+/* 中断会话当前生成：先登记终止标记（Agent 未就绪也不会丢），再中止运行中的 Agent */
 export async function abortAgent(sessionId: string): Promise<void> {
+  abortedSessions.add(sessionId)
   const runtime = runtimes.get(sessionId)
   if (runtime) {
-    const agent = await runtime
-    agent.abort()
+    try {
+      const agent = await runtime
+      agent.abort()
+    } catch {
+      /* Agent 创建失败无需中止 */
+    }
   }
 }
 
@@ -127,7 +161,12 @@ export async function runPrompt(
       sink({ type: 'done' })
     }
   } catch (error) {
-    sink({ type: 'error', message: (error as Error).message })
+    /* 用户终止导致的异常按正常结束处理，避免 UI 误报调用失败 */
+    if (/aborted|cancell?ed/i.test((error as Error).message)) {
+      sink({ type: 'done' })
+    } else {
+      sink({ type: 'error', message: (error as Error).message })
+    }
   } finally {
     unsubscribe()
   }

@@ -10,6 +10,8 @@ import type {
   DeskApi,
   FileContent,
   FsEntry,
+  McpDTO,
+  McpDiscoverQuery,
   OpenWithApp,
   ProviderDTO,
   ProviderModelQuery,
@@ -188,6 +190,25 @@ const api: DeskApi = {
       ipcRenderer.on(IPC.browserOpenTab, listener)
       return () => ipcRenderer.removeListener(IPC.browserOpenTab, listener)
     }
+  },
+  /* MCP 插件中心 */
+  mcp: {
+    /* MCP 服务列表 */
+    list: () => ipcRenderer.invoke(IPC.mcpList),
+    /* 新增或更新 MCP 服务 */
+    save: (dto: Partial<McpDTO>) => ipcRenderer.invoke(IPC.mcpSave, dto),
+    /* 删除 MCP 服务 */
+    remove: (id: string) => ipcRenderer.invoke(IPC.mcpRemove, id),
+    /* 连通测试 */
+    test: (dto: Partial<McpDTO>) => ipcRenderer.invoke(IPC.mcpTest, dto),
+    /* 已保存服务的工具列表 */
+    tools: (id: string) => ipcRenderer.invoke(IPC.mcpTools, id),
+    /* 发现 MCP：在线检索 */
+    discover: (query: McpDiscoverQuery) => ipcRenderer.invoke(IPC.mcpDiscover, query),
+    /* 发现 MCP：社区分类列表 */
+    categories: () => ipcRenderer.invoke(IPC.mcpCategories),
+    /* 发现 MCP：详情 */
+    detail: (slug: string) => ipcRenderer.invoke(IPC.mcpDetail, slug)
   }
 }
 

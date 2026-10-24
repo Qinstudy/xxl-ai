@@ -1194,7 +1194,8 @@ docker compose down
 - 7、【升级】项目前后端依赖版本升级，提升稳定性和安全性；
 
 ### v1.2.1 Release Notes[ING]
-- 【TODO】Desk版本：MCP；
+- 1、【新增】MCP工具（Desk版）：新增支持MCP工具管理，支持远程（Streamable HTTP）/ 本地（stdio）MCP服务在线管理、检索发现及连通测试，Agent运行时自动装配可用工具；
+
 - 【TODO】Desk版本：支持SKILL；
 - 【TODO】Desk版本：记忆；
 - 【TODO】Desk版本：支持浏览器工具操作；

@@ -14,6 +14,7 @@ import type {
   WorkerMessage,
   WorkerRequest
 } from '@shared/agentProtocol'
+import type { McpRuntimeConfig, McpTestResult, McpToolMeta } from '@shared/ipc'
 
 /* 一次运行的回调与结算：以会话为代表，同一会话同时只允许一轮运行 */
 interface PendingRun {
@@ -26,6 +27,14 @@ let worker: UtilityProcess | null = null
 let workerReady: Promise<UtilityProcess> | null = null
 /* 进行中的运行：sessionId → 事件回调与结算（同一会话同时只允许一轮） */
 const pendingRuns = new Map<string, PendingRun>()
+/* 进行中的 MCP 请求：requestId → 结算（连通测试 / 工具列表） */
+const pendingMcp = new Map<
+  string,
+  { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
+>()
+
+/* MCP 请求超时（毫秒）：握手 30s + 列举 30s，留出余量 */
+const MCP_REQUEST_TIMEOUT = 90000
 
 /* 启动（或复用）运行时进程 */
 function ensureWorker(): Promise<UtilityProcess> {
@@ -55,6 +64,12 @@ function ensureWorker(): Promise<UtilityProcess> {
       pending.resolve({ ok: false, message: 'Agent 运行时进程异常退出，请重试' })
       pendingRuns.delete(sessionId)
     }
+    /* 未结算的 MCP 请求同样统一失败 */
+    for (const [requestId, pending] of pendingMcp) {
+      clearTimeout(pending.timer)
+      pending.reject(new Error('Agent 运行时进程异常退出，请重试'))
+      pendingMcp.delete(requestId)
+    }
   })
   return workerReady
 }
@@ -80,6 +95,25 @@ async function handleMessage(message: WorkerMessage): Promise<void> {
     case 'approval-request': {
       const choice = await confirmOutside(message)
       worker?.postMessage({ type: 'approval-response', requestId: message.requestId, choice })
+      break
+    }
+    case 'mcp-test-result':
+    case 'mcp-tools-result': {
+      const pending = pendingMcp.get(message.requestId)
+      if (pending) {
+        clearTimeout(pending.timer)
+        pendingMcp.delete(message.requestId)
+        pending.resolve(message.type === 'mcp-test-result' ? message.result : message.tools)
+      }
+      break
+    }
+    case 'mcp-result-error': {
+      const pending = pendingMcp.get(message.requestId)
+      if (pending) {
+        clearTimeout(pending.timer)
+        pendingMcp.delete(message.requestId)
+        pending.reject(new Error(message.message))
+      }
       break
     }
     default:
@@ -127,6 +161,52 @@ export function clearSessionPermissions(sessionId: string): void {
 /* 清空全部会话运行时缓存（设置/供应商变更时） */
 export function resetAgents(): void {
   postRequest({ type: 'reset' })
+}
+
+/* 发送一次 MCP 请求并等待结果（超时/进程退出统一转为异常） */
+async function requestMcp<T>(build: (requestId: string) => WorkerRequest): Promise<T> {
+  let proc: UtilityProcess
+  try {
+    proc = await ensureWorker()
+  } catch (error) {
+    throw new Error((error as Error).message)
+  }
+  const requestId = `mcp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingMcp.delete(requestId)
+      reject(new Error('MCP 请求超时，请检查服务是否可用'))
+    }, MCP_REQUEST_TIMEOUT)
+    pendingMcp.set(requestId, {
+      resolve: (value) => resolve(value as T),
+      reject,
+      timer
+    })
+    proc.postMessage(build(requestId))
+  })
+}
+
+/* 连通测试（支持未保存草稿；配置由调用方解密后传入） */
+export function testMcpByRuntime(server: McpRuntimeConfig, runtimePath: string): Promise<McpTestResult> {
+  return requestMcp<McpTestResult>((requestId) => ({
+    type: 'mcp-test',
+    requestId,
+    server,
+    runtimePath
+  }))
+}
+
+/* 列举已连接服务的工具（复用运行时连接缓存） */
+export function listMcpToolsByRuntime(
+  server: McpRuntimeConfig,
+  runtimePath: string
+): Promise<McpToolMeta[]> {
+  return requestMcp<McpToolMeta[]>((requestId) => ({
+    type: 'mcp-tools',
+    requestId,
+    server,
+    runtimePath
+  }))
 }
 
 /* 退出时终止运行时进程 */

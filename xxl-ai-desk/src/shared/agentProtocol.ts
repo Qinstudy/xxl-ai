@@ -4,7 +4,7 @@
  * 避免 LLM 流式与工具重活占用主进程事件循环。
  */
 
-import type { ChatMode } from './ipc'
+import type { ChatMode, McpRuntimeConfig, McpTestResult, McpToolMeta } from './ipc'
 
 /* 供应商运行时配置（主进程解密后传给运行时，与 Pi Models 构建入参一致） */
 export interface ProviderModelConfig {
@@ -69,8 +69,10 @@ export interface RunAgentInput {
   mode: ChatMode
   /* 项目根目录（文件沙箱根） */
   rootDir: string
-  /* 运行时 PATH（含设置的 Node / Python 环境，供 run_command 使用） */
+  /* 运行时 PATH（含设置的 Node / Python 环境，供 run_command 与 MCP stdio 使用） */
   runtimePath: string
+  /* 已生效的 MCP 服务配置（未开启的不下发） */
+  mcpServers: McpRuntimeConfig[]
   /* 本轮用户输入 */
   text: string
 }
@@ -83,6 +85,8 @@ export type WorkerRequest =
   | { type: 'clear-permissions'; sessionId: string } /* 清空会话越界白名单 */
   | { type: 'reset' } /* 重置全部运行时状态 */
   | { type: 'approval-response'; requestId: string; choice: ApprovalChoice } /* 回传越界审批结果 */
+  | { type: 'mcp-test'; requestId: string; server: McpRuntimeConfig; runtimePath: string } /* 连通测试（临时连接） */
+  | { type: 'mcp-tools'; requestId: string; server: McpRuntimeConfig; runtimePath: string } /* 列举工具（复用连接缓存） */
 
 /* 运行时进程 → 主进程 */
 export type WorkerMessage =
@@ -90,3 +94,6 @@ export type WorkerMessage =
   | { type: 'run-done'; sessionId: string; messages: unknown[] } /* 运行完成（返回最新上下文） */
   | { type: 'run-error'; sessionId: string; message: string } /* 运行失败 */
   | ({ type: 'approval-request'; requestId: string } & ApprovalRequest) /* 越界审批请求 */
+  | { type: 'mcp-test-result'; requestId: string; result: McpTestResult } /* 连通测试结果 */
+  | { type: 'mcp-tools-result'; requestId: string; tools: McpToolMeta[] } /* 工具列表结果 */
+  | { type: 'mcp-result-error'; requestId: string; message: string } /* MCP 操作失败 */

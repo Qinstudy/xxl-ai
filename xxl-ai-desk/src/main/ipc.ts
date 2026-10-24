@@ -9,6 +9,8 @@ import { IPC } from '@shared/ipc'
 import type {
   AppSettings,
   ChatApprovalChoice,
+  McpDTO,
+  McpDiscoverQuery,
   ProviderDTO,
   ProviderModelQuery,
   ProjectCreateInput,
@@ -56,6 +58,13 @@ import { listDir, readFile, writeFile } from './services/fsService'
 import { initFsWatch, unwatchDir, watchDir } from './services/fsWatchService'
 import { listOpenWithApps, openWith } from './services/openWithService'
 import { abortChat, respondApproval, sendChat } from './services/chatService'
+import {
+  deleteMcp,
+  listMcps,
+  saveMcp
+} from './services/mcpService'
+import { listMcpTools, testMcp } from './services/mcpRuntimeService'
+import { discoverMcp, discoverMcpDetail, listMcpCategories } from './services/mcpDiscoverService'
 import {
   clearSessionPermissions,
   disposeAgentRuntime,
@@ -258,4 +267,21 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.shellOpenWith, (_event, appPath: string, file: string) =>
     openWith(appPath, file)
   )
+
+  /* --- MCP 插件中心（保存即生效：清空运行时缓存，下一轮对话重建工具） --- */
+  ipcMain.handle(IPC.mcpList, () => listMcps())
+  ipcMain.handle(IPC.mcpSave, (_event, dto: Partial<McpDTO>) => {
+    const saved = saveMcp(dto)
+    resetAgents()
+    return saved
+  })
+  ipcMain.handle(IPC.mcpRemove, (_event, id: string) => {
+    deleteMcp(id)
+    resetAgents()
+  })
+  ipcMain.handle(IPC.mcpTest, (_event, dto: Partial<McpDTO>) => testMcp(dto))
+  ipcMain.handle(IPC.mcpTools, (_event, id: string) => listMcpTools(id))
+  ipcMain.handle(IPC.mcpDiscover, (_event, query: McpDiscoverQuery) => discoverMcp(query))
+  ipcMain.handle(IPC.mcpCategories, () => listMcpCategories())
+  ipcMain.handle(IPC.mcpDetail, (_event, slug: string) => discoverMcpDetail(slug))
 }

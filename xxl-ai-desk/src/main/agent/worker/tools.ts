@@ -357,7 +357,7 @@ export async function createBuiltinTools(context: ToolContext): Promise<AgentToo
       timeout: Type.Optional(Type.Number({ description: '超时毫秒数，默认 60000' }))
     }),
     executionMode: 'sequential',
-    execute: async (_toolCallId, params) => {
+    execute: async (_toolCallId, params, signal) => {
       const { command, timeout } = params as { command: string; timeout?: number }
       return new Promise<ReturnType<typeof text>>((resolvePromise) => {
         exec(
@@ -367,7 +367,9 @@ export async function createBuiltinTools(context: ToolContext): Promise<AgentToo
             /* 使用设置中配置的 Node / Python 运行环境 */
             env: runtimePath ? { ...process.env, PATH: runtimePath } : process.env,
             timeout: timeout && timeout > 0 ? timeout : 60000,
-            maxBuffer: 1024 * 1024 * 8
+            maxBuffer: 1024 * 1024 * 8,
+            /* 用户点击终止时同步杀掉子进程，避免长时间占用 */
+            signal
           },
           (error, stdout, stderr) => {
             const parts: string[] = []
@@ -378,7 +380,7 @@ export async function createBuiltinTools(context: ToolContext): Promise<AgentToo
               parts.push(`[stderr]\n${stderr}`)
             }
             if (error) {
-              parts.push(`[exit] ${error.message}`)
+              parts.push(signal?.aborted ? '[已终止] 命令被用户终止' : `[exit] ${error.message}`)
             }
             resolvePromise(text(parts.join('\n') || '（命令无输出）'))
           }
