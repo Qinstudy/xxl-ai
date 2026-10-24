@@ -122,7 +122,11 @@ async function onSelect(id: string): Promise<void> {
         <Search />
       </el-icon>
     </div>
-    <div class="new-btn" @click="onNew">
+  </div>
+
+  <!-- 新建对话：与插件/设置子菜单项保持同一图标与文字位置 -->
+  <div class="new-chat">
+    <div class="new-btn" :class="{ active: !chat.currentId }" @click="onNew">
       <el-icon class="new-icon"><Edit /></el-icon>
       <span class="new-btn-label">{{ t('chat.newChatAction') }}</span>
     </div>
@@ -186,7 +190,6 @@ async function onSelect(id: string): Promise<void> {
   justify-content: flex-start;
   gap: 10px;
   min-width: 0;
-  margin-bottom: 16px;
 }
 
 .brand-text {
@@ -217,12 +220,19 @@ async function onSelect(id: string): Promise<void> {
   color: var(--desk-primary);
 }
 
-/* 新建对话：与会话条目同款列表行，文字色/字重对齐选中项目名（近黑 + 加粗） */
+/* 新建对话：容器与子菜单列表同宽（左右各 10px），行内边距对齐 .menu-item */
+.new-chat {
+  padding: 0 10px;
+  margin-bottom: 10px;
+}
+
+/* 新建对话：与子菜单项同款列表行（图标/文字位置、悬浮背景一致） */
 .new-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px 6px 0;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 2px;
   border-radius: 10px;
   cursor: pointer;
   color: var(--desk-text);
@@ -237,8 +247,15 @@ async function onSelect(id: string): Promise<void> {
   color: var(--desk-text);
 }
 
+/* 选中态（新建对话草稿态）：与插件/设置子菜单选中样式一致 */
+.new-btn.active {
+  background: var(--desk-primary-soft);
+  color: var(--desk-text);
+}
+
 .new-icon {
   flex-shrink: 0;
+  font-size: 15px;
 }
 
 /* 「项目:」分组标题：右侧排序/新建入口 */
