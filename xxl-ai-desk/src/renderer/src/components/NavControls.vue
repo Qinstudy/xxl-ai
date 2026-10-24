@@ -1,13 +1,17 @@
 <script setup lang="ts">
 /*
-* 顶部导航控件：后退 / 前进 / 首页（对话模块），置于各页标题栏左侧固定位置
+* 顶部导航控件：后退 / 前进 / 首页（进入对话模块的新建对话页），置于各页标题栏左侧固定位置
 * @author xuxueli 2026-10-18
 */
 import { useRouter } from 'vue-router'
+import { useChatStore } from '@renderer/stores/chat'
+import { useLayoutStore } from '@renderer/stores/layout'
 import { useNavHistory } from '@renderer/composables/useNavHistory'
 import { t } from '@renderer/i18n'
 
 const router = useRouter()
+const chat = useChatStore()
+const layout = useLayoutStore()
 /* 能否后退/前进（决定箭头可用态） */
 const { canBack, canForward } = useNavHistory()
 
@@ -25,8 +29,10 @@ function goForward(): void {
   }
 }
 
-/* 回到对话模块首页地址 */
+/* 回到对话模块：展开子菜单栏并进入新建对话页面 */
 function goHome(): void {
+  layout.expandSidebar()
+  chat.startNewChat()
   void router.push('/')
 }
 </script>
@@ -44,7 +50,7 @@ function goHome(): void {
     >
       <el-icon><ArrowRight /></el-icon>
     </button>
-    <button class="sidebar-toggle" :title="t('chat.title')" @click="goHome">
+    <button class="sidebar-toggle" :title="t('chat.newChatAction')" @click="goHome">
       <el-icon><HomeFilled /></el-icon>
     </button>
   </div>
