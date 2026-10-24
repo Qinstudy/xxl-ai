@@ -32,8 +32,8 @@ const activeKey = computed(() =>
 
 /* 拖拽右边缘调整子菜单栏宽度（统一复用 usePanelResize） */
 const { startResize } = usePanelResize({
-  getWidth: () => layout.panelWidth,
-  setWidth: layout.setPanelWidth,
+  getSize: () => layout.panelWidth,
+  setSize: layout.setPanelWidth,
   edge: 'left'
 })
 

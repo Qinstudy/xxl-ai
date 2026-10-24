@@ -3,10 +3,15 @@
 */
 
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { api } from '@renderer/api'
 import { useProjectStore } from './project'
 import { useSettingsStore } from './settings'
+import {
+  clearLastSessionId,
+  readLastSessionId,
+  writeLastSessionId
+} from '@renderer/utils/lastSession'
 import type { ChatMode, ChatEvent, SessionDTO, StoredMessage } from '@shared/ipc'
 import type { MessagePart, ToolCallState, UiMessage } from '@renderer/types'
 
@@ -270,6 +275,27 @@ export const useChatStore = defineStore('chat', () => {
     sessions.value = await api.session.list()
   }
 
+  /*
+   * 启动定位会话：优先恢复最近打开的会话（记录丢失时回落最近更新的会话）；
+   * 无任何历史会话则进入新建对话页面。
+   */
+  async function restoreLastSession(): Promise<void> {
+    const lastId = readLastSessionId()
+    const target = sessions.value.find((item) => item.id === lastId) || sessions.value[0]
+    if (target) {
+      await selectSession(target.id)
+      return
+    }
+    startNewChat()
+  }
+
+  /* 记住当前会话：选中/新建会话后写入本地，供下次启动默认定位（草稿态不写入） */
+  watch(currentId, (id) => {
+    if (id) {
+      writeLastSessionId(id)
+    }
+  })
+
   /* 重新加载会话并校正当前会话（项目级联删除后调用） */
   async function reloadSessions(): Promise<void> {
     await loadSessions()
@@ -350,6 +376,8 @@ export const useChatStore = defineStore('chat', () => {
     streamBuffers.delete(id)
     delete streamingIds.value[id]
     sessions.value = sessions.value.filter((item) => item.id !== id)
+    /* 清除「最后会话」记录：避免下次启动定位到已删除的会话 */
+    clearLastSessionId(id)
     if (currentId.value === id) {
       currentId.value = ''
       messages.value = []
@@ -575,6 +603,7 @@ export const useChatStore = defineStore('chat', () => {
     currentSession,
     loadSessions,
     reloadSessions,
+    restoreLastSession,
     selectSession,
     createSession,
     startNewChat,

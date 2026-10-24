@@ -8,6 +8,13 @@ export const useLayoutStore = defineStore('layout', () => {
   /* 左侧子菜单栏宽度：三板块共用（拖拽调整、持久化、双击复位） */
   const panel = createPersistedWidth('desk-panel-width', { default: 240, min: 180, max: 520 })
 
+  /* 底部终端面板高度（拖拽调整、持久化、双击复位） */
+  const terminal = createPersistedWidth('desk-terminal-height', {
+    default: 240,
+    min: 120,
+    max: 600
+  })
+
   /* 左侧栏是否折叠（折叠后仅保留图标栏，内容区铺满） */
   const sidebarCollapsed = ref(false)
 
@@ -56,6 +63,17 @@ export const useLayoutStore = defineStore('layout', () => {
     terminalVisible.value = true
   }
 
+  /* 设置底部终端高度：夹取到窗口可用高度内（为正文预留空间）后持久化 */
+  function setTerminalHeight(height: number): void {
+    const max = Math.max(120, window.innerHeight - 240)
+    terminal.setWidth(Math.min(height, max))
+  }
+
+  /* 恢复底部终端默认高度并持久化 */
+  function resetTerminalHeight(): void {
+    terminal.resetWidth()
+  }
+
   /* 切换右侧侧栏显隐（保留放大态，重新打开时维持全屏） */
   function toggleRightPanel(): void {
     rightPanelVisible.value = !rightPanelVisible.value
@@ -82,6 +100,9 @@ export const useLayoutStore = defineStore('layout', () => {
     setPanelWidth: panel.setWidth,
     resetPanelWidth: panel.resetWidth,
     terminalVisible,
+    terminalHeight: terminal.width,
+    setTerminalHeight,
+    resetTerminalHeight,
     rightPanelVisible,
     rightPanelTool,
     rightPanelMaximized,

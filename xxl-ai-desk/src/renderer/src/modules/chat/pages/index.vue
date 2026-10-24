@@ -68,8 +68,8 @@ watch(
 
 /* 拖拽右侧栏左边缘调整宽度（统一复用 usePanelResize） */
 const { startResize: startPanelResize } = usePanelResize({
-  getWidth: () => layout.rightPanelWidth,
-  setWidth: layout.setRightPanelWidth,
+  getSize: () => layout.rightPanelWidth,
+  setSize: layout.setRightPanelWidth,
   edge: 'right'
 })
 

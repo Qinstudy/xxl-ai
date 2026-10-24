@@ -97,6 +97,11 @@ body.resizing {
   user-select: none;
 }
 
+/* 拖拽调整底部面板高度期间：切换为行高光标 */
+body.resizing-vertical {
+  cursor: row-resize;
+}
+
 /* 自绘 SVG 图标：统一随文字色着色（尺寸由使用处覆盖） */
 .desk-svg-icon {
   fill: none;

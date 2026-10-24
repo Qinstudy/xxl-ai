@@ -37,7 +37,8 @@
     "forward": "前进",
     "collapseSidebar": "收起侧栏",
     "expandSidebar": "展开侧栏",
-    "resetPanelWidth": "双击恢复默认宽度"
+    "resetPanelWidth": "双击恢复默认宽度",
+    "resetPanelHeight": "双击恢复默认高度"
   },
   "chat": {
     "newChat": "新对话",

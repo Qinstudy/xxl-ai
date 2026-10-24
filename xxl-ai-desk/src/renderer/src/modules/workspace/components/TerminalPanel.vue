@@ -8,10 +8,22 @@ import { Terminal, type ITheme } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { api } from '@renderer/api'
+import { useLayoutStore } from '@renderer/stores/layout'
+import { usePanelResize } from '@renderer/composables/usePanelResize'
 import { t } from '@renderer/i18n'
 
 const props = defineProps<{ cwd?: string; title?: string; visible?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
+
+/* 布局状态（终端高度持久化） */
+const layout = useLayoutStore()
+
+/* 拖拽上边缘调整终端高度（统一复用 usePanelResize，底部面板手柄在上缘） */
+const { startResize } = usePanelResize({
+  getSize: () => layout.terminalHeight,
+  setSize: layout.setTerminalHeight,
+  edge: 'bottom'
+})
 
 /* 终端标签：id 对应主进程 PTY 会话 */
 interface TerminalTab {
@@ -177,7 +189,14 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="chat-terminal">
+  <div class="chat-terminal" :style="{ height: `${layout.terminalHeight}px` }">
+    <!-- 上边缘拖拽手柄：拖拽调整终端高度，双击恢复默认高度 -->
+    <div
+      class="terminal-resizer"
+      :title="t('layout.resetPanelHeight')"
+      @mousedown="startResize"
+      @dblclick="layout.resetTerminalHeight"
+    ></div>
     <!-- 标签栏：切换/关闭终端标签，右侧为新建与隐藏面板 -->
     <div class="terminal-header">
       <div class="terminal-tabs">
@@ -221,14 +240,41 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped lang="scss">
-/* 底部终端面板：横跨主区底部 */
+/* 底部终端面板：横跨主区底部（高度由布局状态提供，可拖拽调整） */
 .chat-terminal {
+  position: relative;
   height: 240px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   border-top: 1px solid var(--desk-border);
   background: var(--desk-bg);
+}
+
+/* 上边缘拖拽手柄：调整终端高度；透明命中区略宽于视觉条 */
+.terminal-resizer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  width: 100%;
+  height: 5px;
+  cursor: row-resize;
+  -webkit-app-region: no-drag;
+}
+
+.terminal-resizer::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 100%;
+  height: 12px;
+}
+
+.terminal-resizer:hover,
+body.resizing-vertical .terminal-resizer {
+  background: var(--desk-primary-soft);
 }
 
 .terminal-header {

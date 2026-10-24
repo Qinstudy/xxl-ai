@@ -37,7 +37,8 @@
     "forward": "Forward",
     "collapseSidebar": "Collapse sidebar",
     "expandSidebar": "Expand sidebar",
-    "resetPanelWidth": "Double-click to reset width"
+    "resetPanelWidth": "Double-click to reset width",
+    "resetPanelHeight": "Double-click to reset height"
   },
   "chat": {
     "newChat": "New chat",

@@ -45,13 +45,8 @@ onMounted(async () => {
   await settings.load()
   await project.loadProjects()
   await chat.loadSessions()
-  /* 默认进入最后一条对话（最近更新优先）；无对话则进入新建对话 */
-  const last = chat.sessions[0]
-  if (last) {
-    await chat.selectSession(last.id)
-  } else {
-    chat.startNewChat()
-  }
+  /* 默认定位会话：有历史会话则打开最后打开的会话，否则进入新建对话页面 */
+  await chat.restoreLastSession()
   /* 启动后延迟静默检查更新（仅发现新版本时弹提示，失败静默） */
   if (settings.settings.updateAutoCheck) {
     updateTimer = setTimeout(() => {

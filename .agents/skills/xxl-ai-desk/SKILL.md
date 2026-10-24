@@ -393,7 +393,7 @@ desk-shell（纵向）
 
 - **导航映射单一来源**：板块 ↔ 入口路径 ↔ 顶栏标题 ↔ 子菜单项 全部定义在 `config/nav.ts`；`ActivityRail` / `Sidebar` / `AppTopbar` 只读同一份，**新增板块只改此处**。
 - **shell 不承载域逻辑**：`AppTopbar` / `Sidebar` 仅做外壳与路由上下文；域内逻辑下沉到 `modules/{module}/`（如会话操作 `modules/chat/composables/useSessionActions.ts`、顶栏对话操作 `modules/chat/components/ChatTopbarActions.vue`）。
-- **面板交互统一复用**：拖拽用 `composables/usePanelResize.ts`（`edge` 区分左右缘）；宽度状态用 `utils/persistedWidth.ts#createPersistedWidth`（读取/夹取/持久化/复位），左侧栏与右侧栏共用，**禁止各写一套**。
+- **面板交互统一复用**：拖拽用 `composables/usePanelResize.ts`（`edge` 区分左右缘/上下缘）；尺寸状态用 `utils/persistedWidth.ts#createPersistedWidth`（读取/夹取/持久化/复位），左侧栏、右侧栏与底部终端共用，**禁止各写一套**。
 - **共享选中态归属域**：跨「左侧子菜单 ↔ 页面」的选中态放所属域 store（如设置分类 `settings.activeTab`），勿塞进 `layout`。
 - **自绘 SVG 图标**：统一加 `.desk-svg-icon`（`styles/index.scss`，提供 `currentColor` 描边），尺寸由使用处覆盖。
 
