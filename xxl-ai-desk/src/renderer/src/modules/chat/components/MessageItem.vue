@@ -209,7 +209,7 @@ function removeMessage(): void {
           <el-icon class="action" @click="removeMessage"><Delete /></el-icon>
         </el-tooltip>
         <!-- 仅用户消息：编辑后重新回答（内容回填输入框） -->
-        <el-tooltip v-if="message.role === 'user'" :content="t('common.edit')">
+        <el-tooltip v-if="message.role === 'user'" :content="t('chat.editAndRetry')">
           <el-icon class="action" @click="editContent"><EditPen /></el-icon>
         </el-tooltip>
       </div>

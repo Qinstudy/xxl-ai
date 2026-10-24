@@ -90,6 +90,7 @@
     "deleteConfirm": "Delete this chat and all of its messages?",
     "deleteMessage": "Delete message",
     "deleteMessageConfirm": "Delete this message? It will also be removed from the conversation context.",
+    "editAndRetry": "Edit and retry",
     "noModel": "No model configured yet. Add a provider and model in Settings.",
     "goSettings": "Go to Settings",
     "showTerminal": "Show terminal",
