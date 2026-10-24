@@ -50,14 +50,14 @@ const { childrenMap, expandedMap, loadingMap, keyword, rootChildren, visibleRoot
 </template>
 
 <style scoped lang="scss">
-/* 右侧文件树 */
+/* 左侧文件树 */
 .file-tree {
   flex-shrink: 0;
   width: 240px;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-left: 1px solid var(--desk-border);
+  border-right: 1px solid var(--desk-border);
   background: var(--desk-sidebar);
 }
 

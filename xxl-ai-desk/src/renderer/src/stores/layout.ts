@@ -30,15 +30,10 @@ export const useLayoutStore = defineStore('layout', () => {
   /* 右侧侧栏是否放大占满正文区 */
   const rightPanelMaximized = ref(false)
 
-  /* 各工具的默认面板宽度（首次打开时套用，之后沿用用户拖拽宽度） */
-  const RIGHT_PANEL_TOOL_WIDTH: Record<'files' | 'browser', number> = {
-    files: 560,
-    browser: 480
-  }
-
-  /* 右侧侧栏宽度（拖拽调整、持久化） */
-  const rightPanel = createPersistedWidth('desk-right-panel-width', {
-    default: 320,
+  /* 右侧侧栏宽度（拖拽调整、持久化）：默认宽度按文件面板实用尺寸设定，避免选中工具时二次变宽 */
+  /* 存储键升级 v2：让旧版本遗留的窄默认值（320）失效，首次打开即为合适宽度 */
+  const rightPanel = createPersistedWidth('desk-right-panel-width-v2', {
+    default: 520,
     min: 240,
     max: 720
   })
@@ -79,12 +74,8 @@ export const useLayoutStore = defineStore('layout', () => {
     rightPanelVisible.value = !rightPanelVisible.value
   }
 
-  /* 打开右侧侧栏并定位到指定工具（宽度不足时套用该工具默认宽度） */
+  /* 打开右侧侧栏并定位到指定工具（宽度保持当前值，不在选中工具时变宽） */
   function openRightPanelTool(tool: 'files' | 'browser'): void {
-    const defaultWidth = RIGHT_PANEL_TOOL_WIDTH[tool]
-    if (!rightPanelVisible.value || rightPanel.width.value < defaultWidth) {
-      rightPanel.setWidth(defaultWidth)
-    }
     rightPanelTool.value = tool
     rightPanelVisible.value = true
   }

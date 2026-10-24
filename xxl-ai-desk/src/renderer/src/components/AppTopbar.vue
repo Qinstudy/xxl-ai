@@ -117,7 +117,7 @@ function goHome(): void {
   margin-right: -6px;
 }
 
-/* 软件名称：顶栏左侧（首页入口右侧） */
+/* 软件名称：顶栏视觉重点，使用主色 + 加粗 */
 .topbar-brand {
   flex-shrink: 0;
   max-width: 220px;
@@ -126,6 +126,7 @@ function goHome(): void {
   white-space: nowrap;
   font-size: 14px;
   font-weight: 600;
+  color: var(--desk-text);
 }
 
 /* 标题前分隔线（｜）：区分软件名称与标题，仅在存在标题时渲染 */
@@ -149,7 +150,8 @@ function goHome(): void {
 
 .chat-title {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--desk-text-secondary);
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -179,6 +181,7 @@ function goHome(): void {
 /* 非对话页标题（插件 / 系统设置） */
 .topbar-title {
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
+  color: var(--desk-text-secondary);
 }
 </style>

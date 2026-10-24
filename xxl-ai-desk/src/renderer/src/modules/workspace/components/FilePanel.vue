@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /*
- * 右侧「文件」面板：左为选中文件内容（可编辑代码 / 预览），右为项目目录文件树。
- * 顶部提供保存、预览切换、打开方式下拉与「打开所在文件夹」。
+ * 右侧「文件」面板：左为项目目录文件树，右为选中文件内容（可编辑代码 / 预览）。
+ * 顶部提供保存、预览切换、打开（左半默认应用打开 / 右半打开方式下拉）与「打开所在文件夹」。
  * 文件树状态由 useProjectFileTree 维护，查看器由 FileViewer 渲染。
  * @author xuxueli 2026-10-18
  */
@@ -210,6 +210,14 @@ async function copyPath(): Promise<void> {
   ElMessage.success(t('panel.copied'))
 }
 
+/* 直接以系统默认应用打开当前文件（「打开」按钮左半区） */
+function openDefault(): void {
+  if (!file.value) {
+    return
+  }
+  void api.shell.openPath(file.value.path)
+}
+
 /* 打开方式下拉分发 */
 function onOpenCommand(command: string): void {
   if (!file.value) {
@@ -267,38 +275,51 @@ function onOpenCommand(command: string): void {
         >
           <el-icon><FolderOpened /></el-icon>
         </button>
-        <el-dropdown trigger="click" :disabled="!file" @command="onOpenCommand">
-          <button class="panel-btn" :disabled="!file">
+        <!-- 打开：左半默认应用直接打开，右半下拉选择打开方式 -->
+        <div class="panel-btn open-split" :class="{ disabled: !file }">
+          <button
+            class="open-split-main"
+            :disabled="!file"
+            :title="t('panel.openDefault')"
+            @click="openDefault"
+          >
             <el-icon><DocumentAdd /></el-icon>
             <span>{{ t('panel.open') }}</span>
-            <el-icon class="chevron"><ArrowDown /></el-icon>
           </button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="default">
-                <el-icon><Document /></el-icon>{{ t('panel.openDefault') }}
-              </el-dropdown-item>
-              <el-dropdown-item
-                v-for="app in openApps"
-                :key="app.path"
-                :command="`app:${app.path}`"
-              >
-                <el-icon><Monitor /></el-icon>{{ app.name }}
-              </el-dropdown-item>
-              <el-dropdown-item command="folder" divided>
-                <el-icon><FolderOpened /></el-icon>{{ t('panel.openFolder') }}
-              </el-dropdown-item>
-              <el-dropdown-item command="copy" divided>
-                <el-icon><CopyDocument /></el-icon>{{ t('panel.copyPath') }}
-              </el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+          <el-dropdown trigger="click" :disabled="!file" @command="onOpenCommand">
+            <button class="open-split-toggle" :disabled="!file" :title="t('panel.open')">
+              <el-icon class="chevron"><ArrowDown /></el-icon>
+            </button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="default">
+                  <el-icon><Document /></el-icon>{{ t('panel.openDefault') }}
+                </el-dropdown-item>
+                <el-dropdown-item
+                  v-for="app in openApps"
+                  :key="app.path"
+                  :command="`app:${app.path}`"
+                >
+                  <el-icon><Monitor /></el-icon>{{ app.name }}
+                </el-dropdown-item>
+                <el-dropdown-item command="folder" divided>
+                  <el-icon><FolderOpened /></el-icon>{{ t('panel.openFolder') }}
+                </el-dropdown-item>
+                <el-dropdown-item command="copy" divided>
+                  <el-icon><CopyDocument /></el-icon>{{ t('panel.copyPath') }}
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </div>
     </div>
 
     <div class="file-main">
-      <!-- 左：文件内容 -->
+      <!-- 左：项目目录树 -->
+      <FileTreePanel :root="root" :selected-path="selected?.path ?? ''" @select="select" />
+
+      <!-- 右：文件内容 -->
       <FileViewer
         v-model:draft="draft"
         :root="root"
@@ -312,9 +333,6 @@ function onOpenCommand(command: string): void {
         :saving="saving"
         @save="save"
       />
-
-      <!-- 右：项目目录树 -->
-      <FileTreePanel :root="root" :selected-path="selected?.path ?? ''" @select="select" />
     </div>
   </div>
 </template>
@@ -412,7 +430,54 @@ function onOpenCommand(command: string): void {
   font-size: 12px;
 }
 
-/* 主体：左内容 + 右文件树 */
+/* 打开按钮：左半默认打开 + 右半打开方式下拉，整体保持一个按钮外观 */
+.open-split {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.open-split.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.open-split-main,
+.open-split-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.open-split-main {
+  gap: 5px;
+  padding: 0 10px;
+}
+
+/* 右半下拉触发器：与左半用细线分隔，仅展示箭头 */
+.open-split-toggle {
+  padding: 0 6px;
+  border-left: 1px solid var(--desk-border);
+}
+
+.open-split-main:disabled,
+.open-split-toggle:disabled {
+  cursor: not-allowed;
+}
+
+/* 下拉包裹层撑满按钮高度，保证左右两半等高 */
+.open-split :deep(.el-dropdown) {
+  display: inline-flex;
+  height: 100%;
+}
+
+/* 主体：左文件树 + 右内容 */
 .file-main {
   flex: 1;
   min-height: 0;
