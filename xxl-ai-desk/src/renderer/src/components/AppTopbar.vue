@@ -39,14 +39,15 @@ const section = computed(() => sectionOfPath(route.path))
 /* 是否对话页（对话页展示会话标题与终端/侧栏开关） */
 const isChat = computed(() => section.value === 'home')
 
-/* 顶栏标题：对话页取当前会话标题（无会话回落「新对话」）；其余取板块标题 */
-const pageTitle = computed(() =>
-  section.value === 'home'
-    ? chat.currentSession?.title || t('chat.newChat')
-    : t(NAV_SECTIONS[section.value].titleKey)
-)
+/* 顶栏标题：对话页仅已有会话时展示会话标题（新建对话页不展示动态标题）；其余取板块标题 */
+const pageTitle = computed(() => {
+  if (section.value === 'home') {
+    return chat.currentId ? chat.currentSession?.title || t('chat.newChat') : ''
+  }
+  return t(NAV_SECTIONS[section.value].titleKey)
+})
 
-/* 是否有标题：仅在有标题时才展示标题前的分隔线 */
+/* 是否有标题：仅在有标题时才展示板块图标与标题 */
 const hasTitle = computed(() => pageTitle.value.trim().length > 0)
 
 /* 软件名称：优先取用户自定义名称，未设置时回落应用默认名称 */
