@@ -12,23 +12,7 @@ import type { Tool } from '@earendil-works/pi-mcp'
 import log from 'electron-log/main'
 import type { ChatMode, McpRuntimeConfig } from '@shared/ipc'
 import { callMcpTool, getMcpConnection, loadPiMcp } from './client'
-
-/* 工具名总长上限（主流模型供应商限制 64） */
-const MAX_NAME_LENGTH = 64
-
-/* 名称归一：仅保留字母、数字、下划线、连字符 */
-function slugify(value: string): string {
-  const slug = value
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-  return slug || 'mcp'
-}
-
-/* 工具名：mcp_{服务}_{工具}，保证多服务下唯一且符合供应商约束 */
-function buildToolName(serverName: string, toolName: string): string {
-  return `mcp_${slugify(serverName)}_${slugify(toolName)}`.slice(0, MAX_NAME_LENGTH)
-}
+import { buildToolName, uniqueToolName } from './naming'
 
 /*
  * 构建 MCP 工具集合：逐个服务连接并列举工具，失败服务跳过。
@@ -71,14 +55,7 @@ export async function createMcpTools(options: {
       }
 
       /* 同名工具追加序号，保证 Agent 工具名唯一 */
-      const baseName = buildToolName(server.name, tool.name)
-      let name = baseName
-      let suffix = 2
-      while (usedNames.has(name)) {
-        const tail = `_${suffix}`
-        name = `${baseName.slice(0, MAX_NAME_LENGTH - tail.length)}${tail}`
-        suffix += 1
-      }
+      const name = uniqueToolName(buildToolName(server.name, tool.name), usedNames)
       usedNames.add(name)
 
       tools.push({

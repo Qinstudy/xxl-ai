@@ -18,6 +18,10 @@ export interface ChatEvent {
   args?: unknown
   /* 工具返回文本（tool_end） */
   result?: string
+  /* 工具结构化结果（tool_end，供 UI 展开查看） */
+  details?: unknown
+  /* 工具执行耗时毫秒（tool_end） */
+  durationMs?: number
   /* 工具是否失败（tool_end） */
   isError?: boolean
   /* 错误信息（error） */

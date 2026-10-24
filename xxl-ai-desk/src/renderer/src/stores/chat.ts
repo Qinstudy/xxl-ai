@@ -307,6 +307,8 @@ export const useChatStore = defineStore('chat', () => {
         if (part && part.type === 'tool') {
           part.tool.status = event.isError ? 'error' : 'done'
           part.tool.result = event.result ?? part.tool.result
+          part.tool.details = event.details ?? part.tool.details
+          part.tool.durationMs = event.durationMs ?? part.tool.durationMs
           part.tool.endedAt = Date.now()
         }
         break

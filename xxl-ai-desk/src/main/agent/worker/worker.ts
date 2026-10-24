@@ -14,7 +14,7 @@ import {
   resetAgents,
   runPrompt
 } from './session'
-import { setRuntimePath } from './tools'
+import { setBrowserOpener, setBrowserReader, setRuntimePath } from './tools'
 import {
   closeAllMcpClients,
   listServerTools,
@@ -29,7 +29,7 @@ import type {
   WorkerMessage,
   WorkerRequest
 } from '@shared/agentProtocol'
-import type { McpRuntimeConfig } from '@shared/ipc'
+import type { BrowserReadParams, BrowserReadResult, McpRuntimeConfig } from '@shared/ipc'
 
 /* 与主进程通信的端口（utilityProcess 中始终存在） */
 const port = process.parentPort
@@ -52,6 +52,22 @@ const deltaBuffers = new Map<string, DeltaBuffer>()
 function post(message: WorkerMessage): void {
   port.postMessage(message)
 }
+
+/* open_browser 工具：把待打开地址转交主进程，由渲染层在右侧「浏览器」面板打开 */
+setBrowserOpener((url, newTab) => post({ type: 'open-browser', url, newTab }))
+
+/* 页面读取请求：requestId → 结果结算（主进程经渲染层 webview 取回正文后回传） */
+const pendingBrowserReads = new Map<string, (result: BrowserReadResult) => void>()
+
+/* read_browser 工具：跨进程请求渲染层读取当前页正文 */
+setBrowserReader(
+  (params: BrowserReadParams) =>
+    new Promise<BrowserReadResult>((resolve) => {
+      const requestId = `br_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`
+      pendingBrowserReads.set(requestId, resolve)
+      post({ type: 'browser-read', requestId, params })
+    })
+)
 
 /* 冲刷某会话缓冲的增量（保证在工具/完成等关键事件前先落文本，维持时序） */
 function flushDelta(sessionId: string): void {
@@ -200,6 +216,14 @@ function handleRequest(message: WorkerRequest): void {  switch (message.type) {
     case 'mcp-tools':
       void handleMcpTools(message.requestId, message.server, message.runtimePath)
       break
+    case 'browser-read-result': {
+      const resolve = pendingBrowserReads.get(message.requestId)
+      if (resolve) {
+        pendingBrowserReads.delete(message.requestId)
+        resolve(message.result)
+      }
+      break
+    }
     case 'abort':
       void abortAgent(message.sessionId)
       break

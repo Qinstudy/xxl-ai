@@ -25,7 +25,9 @@ const TOOL_TITLE_KEYS: Record<string, string> = {
   glob_files: 'glob',
   search_files: 'search',
   run_command: 'command',
-  get_current_time: 'time'
+  get_current_time: 'time',
+  open_browser: 'openBrowser',
+  read_browser: 'readBrowser'
 }
 
 /* 工具名 → 图标组件名 */
@@ -37,7 +39,9 @@ const TOOL_ICONS: Record<string, string> = {
   glob_files: 'Search',
   search_files: 'Search',
   run_command: 'Monitor',
-  get_current_time: 'Clock'
+  get_current_time: 'Clock',
+  open_browser: 'Link',
+  read_browser: 'View'
 }
 
 /* 参数摘要过长时截断，避免撑破单行 */
@@ -70,6 +74,10 @@ function detailOf(name: string, args: unknown): string {
       return clip(pick('command'))
     case 'get_current_time':
       return clip(pick('timezone'))
+    case 'open_browser':
+      return clip(pick('url'))
+    case 'read_browser':
+      return clip(pick('selector'))
     default:
       return ''
   }
@@ -78,6 +86,14 @@ function detailOf(name: string, args: unknown): string {
 /* 生成工具调用的展示视图 */
 export function toolView(tool: ToolCallState): ToolView {
   const key = TOOL_TITLE_KEYS[tool.name]
+  /* MCP 工具：展示「MCP 工具」标题，详情给出原始工具标识 */
+  if (!key && tool.name.startsWith('mcp_')) {
+    return {
+      icon: TOOL_ICONS[tool.name] ?? 'Connection',
+      title: t('chat.tool.mcp'),
+      detail: clip(tool.name.slice(4).replace(/_/g, ' / '))
+    }
+  }
   /* 未知工具回退为原始工具名，再回退通用标题 */
   const title = key ? t(`chat.tool.${key}`) : tool.name || t('chat.tool.generic')
   return {

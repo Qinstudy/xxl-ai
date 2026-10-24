@@ -4,9 +4,12 @@
  * @author xuxueli 2026-10-25
  */
 
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '@renderer/api'
+import { useLayoutStore } from '@renderer/stores/layout'
 import { t } from '@renderer/i18n'
+import type { BrowserReadParams, BrowserReadResult } from '@shared/ipc'
+import { normalizeBrowserUrl } from '@shared/browserUrl'
 
 /* Electron <webview> 的最小能力声明（渲染进程无官方类型） */
 export interface WebviewElement extends HTMLElement {
@@ -18,6 +21,8 @@ export interface WebviewElement extends HTMLElement {
   goForward(): void
   reload(): void
   stop(): void
+  focus(): void
+  executeJavaScript(code: string): Promise<unknown>
 }
 
 /* 标签页（可序列化状态，webview 元素另存于 Map） */
@@ -46,6 +51,37 @@ interface TitleEvent extends Event {
 /* 标签页自增序号，用于生成唯一 id */
 let seq = 0
 
+/* 工具名 → 空等：读取前等待面板/页面就绪 */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/*
+ * 面板读取实现注册表：由 BrowserPanel 挂载时写入、卸载时清理。
+ * IPC 读取监听放在常驻的 RightPanel，避免「面板刚打开 / open 与 read 同批并行」时漏事件。
+ */
+let panelReader: ((params: BrowserReadParams) => Promise<BrowserReadResult>) | null = null
+
+/* 注册当前面板的读取实现 */
+export function setBrowserPanelReader(reader: typeof panelReader): void {
+  panelReader = reader
+}
+
+/* 等待面板就绪后读取（面板尚未挂载时短暂等待，覆盖首次打开场景） */
+export async function readBrowserFromPanel(
+  params: BrowserReadParams,
+  timeout = 6000
+): Promise<BrowserReadResult> {
+  const started = Date.now()
+  while (!panelReader && Date.now() - started < timeout) {
+    await sleep(100)
+  }
+  if (!panelReader) {
+    return { ok: false, error: '右侧浏览器尚未就绪，请稍后重试' }
+  }
+  return panelReader(params)
+}
+
 /* 新建标签页状态（url 非空时直接导航） */
 function makeTab(url = ''): BrowserTab {
   return {
@@ -60,28 +96,11 @@ function makeTab(url = ''): BrowserTab {
   }
 }
 
-/* 规范化地址：完整 URL 直用；形如域名补 https；其余走搜索引擎 */
-function normalize(raw: string): string {
-  const value = raw.trim()
-  if (!value) {
-    return ''
-  }
-  if (/^https?:\/\//i.test(value)) {
-    return value
-  }
-  if (
-    /^localhost(:\d+)?(\/.*)?$/i.test(value) ||
-    /^\d{1,3}(\.\d{1,3}){3}(:\d+)?(\/.*)?$/.test(value)
-  ) {
-    return `http://${value}`
-  }
-  if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/.*)?$/.test(value)) {
-    return `https://${value}`
-  }
-  return `https://www.bing.com/search?q=${encodeURIComponent(value)}`
-}
-
+/* 浏览器标签页组合式函数：标签页状态、导航、页面读取与外部请求消费 */
 export function useBrowserTabs() {
+  /* 布局 store：承接 Agent 工具 / 页面 window.open 的打开请求 */
+  const layout = useLayoutStore()
+
   /* 标签页列表与当前激活标签页 id（首个标签默认激活） */
   const tabs = ref<BrowserTab[]>([makeTab()])
   const activeId = ref(tabs.value[0].id)
@@ -269,7 +288,7 @@ export function useBrowserTabs() {
     if (!tab) {
       return
     }
-    const url = normalize(tab.input)
+    const url = normalizeBrowserUrl(tab.input)
     if (!url) {
       return
     }
@@ -287,6 +306,31 @@ export function useBrowserTabs() {
     } else {
       webviews.get(tab.id)?.focus()
     }
+  }
+
+  /*
+   * 打开外部请求的地址：
+   *   - newTab=true（页面 window.open 等）→ 新建标签页；
+   *   - 否则复用当前标签页（若当前是空白页则直接用该页），保证 Agent 连续操作在同一页完成。
+   */
+  async function openRequested(url: string, newTab: boolean): Promise<void> {
+    if (newTab) {
+      await addTab(url)
+      return
+    }
+    const blank = tabs.value.find((tab) => !tab.hasPage && !tab.currentUrl)
+    if (blank) {
+      activeId.value = blank.id
+      await nextTick()
+      await navigate(blank.id, url)
+      return
+    }
+    const current = activeTab.value
+    if (current) {
+      await navigate(current.id, url)
+      return
+    }
+    await addTab(url)
   }
 
   /* 切换标签页 */
@@ -374,18 +418,122 @@ export function useBrowserTabs() {
     inputFocused = false
   }
 
-  let offOpenTab: (() => void) | null = null
+  /* 读取 webview 当前地址（未就绪时返回空串，避免抛错中断等待） */
+  function currentUrlOf(view: WebviewElement): string {
+    try {
+      return view.getURL() || ''
+    } catch {
+      return ''
+    }
+  }
 
-  /* 挂载：监听主进程转发的页面内新窗口请求 */
+  /*
+   * 等待页面真正可读：webview 已 dom-ready、不在加载中、且已离开 about:blank。
+   * open_browser 与 read_browser 可能同批并行，必须等导航落地后再取正文。
+   */
+  async function waitForPageReady(
+    tab: BrowserTab,
+    view: WebviewElement,
+    timeout = 12000
+  ): Promise<void> {
+    const started = Date.now()
+    while (Date.now() - started < timeout) {
+      const url = currentUrlOf(view)
+      if (readyTabs.has(tab.id) && !tab.loading && url && url !== 'about:blank') {
+        return
+      }
+      await sleep(150)
+    }
+  }
+
+  /*
+   * 读取当前标签页正文：注入脚本提取标题、地址与可见文本。
+   * 选择器由参数序列化后内联，避免拼接注入；返回结果按 maxChars 截断。
+   */
+  async function readActiveTab(params: BrowserReadParams): Promise<BrowserReadResult> {
+    const started = Date.now()
+    /* 先等标签页创建 + 导航目标写入（open_browser 的请求由 IPC 异步转达） */
+    let tab = activeTab.value
+    let view = tab ? webviews.get(tab.id) : undefined
+    while ((!tab?.hasPage || !view) && Date.now() - started < 12000) {
+      await sleep(120)
+      tab = activeTab.value
+      view = tab ? webviews.get(tab.id) : undefined
+    }
+    if (!tab?.hasPage) {
+      return { ok: false, error: '右侧浏览器尚未打开页面，请先使用 open_browser 打开页面' }
+    }
+    if (!view) {
+      return { ok: false, error: '浏览器尚未就绪，请稍后重试' }
+    }
+    await waitForPageReady(tab, view, Math.max(1000, 12000 - (Date.now() - started)))
+    const max = Math.min(Math.max(Math.floor(params.maxChars ?? 20000), 1000), 50000)
+    const selector = params.selector ? JSON.stringify(params.selector) : 'null'
+    const script = `(() => {
+      const selector = ${selector};
+      const root = selector ? document.querySelector(selector) : (document.body || document.documentElement);
+      if (!root) {
+        return { title: document.title, url: location.href, missing: true };
+      }
+      return {
+        title: document.title,
+        url: location.href,
+        text: (root.innerText || root.textContent || '')
+      };
+    })()`
+    try {
+      const raw = (await view.executeJavaScript(script)) as {
+        title?: string
+        url?: string
+        text?: string
+        missing?: boolean
+      }
+      if (raw?.missing) {
+        return { ok: false, error: `未找到选择器匹配的元素：${params.selector ?? ''}` }
+      }
+      const full = raw?.text ?? ''
+      return {
+        ok: true,
+        title: raw?.title ?? tab.title,
+        url: raw?.url ?? tab.currentUrl,
+        text: full.slice(0, max),
+        truncated: full.length > max
+      }
+    } catch (error) {
+      return { ok: false, error: `读取页面失败：${(error as Error).message}` }
+    }
+  }
+
+  /* 面板挂载后注册读取实现（常驻的 RightPanel 负责接收 IPC 读取请求） */
   onMounted(() => {
-    offOpenTab = api.browser.onOpenTab((url) => {
-      void addTab(url)
-    })
+    setBrowserPanelReader(readActiveTab)
   })
 
-  /* 卸载：取消监听并销毁全部 webview 与缓存 */
+  /* 已消费的打开请求序号：避免面板首次挂载时重复打开已处理过的地址 */
+  let consumedRequestId = 0
+
+  /*
+   * 打开请求：Agent 工具 open_browser 与页面 window.open 统一经布局 store 转入。
+   * 面板可能尚未创建（首次打开），故 immediate 兜底消费挂载前的请求。
+   */
+  watch(
+    () => layout.browserOpenRequest,
+    (request) => {
+      if (!request || request.id === consumedRequestId) {
+        return
+      }
+      consumedRequestId = request.id
+      const url = normalizeBrowserUrl(request.url)
+      if (url) {
+        void openRequested(url, request.newTab)
+      }
+    },
+    { immediate: true }
+  )
+
+  /* 卸载：注销读取实现并销毁全部 webview 与缓存 */
   onBeforeUnmount(() => {
-    offOpenTab?.()
+    setBrowserPanelReader(null)
     for (const view of webviews.values()) {
       view.remove()
     }

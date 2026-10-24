@@ -4,6 +4,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/ipc'
 import type {
   AppSettings,
+  BrowserReadParams,
+  BrowserReadResult,
   ChatApprovalChoice,
   ChatApprovalPrompt,
   ChatEvent,
@@ -184,12 +186,23 @@ const api: DeskApi = {
   },
   /* 内嵌浏览器 */
   browser: {
-    /* 内嵌浏览器：guest 新窗口请求 → 渲染层新标签页（返回取消订阅函数） */
-    onOpenTab: (callback: (url: string) => void) => {
-      const listener = (_event: unknown, url: string): void => callback(url)
+    /* 内嵌浏览器：新窗口 / Agent 打开请求 → 渲染层标签页（返回取消订阅函数） */
+    onOpenTab: (callback: (url: string, newTab: boolean) => void) => {
+      const listener = (_event: unknown, url: string, newTab: boolean): void =>
+        callback(url, newTab === true)
       ipcRenderer.on(IPC.browserOpenTab, listener)
       return () => ipcRenderer.removeListener(IPC.browserOpenTab, listener)
-    }
+    },
+    /* Agent 页面读取请求：渲染层执行脚本提取正文（返回取消订阅函数） */
+    onReadRequest: (callback: (requestId: string, params: BrowserReadParams) => void) => {
+      const listener = (_event: unknown, requestId: string, params: BrowserReadParams): void =>
+        callback(requestId, params)
+      ipcRenderer.on(IPC.browserReadRequest, listener)
+      return () => ipcRenderer.removeListener(IPC.browserReadRequest, listener)
+    },
+    /* 回传页面读取结果 */
+    respondRead: (requestId: string, result: BrowserReadResult) =>
+      ipcRenderer.invoke(IPC.browserReadResult, requestId, result)
   },
   /* MCP 插件中心 */
   mcp: {

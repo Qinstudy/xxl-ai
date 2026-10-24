@@ -3,11 +3,13 @@
  * 右侧「工具」面板：顶部横向 Tab（文件 / 浏览器）切换工具，
  * 选定后承载对应面板；支持放大占满正文区与收起。
  */
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { api } from '@renderer/api'
 import { useLayoutStore } from '@renderer/stores/layout'
 import { t } from '@renderer/i18n'
 import FilePanel from './FilePanel.vue'
 import BrowserPanel from './BrowserPanel.vue'
+import { readBrowserFromPanel } from '../composables/useBrowserTabs'
 
 const props = defineProps<{ root?: string; projectName?: string }>()
 
@@ -17,6 +19,27 @@ const layout = useLayoutStore()
 /* 面板首次打开后保持挂载（切换工具用 v-show），保留文件树/浏览器页面状态 */
 const filesOpened = ref(false)
 const browserOpened = ref(false)
+
+/* 浏览器新标签页请求：Agent 工具 open_browser 与页面 window.open 统一在此接收。
+ * 放在常驻的 RightPanel 上，保证「浏览器面板尚未打开过」时也不会丢请求。 */
+let offOpenTab: (() => void) | null = null
+/* 页面读取请求：同样常驻监听，并在读取前确保浏览器面板已挂载 */
+let offReadRequest: (() => void) | null = null
+
+onMounted(() => {
+  offOpenTab = api.browser.onOpenTab((url, newTab) => layout.openBrowser(url, { newTab }))
+  offReadRequest = api.browser.onReadRequest((requestId, params) => {
+    layout.openRightPanelTool('browser')
+    void readBrowserFromPanel(params).then((result) => api.browser.respondRead(requestId, result))
+  })
+})
+
+onBeforeUnmount(() => {
+  offOpenTab?.()
+  offOpenTab = null
+  offReadRequest?.()
+  offReadRequest = null
+})
 
 /* 标记已打开过的工具，使其面板首次打开后保持挂载（切换用 v-show） */
 watch(

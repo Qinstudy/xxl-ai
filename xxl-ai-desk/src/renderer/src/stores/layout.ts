@@ -30,6 +30,10 @@ export const useLayoutStore = defineStore('layout', () => {
   /* 右侧侧栏是否放大占满正文区 */
   const rightPanelMaximized = ref(false)
 
+  /* 待浏览器打开的地址请求（Agent 工具 open_browser / 页面 window.open 触发）：id 递增以支持重复打开同一地址 */
+  const browserOpenRequest = ref<{ id: number; url: string; newTab: boolean } | null>(null)
+  let browserOpenSeq = 0
+
   /* 右侧侧栏宽度（拖拽调整、持久化）：默认宽度按文件面板实用尺寸设定，避免选中工具时二次变宽 */
   /* 存储键升级 v2：让旧版本遗留的窄默认值（320）失效，首次打开即为合适宽度 */
   const rightPanel = createPersistedWidth('desk-right-panel-width-v2', {
@@ -80,6 +84,20 @@ export const useLayoutStore = defineStore('layout', () => {
     rightPanelVisible.value = true
   }
 
+  /* 在右侧「浏览器」面板打开地址（自动展开侧栏并切到浏览器工具；newTab 控制是否新建标签页） */
+  function openBrowser(url: string, options?: { newTab?: boolean }): void {
+    const value = url.trim()
+    if (!value) {
+      return
+    }
+    browserOpenRequest.value = {
+      id: (browserOpenSeq += 1),
+      url: value,
+      newTab: options?.newTab === true
+    }
+    openRightPanelTool('browser')
+  }
+
   /* 切换右侧侧栏放大态（放大后占满正文区） */
   function toggleRightPanelMaximized(): void {
     rightPanelMaximized.value = !rightPanelMaximized.value
@@ -97,6 +115,7 @@ export const useLayoutStore = defineStore('layout', () => {
     rightPanelVisible,
     rightPanelTool,
     rightPanelMaximized,
+    browserOpenRequest,
     rightPanelWidth: rightPanel.width,
     resetRightPanelWidth: rightPanel.resetWidth,
     toggleSidebar,
@@ -105,6 +124,7 @@ export const useLayoutStore = defineStore('layout', () => {
     openTerminal,
     toggleRightPanel,
     openRightPanelTool,
+    openBrowser,
     toggleRightPanelMaximized,
     setRightPanelWidth: rightPanel.setWidth
   }

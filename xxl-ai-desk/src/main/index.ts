@@ -12,6 +12,7 @@ import { registerLocalFileProtocol } from './services/localFileProtocolService'
 import { disposeAllTerminals } from './services/terminalService'
 import { disposeAllFsWatch } from './services/fsWatchService'
 import { disposeAgentRuntime } from './agent/host/runtimeHost'
+import { disposeBrowserReads } from './agent/host/browserBridge'
 
 /* 主窗口引用（未创建或已关闭时为 null） */
 let mainWindow: BrowserWindow | null = null
@@ -66,8 +67,9 @@ function createWindow(): void {
     app.dock?.setIcon(nativeImage.createFromPath(appIconPath))
   }
 
-  /* 窗口关闭：解除引用，避免后续误用已销毁窗口 */
+  /* 窗口关闭：解除引用并结算未完成的浏览器读取，避免等待超时 */
   mainWindow.on('closed', () => {
+    disposeBrowserReads()
     mainWindow = null
   })
 
@@ -113,7 +115,8 @@ if (!gotLock) {
     app.on('web-contents-created', (_event, contents) => {
       if (contents.getType() === 'webview') {
         contents.setWindowOpenHandler(({ url }) => {
-          mainWindow?.webContents.send(IPC.browserOpenTab, url)
+          /* 页面内新窗口请求：始终新建标签页 */
+          mainWindow?.webContents.send(IPC.browserOpenTab, url, true)
           return { action: 'deny' }
         })
       }

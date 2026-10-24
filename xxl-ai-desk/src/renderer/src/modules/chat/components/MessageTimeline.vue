@@ -78,13 +78,29 @@ function toggleTool(tool: ToolCallState): void {
   toolOpen.value = { ...toolOpen.value, [tool.id]: !toolExpanded(tool) }
 }
 
-/* 工具耗时：运行中按当前时钟实时计算，完成后取结束时间 */
+/* 工具耗时：优先使用运行时上报的 durationMs（落库后仍可展示），否则按时间戳计算 */
 function toolDuration(tool: ToolCallState): string {
+  if (typeof tool.durationMs === 'number' && tool.durationMs >= 0) {
+    return formatDuration(tool.durationMs)
+  }
   if (!tool.startedAt) {
     return ''
   }
   const end = tool.endedAt ?? now.value
   return formatDuration(end - tool.startedAt)
+}
+
+/* 工具结构化结果：格式化 JSON，供展开查看 */
+function toolDetailsText(tool: ToolCallState): string {
+  if (tool.details === undefined || tool.details === null) {
+    return ''
+  }
+  try {
+    const value = JSON.stringify(tool.details, null, 2)
+    return value === '{}' ? '' : (value ?? '')
+  } catch {
+    return String(tool.details)
+  }
 }
 </script>
 
@@ -138,6 +154,10 @@ function toolDuration(tool: ToolCallState): string {
           <div class="tool-block">
             <div class="tool-block-title">{{ t('chat.toolResult') }}</div>
             <pre class="tool-pre" :class="{ 'is-error': part.tool.status === 'error' }">{{ part.tool.result || t('chat.toolNoOutput') }}</pre>
+          </div>
+          <div v-if="toolDetailsText(part.tool)" class="tool-block">
+            <div class="tool-block-title">{{ t('chat.toolDetails') }}</div>
+            <pre class="tool-pre">{{ toolDetailsText(part.tool) }}</pre>
           </div>
         </div>
       </div>

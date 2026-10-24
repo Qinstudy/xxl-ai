@@ -27,6 +27,9 @@ export interface RawMessage {
   errorMessage?: string
   toolCallId?: string
   isError?: boolean
+  /* 工具结果的结构化细节与耗时（Pi 持久化在 toolResult 消息上） */
+  details?: unknown
+  durationMs?: number
 }
 
 /* 生成 UI 消息 id */
@@ -104,6 +107,8 @@ export function mapStoredMessages(stored: StoredMessage[]): UiMessage[] {
       if (tool) {
         tool.status = raw?.isError ? 'error' : 'done'
         tool.result = contentToPlain(raw)
+        tool.details = raw?.details
+        tool.durationMs = typeof raw?.durationMs === 'number' ? raw.durationMs : undefined
       }
       continue
     }

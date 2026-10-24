@@ -69,11 +69,25 @@ import {
   clearSessionPermissions,
   disposeAgentRuntime,
   evictAgent,
-  resetAgents
+  resetAgents,
+  setBrowserOpener
 } from './agent/host/runtimeHost'
+import { resolveBrowserRead, setBrowserActionSender } from './agent/host/browserBridge'
 
 /* 注册全部 IPC 处理器 */
 export function registerIpc(getWindow: () => BrowserWindow | null): void {
+  /* Agent 工具 open_browser：把 URL 交给渲染层，在右侧「浏览器」面板打开（可指定新建标签页） */
+  setBrowserOpener((url, newTab) => {
+    getWindow()?.webContents.send(IPC.browserOpenTab, url, newTab)
+  })
+  /* Agent 工具 read_browser：读取请求转渲染层，结果经 browserReadResult 回传 */
+  setBrowserActionSender((requestId, params) => {
+    getWindow()?.webContents.send(IPC.browserReadRequest, requestId, params)
+  })
+  ipcMain.handle(IPC.browserReadResult, (_event, requestId: string, result) =>
+    resolveBrowserRead(requestId, result)
+  )
+
   ipcMain.handle(
     IPC.appInfo,
     (): RuntimeInfo => ({

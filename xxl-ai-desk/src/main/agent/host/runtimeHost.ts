@@ -5,9 +5,11 @@
  */
 
 import { join } from 'path'
+import { execFileSync, spawn } from 'child_process'
 import { utilityProcess, type UtilityProcess } from 'electron'
 import log from 'electron-log/main'
 import { confirmOutside } from './approval'
+import { requestBrowserRead } from './browserBridge'
 import type {
   HostEvent,
   RunAgentInput,
@@ -35,6 +37,14 @@ const pendingMcp = new Map<
 
 /* MCP 请求超时（毫秒）：握手 30s + 列举 30s，留出余量 */
 const MCP_REQUEST_TIMEOUT = 90000
+
+/* 右侧「浏览器」面板打开回调（由 ipc.ts 注册，把 URL 转发到渲染层标签页） */
+let browserOpener: ((url: string, newTab: boolean) => void) | null = null
+
+/* 注册浏览器打开回调（主进程窗口就绪后由 IPC 网关注入） */
+export function setBrowserOpener(opener: (url: string, newTab: boolean) => void): void {
+  browserOpener = opener
+}
 
 /* 启动（或复用）运行时进程 */
 function ensureWorker(): Promise<UtilityProcess> {
@@ -79,6 +89,20 @@ async function handleMessage(message: WorkerMessage): Promise<void> {
   switch (message.type) {
     case 'event':
       pendingRuns.get(message.sessionId)?.onEvent(message.event)
+      break
+    case 'open-browser':
+      /* Agent 工具请求：转交渲染层，在右侧「浏览器」面板打开（newTab 控制是否新建标签页） */
+      browserOpener?.(message.url, message.newTab === true)
+      break
+    case 'browser-read':
+      /* Agent 工具请求：经渲染层 webview 提取当前页正文，结果回传运行时进程 */
+      void requestBrowserRead(message.params).then((result) => {
+        worker?.postMessage({
+          type: 'browser-read-result',
+          requestId: message.requestId,
+          result
+        } satisfies WorkerRequest)
+      })
       break
     case 'run-done': {
       const pending = pendingRuns.get(message.sessionId)
@@ -209,24 +233,97 @@ export function listMcpToolsByRuntime(
   }))
 }
 
-/* 退出时终止运行时进程：先请求优雅关闭（释放 MCP 子进程），超时则强杀兜底 */
-export function disposeAgentRuntime(timeout = 3000): Promise<void> {
+/* 退出时终止运行时进程：先请求优雅关闭（释放 MCP 子进程），超时强杀，并兜底清理残留后代进程 */
+export function disposeAgentRuntime(timeout = 6000): Promise<void> {
   const proc = worker
   worker = null
   workerReady = null
   if (!proc) {
     return Promise.resolve()
   }
+  /* 退出前先快照后代进程（MCP 的 npx/node、Agent 执行的命令等），退出后按 PID 兜底清理 */
+  const descendants = proc.pid ? collectDescendantPids(proc.pid) : []
   return new Promise<void>((resolve) => {
-    /* 超时兜底：MCP 关闭卡住时强杀，避免退出流程被无限阻塞 */
     const timer = setTimeout(() => {
+      /* 超时：Windows 用 taskkill 杀整棵树，POSIX 逐个强杀后代后再杀 worker */
+      if (process.platform === 'win32' && proc.pid) {
+        spawn('taskkill', ['/pid', String(proc.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true })
+      } else {
+        killPids(descendants)
+      }
       proc.kill()
       resolve()
     }, timeout)
     proc.once('exit', () => {
       clearTimeout(timer)
+      /* 优雅退出后仍存活的子进程（如关闭 MCP 失败 / 用户命令未结束）：兜底清理 */
+      const leftovers = alivePids(descendants)
+      if (leftovers.length > 0) {
+        log.warn(`[agent] 退出时清理残留子进程：${leftovers.join(',')}`)
+        killPids(leftovers)
+      }
       resolve()
     })
     proc.postMessage({ type: 'shutdown' } satisfies WorkerRequest)
+  })
+}
+
+/* 收集指定进程的全部后代 PID（POSIX 通过 ps 解析父子关系；Windows 交由 taskkill 处理） */
+function collectDescendantPids(rootPid: number): number[] {
+  if (process.platform === 'win32') {
+    return []
+  }
+  try {
+    const rows = execFileSync('ps', ['-Ao', 'pid=,ppid='], { encoding: 'utf8' }).split('\n')
+    const childrenOf = new Map<number, number[]>()
+    for (const row of rows) {
+      const [pidText, ppidText] = row.trim().split(/\s+/)
+      const pid = Number(pidText)
+      const ppid = Number(ppidText)
+      if (!pid || !ppid) {
+        continue
+      }
+      const list = childrenOf.get(ppid) ?? []
+      list.push(pid)
+      childrenOf.set(ppid, list)
+    }
+    /* 广度优先展开后代 */
+    const result: number[] = []
+    const queue = [...(childrenOf.get(rootPid) ?? [])]
+    while (queue.length > 0) {
+      const pid = queue.shift() as number
+      result.push(pid)
+      queue.push(...(childrenOf.get(pid) ?? []))
+    }
+    return result
+  } catch {
+    return []
+  }
+}
+
+/* 强杀进程：优先按进程组（MCP stdio 为独立进程组），失败再按单进程；先子后父 */
+function killPids(pids: number[]): void {
+  for (const pid of [...pids].reverse()) {
+    try {
+      process.kill(-pid, 'SIGKILL')
+    } catch {
+      try {
+        process.kill(pid, 'SIGKILL')
+      } catch {
+        /* 进程已退出 */
+      }
+    }
+  }
+}
+
+/* 过滤仍存活的 PID（信号 0 仅做存在性探测） */
+function alivePids(pids: number[]): number[] {
+  return pids.filter((pid) => {
+    try {
+      process.kill(pid, 0)
+      return true
+    } catch {
+      return false
+    }
   })
 }

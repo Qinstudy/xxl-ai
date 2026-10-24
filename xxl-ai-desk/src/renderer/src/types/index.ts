@@ -12,6 +12,10 @@ export interface ToolCallState {
   args?: unknown
   /* 工具返回文本（供展开查看） */
   result?: string
+  /* 结构化结果（工具 details，供展开查看） */
+  details?: unknown
+  /* 工具执行耗时（毫秒，来自运行时；历史消息可能缺省） */
+  durationMs?: number
   /* 开始/结束时间戳（毫秒），用于展示耗时；历史消息缺省为 0 */
   startedAt: number
   endedAt?: number

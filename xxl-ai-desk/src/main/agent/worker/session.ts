@@ -5,7 +5,7 @@
 
 import type { Agent } from '@earendil-works/pi-agent-core'
 import { buildModels, type ProviderModelConfig } from './models'
-import { createBuiltinTools } from './tools'
+import { buildToolGuide, createBuiltinToolEntries } from './tools'
 import { createMcpTools } from './mcp/tools'
 import { setMcpRuntimePath } from './mcp/client'
 import type { ChatMode } from '@shared/ipc'
@@ -54,11 +54,12 @@ async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
   if (!model) {
     throw new Error(`模型未找到：${options.provider.id}/${options.modelId}`)
   }
-  const tools = await createBuiltinTools({
+  const entries = await createBuiltinToolEntries({
     mode: options.mode,
     rootDir: options.rootDir,
     sessionId: options.sessionId
   })
+  const tools = entries.map((entry) => entry.tool)
   /* MCP 工具：随会话装配（未开启的服务不下发，连接失败的服务自动跳过） */
   const mcpTools = await createMcpTools({
     servers: options.mcpServers,
@@ -69,7 +70,7 @@ async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
   /* 历史消息随 initialState 注入：Agent 会在其前自动补上系统指令（直接覆盖 state.messages 会把系统指令冲掉） */
   const agent = new AgentClass({
     initialState: {
-      systemPrompt: options.systemPrompt,
+      systemPrompt: `${options.systemPrompt}${buildToolGuide(entries)}`,
       model,
       tools: [...tools, ...mcpTools],
       messages: (options.messages ?? []) as never[]
@@ -144,7 +145,9 @@ export async function runPrompt(
           toolCallId: event.toolCallId,
           toolName: event.toolName,
           isError: event.isError,
-          result: toolResultText(event.result)
+          result: toolResultText(event.result),
+          details: (event.result as { details?: unknown } | undefined)?.details,
+          durationMs: event.durationMs
         })
         break
       default:
