@@ -1,19 +1,24 @@
 <script setup lang="ts">
 /*
- * 右侧「浏览器」面板：基于 Electron <webview> 的内嵌浏览器，支持多标签页。
- * 标签页生命周期与导航状态由 useBrowserTabs 统一管理，组件只负责视图与交互。
+ * 右侧「浏览器」面板：标签栏 + 地址栏 + 内容锚点。
+ *   - 标签页状态按会话隔离（useBrowserPanel 绑定 sessionId）；
+ *   - webview 由壳级 BrowserHost 承载，本组件只上报内容区锚点。
  * @author xuxueli 2026-10-25
  */
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { t } from '@renderer/i18n'
-import { useBrowserTabs } from '../composables/useBrowserTabs'
+import { useBrowserSessionStore } from '@renderer/stores/browserSession'
+import { useBrowserPanel } from '../../composables/browserRuntime'
 
+const props = defineProps<{ sessionId: string }>()
+
+const browser = useBrowserSessionStore()
 const {
   tabs,
   activeId,
   activeTab,
   addressInput,
   tabLabel,
-  setContainer,
   addTab,
   selectTab,
   closeTab,
@@ -25,7 +30,58 @@ const {
   onMore,
   onAddressFocus,
   onAddressBlur
-} = useBrowserTabs()
+} = useBrowserPanel(props.sessionId)
+
+/* 内容区锚点：供壳级宿主层把 webview 覆盖到本区域 */
+const viewportRef = ref<HTMLElement | null>(null)
+let observer: ResizeObserver | null = null
+
+/* 上报内容区在视口中的位置；尺寸为 0 时保留上次锚点，避免宿主反复改尺寸 */
+function updateAnchor(): void {
+  const el = viewportRef.value
+  if (!el) {
+    return
+  }
+  const rect = el.getBoundingClientRect()
+  if (rect.width === 0 || rect.height === 0) {
+    return
+  }
+  const next = {
+    top: Math.round(rect.top),
+    left: Math.round(rect.left),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height)
+  }
+  const current = browser.anchor
+  if (
+    current &&
+    current.top === next.top &&
+    current.left === next.left &&
+    current.width === next.width &&
+    current.height === next.height
+  ) {
+    return
+  }
+  browser.setAnchor(next)
+}
+
+onMounted(() => {
+  void nextTick(() => {
+    updateAnchor()
+    if (viewportRef.value) {
+      observer = new ResizeObserver(updateAnchor)
+      observer.observe(viewportRef.value)
+    }
+    window.addEventListener('resize', updateAnchor)
+  })
+})
+
+onBeforeUnmount(() => {
+  observer?.disconnect()
+  observer = null
+  window.removeEventListener('resize', updateAnchor)
+  /* 保留最后一次锚点：其他会话的后台宿主沿用相同尺寸，避免切换时改尺寸造成卡顿 */
+})
 </script>
 
 <template>
@@ -103,26 +159,19 @@ const {
       </el-dropdown>
     </div>
 
-    <!-- 内容区：每个标签页一个 webview 宿主，仅当前页可见 -->
+    <!-- 内容区：webview 由壳级宿主层覆盖；此处只保留锚点、空态与加载条 -->
     <div class="browser-body">
-      <div
-        v-for="tab in tabs"
-        :key="tab.id"
-        class="webview-slot"
-        :class="{ active: tab.id === activeId }"
-        :ref="(el) => setContainer(tab.id, el)"
-      >
-        <!-- 加载进度条：覆盖在内容顶部，不引起 webview 尺寸抖动 -->
-        <div v-if="tab.hasPage && tab.loading" class="load-bar"><span></span></div>
-        <div v-if="!tab.hasPage" class="browser-empty">
-          <svg class="globe" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M3 12h18" />
-            <path d="M12 3c2.5 2.6 4 5.6 4 9s-1.5 6.4-4 9c-2.5-2.6-4-5.6-4-9s1.5-6.4 4-9z" />
-          </svg>
-          <div class="empty-title">{{ t('panel.browserStart') }}</div>
-          <div class="empty-tip">{{ t('panel.browserStartTip') }}</div>
-        </div>
+      <div ref="viewportRef" class="browser-viewport"></div>
+      <!-- 加载进度条：覆盖在内容顶部，不引起 webview 尺寸抖动 -->
+      <div v-if="activeTab?.hasPage && activeTab.loading" class="load-bar"><span></span></div>
+      <div v-if="!activeTab?.hasPage" class="browser-empty">
+        <svg class="globe" viewBox="0 0 24 24" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M3 12h18" />
+          <path d="M12 3c2.5 2.6 4 5.6 4 9s-1.5 6.4-4 9c-2.5-2.6-4-5.6-4-9s1.5-6.4 4-9z" />
+        </svg>
+        <div class="empty-title">{{ t('panel.browserStart') }}</div>
+        <div class="empty-tip">{{ t('panel.browserStartTip') }}</div>
       </div>
     </div>
   </div>
@@ -311,15 +360,11 @@ const {
   background: var(--desk-bg);
 }
 
-/* 标签页内容槽：仅当前页展示，切换保留各页状态 */
-.webview-slot {
+/* 内容锚点：实际 webview 由壳级宿主层覆盖到该区域 */
+.browser-viewport {
   position: absolute;
   inset: 0;
-  display: none;
-}
-
-.webview-slot.active {
-  display: block;
+  visibility: hidden;
 }
 
 /* 加载进度条：顶部滑动指示，仅覆盖不占位 */

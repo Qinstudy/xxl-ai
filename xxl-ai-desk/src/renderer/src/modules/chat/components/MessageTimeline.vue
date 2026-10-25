@@ -6,6 +6,7 @@
 import { computed, ref, watch, type ComponentPublicInstance } from 'vue'
 import { renderMarkdown } from '@renderer/composables/useMarkdown'
 import { onCodeCopyClick } from '@renderer/composables/useCodeCopy'
+import { onContentLinkClick } from '@renderer/composables/useContentLink'
 import { toolArgsText, toolView } from '@renderer/composables/useToolView'
 import { useNow } from '@renderer/composables/useNow'
 import { useChatStore } from '@renderer/stores/chat'
@@ -35,7 +36,7 @@ const toolOpen = ref<Record<string, boolean>>({})
 /* 最后一个片段下标（用于判断是否处于流式跟随的尾段） */
 const lastIndex = computed(() => props.message.parts.length - 1)
 
-/* 生成中文案：尚无输出为「正在准备」，已有输出则为「正在生成」（尾部常驻活动指示） */
+/* 生成中文案：尚无输出为「工作中」，已有输出则为「正在生成」（尾部常驻活动指示） */
 const pendingLabel = computed(() =>
   props.message.parts.length === 0 ? t('chat.preparing') : t('chat.generating')
 )
@@ -132,6 +133,14 @@ function toolDuration(tool: ToolCallState): string {
   return formatDuration(end - tool.startedAt)
 }
 
+/* 正文点击：链接交给系统浏览器；其余交给代码复制事件委托 */
+function onContentClick(event: MouseEvent): void {
+  if (onContentLinkClick(event)) {
+    return
+  }
+  void onCodeCopyClick(event)
+}
+
 /* 工具结构化结果：格式化 JSON，供展开查看 */
 function toolDetailsText(tool: ToolCallState): string {
   if (tool.details === undefined || tool.details === null) {
@@ -156,13 +165,13 @@ function toolDetailsText(tool: ToolCallState): string {
         :class="{ active: message.pending && isLastPart(index) }"
       >
         <button class="step-head" @click="toggleThinking(index)">
+          <span class="step-label">
+            {{ message.pending && isLastPart(index) ? t('chat.thinkingActive') : t('chat.thinkingDone') }}
+          </span>
           <el-icon class="step-icon">
             <Loading v-if="message.pending && isLastPart(index)" class="spin" />
             <Cpu v-else />
           </el-icon>
-          <span class="step-label">
-            {{ message.pending && isLastPart(index) ? t('chat.thinkingActive') : t('chat.thinkingDone') }}
-          </span>
           <el-icon class="step-chevron" :class="{ open: thinkingExpanded(index) }">
             <ArrowDown />
           </el-icon>
@@ -214,15 +223,15 @@ function toolDetailsText(tool: ToolCallState): string {
         v-else-if="part.type === 'text'"
         class="step step-text markdown-body"
         :class="{ 'is-error': message.error && isLastPart(index) }"
-        @click="onCodeCopyClick"
+        @click="onContentClick"
         v-html="renderMarkdown(part.text, baseDir)"
       ></div>
     </template>
 
     <!-- 生成中：尾部常驻活动指示，明确「仍在运行」，避免看似卡住 -->
     <div v-if="message.pending" class="generating">
-      <span class="generating-dots"><span></span><span></span><span></span></span>
       <span class="generating-label">{{ pendingLabel }}</span>
+      <span class="generating-dots"><span></span><span></span><span></span></span>
     </div>
 
     <!-- 本轮耗时（仅流式轮次可见） -->

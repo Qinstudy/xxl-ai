@@ -27,10 +27,19 @@ import type { ProviderDTO, ProviderModelQuery } from './contracts/provider'
 import type { ProjectCreateInput, ProjectDTO } from './contracts/project'
 import type { SessionDTO, StoredMessage } from './contracts/session'
 import type { ChatApprovalChoice, ChatApprovalPrompt, ChatEvent } from './contracts/chat'
-import type { TerminalCreateInput, TerminalDTO, TerminalEvent } from './contracts/terminal'
+import type {
+  TerminalAttachResult,
+  TerminalCreateInput,
+  TerminalDTO,
+  TerminalEvent
+} from './contracts/terminal'
 import type { FileContent, FsEntry } from './contracts/fs'
 import type { OpenWithApp } from './contracts/shell'
-import type { BrowserAction, BrowserActionResult } from './contracts/browser'
+import type {
+  BrowserActionResult,
+  BrowserActionRequest,
+  BrowserOpenTabRequest
+} from './contracts/browser'
 import type {
   McpCategory,
   McpDiscoverDetail,
@@ -141,14 +150,22 @@ export interface DeskApi {
   }
   /* 终端（本地 PTY）管理 */
   terminal: {
-    /* 创建终端实例 */
-    create(input?: TerminalCreateInput): Promise<TerminalDTO>
+    /* 创建终端实例（必须归属会话） */
+    create(input: TerminalCreateInput): Promise<TerminalDTO>
+    /* 列举某会话存活的终端实例 */
+    list(sessionId: string): Promise<TerminalDTO[]>
+    /* 重连终端：返回实例信息与历史输出片段（会话切换后回放） */
+    attach(id: string): Promise<TerminalAttachResult | null>
     /* 写入终端输入 */
     write(id: string, data: string): Promise<void>
     /* 调整终端尺寸 */
     resize(id: string, cols: number, rows: number): Promise<void>
     /* 销毁终端实例 */
     dispose(id: string): Promise<void>
+    /* 销毁某会话的全部终端实例 */
+    disposeBySession(sessionId: string): Promise<void>
+    /* 终端归属会话迁移（新建对话草稿 → 真实会话） */
+    reassign(fromSessionId: string, toSessionId: string): Promise<void>
     /* 订阅终端输出 / 退出事件（返回取消订阅函数） */
     onEvent(cb: (event: TerminalEvent) => void): () => void
   }
@@ -182,10 +199,10 @@ export interface DeskApi {
   }
   /* 内嵌浏览器（右侧「工具 → 浏览器」面板）：新窗口请求转发 + 页面内容读取 */
   browser: {
-    /* 订阅新标签页请求（返回取消订阅函数）：newTab 为 true 时强制新标签页 */
-    onOpenTab(cb: (url: string, newTab: boolean) => void): () => void
+    /* 订阅新标签页请求（返回取消订阅函数） */
+    onOpenTab(cb: (request: BrowserOpenTabRequest) => void): () => void
     /* 订阅 Agent 页面动作请求（返回取消订阅函数），处理完需调用 respondAction 回传 */
-    onActionRequest(cb: (requestId: string, action: BrowserAction) => void): () => void
+    onActionRequest(cb: (request: BrowserActionRequest) => void): () => void
     /* 回传页面动作结果 */
     respondAction(requestId: string, result: BrowserActionResult): Promise<void>
   }
@@ -281,9 +298,13 @@ export const IPC = {
   chatApprovalRespond: 'desk:chat:approval-respond',
   /* 终端 */
   terminalCreate: 'desk:terminal:create',
+  terminalList: 'desk:terminal:list',
+  terminalAttach: 'desk:terminal:attach',
   terminalWrite: 'desk:terminal:write',
   terminalResize: 'desk:terminal:resize',
   terminalDispose: 'desk:terminal:dispose',
+  terminalDisposeBySession: 'desk:terminal:dispose-by-session',
+  terminalReassign: 'desk:terminal:reassign',
   terminalEvent: 'desk:terminal:event',
   /* 本地文件系统 */
   fsList: 'desk:fs:list',

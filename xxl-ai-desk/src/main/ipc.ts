@@ -49,10 +49,14 @@ import {
   renameProject
 } from './services/projectService'
 import {
+  attachTerminal,
   createTerminal,
   disposeAllTerminals,
   disposeTerminal,
+  disposeTerminalsBySession,
+  listTerminals,
   onTerminalEvent,
+  reassignTerminals,
   resizeTerminal,
   writeTerminal
 } from './services/terminalService'
@@ -94,13 +98,13 @@ import { resolveBrowserAction, setBrowserActionSender } from './agent/host/brows
 
 /* 注册全部 IPC 处理器 */
 export function registerIpc(getWindow: () => BrowserWindow | null): void {
-  /* Agent 工具 open_browser：把 URL 交给渲染层，在右侧「浏览器」面板打开（可指定新建标签页） */
-  setBrowserOpener((url, newTab) => {
-    getWindow()?.webContents.send(IPC.browserOpenTab, url, newTab)
+  /* Agent 工具 open_browser：把 URL 交给渲染层，在对应会话的浏览器面板打开（可指定新建标签页） */
+  setBrowserOpener((sessionId, url, newTab) => {
+    getWindow()?.webContents.send(IPC.browserOpenTab, { sessionId, url, newTab })
   })
   /* Agent 浏览器动作：请求转渲染层执行，结果经 browserActionResult 回传 */
-  setBrowserActionSender((requestId, action: BrowserAction) => {
-    getWindow()?.webContents.send(IPC.browserActionRequest, requestId, action)
+  setBrowserActionSender((request) => {
+    getWindow()?.webContents.send(IPC.browserActionRequest, request)
   })
   ipcMain.handle(IPC.browserActionResult, (_event, requestId: string, result) =>
     resolveBrowserAction(requestId, result)
@@ -271,12 +275,20 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   )
 
   /* --- 终端（本地 PTY） --- */
-  ipcMain.handle(IPC.terminalCreate, (_event, input?: TerminalCreateInput) => createTerminal(input))
+  ipcMain.handle(IPC.terminalCreate, (_event, input: TerminalCreateInput) => createTerminal(input))
+  ipcMain.handle(IPC.terminalList, (_event, sessionId: string) => listTerminals(sessionId))
+  ipcMain.handle(IPC.terminalAttach, (_event, id: string) => attachTerminal(id))
   ipcMain.handle(IPC.terminalWrite, (_event, id: string, data: string) => writeTerminal(id, data))
   ipcMain.handle(IPC.terminalResize, (_event, id: string, cols: number, rows: number) =>
     resizeTerminal(id, cols, rows)
   )
   ipcMain.handle(IPC.terminalDispose, (_event, id: string) => disposeTerminal(id))
+  ipcMain.handle(IPC.terminalDisposeBySession, (_event, sessionId: string) =>
+    disposeTerminalsBySession(sessionId)
+  )
+  ipcMain.handle(IPC.terminalReassign, (_event, fromSessionId: string, toSessionId: string) =>
+    reassignTerminals(fromSessionId, toSessionId)
+  )
   /* 终端输出/退出事件统一转发到渲染窗口 */
   onTerminalEvent((event) => {
     getWindow()?.webContents.send(IPC.terminalEvent, event)

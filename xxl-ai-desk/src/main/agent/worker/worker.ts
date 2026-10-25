@@ -53,19 +53,21 @@ function post(message: WorkerMessage): void {
   port.postMessage(message)
 }
 
-/* open_browser 工具：把待打开地址转交主进程，由渲染层在右侧「浏览器」面板打开 */
-setBrowserOpener((url, newTab) => post({ type: 'open-browser', url, newTab }))
+/* open_browser 工具：把待打开地址转交主进程，由渲染层在对应会话的浏览器面板打开 */
+setBrowserOpener((sessionId, url, newTab) =>
+  post({ type: 'open-browser', sessionId, url, newTab })
+)
 
 /* 页面动作请求：requestId → 结果结算（主进程经渲染层 webview 执行后回传） */
 const pendingBrowserActions = new Map<string, (result: BrowserActionResult) => void>()
 
 /* 浏览器工具：跨进程请求渲染层执行页面动作 */
 setBrowserActionInvoker(
-  (action: BrowserAction) =>
+  (sessionId, action) =>
     new Promise<BrowserActionResult>((resolve) => {
       const requestId = `ba_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`
       pendingBrowserActions.set(requestId, resolve)
-      post({ type: 'browser-action', requestId, action })
+      post({ type: 'browser-action', requestId, sessionId, action })
     })
 )
 

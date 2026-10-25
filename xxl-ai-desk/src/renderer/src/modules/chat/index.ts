@@ -4,9 +4,8 @@
  * @author xuxueli 2026-10-25
  */
 
-export { default as ChatSidebar } from './components/Sidebar.vue'
-export { default as ChatTopbarActions } from './components/ChatTopbarActions.vue'
+export { default as ChatSidebarHomePanel } from './components/SidebarHomePanel.vue'
+export { default as ChatSearchAction } from './components/ChatSearchAction.vue'
 export { default as ChatCommandPalette } from './components/CommandPalette.vue'
 export { useCommandPalette } from './composables/useCommandPalette'
 export { useSessionActions } from './composables/useSessionActions'
-export { useTerminalTarget } from './composables/useTerminalTarget'

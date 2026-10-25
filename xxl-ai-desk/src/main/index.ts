@@ -73,11 +73,33 @@ function createWindow(): void {
     mainWindow = null
   })
 
+  /* 渲染进程崩溃/重载：回收残留 PTY，避免进程泄漏 */
+  mainWindow.webContents.on('render-process-gone', () => {
+    disposeAllTerminals()
+  })
+
   /* 外链使用系统浏览器打开 */
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
   })
+
+  /*
+   * 拦截主窗口内导航：Markdown / 页面内的普通链接不得替换应用界面。
+   * 同文档（仅 hash 变化）放行；其余 http(s) 交给系统浏览器。
+   */
+  const guardNavigation = (event: Electron.Event, url: string): void => {
+    const current = mainWindow?.webContents.getURL() ?? ''
+    if (url.split('#')[0] === current.split('#')[0]) {
+      return
+    }
+    event.preventDefault()
+    if (/^https?:/i.test(url)) {
+      void shell.openExternal(url)
+    }
+  }
+  mainWindow.webContents.on('will-navigate', guardNavigation)
+  mainWindow.webContents.on('will-redirect', guardNavigation)
 
   if (process.env.ELECTRON_RENDERER_URL) {
     mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
@@ -115,8 +137,12 @@ if (!gotLock) {
     app.on('web-contents-created', (_event, contents) => {
       if (contents.getType() === 'webview') {
         contents.setWindowOpenHandler(({ url }) => {
-          /* 页面内新窗口请求：始终新建标签页 */
-          mainWindow?.webContents.send(IPC.browserOpenTab, url, true)
+          /* 页面内新窗口请求：始终新建标签页；sessionId 留空由渲染层按当前会话兜底 */
+          mainWindow?.webContents.send(IPC.browserOpenTab, {
+            sessionId: '',
+            url,
+            newTab: true
+          })
           return { action: 'deny' }
         })
       }

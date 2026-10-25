@@ -8,6 +8,7 @@ import { randomUUID } from 'crypto'
 import { eq, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
 import { messageTable, projectTable, sessionTable } from '../db/schema'
+import { disposeTerminalsBySession } from './terminalService'
 import type { ProjectCreateInput, ProjectDTO } from '@shared/ipc'
 
 type ProjectRow = typeof projectTable.$inferSelect
@@ -93,5 +94,7 @@ export function deleteProject(id: string): string[] {
     db.delete(sessionTable).where(inArray(sessionTable.id, sessionIds)).run()
   }
   db.delete(projectTable).where(eq(projectTable.id, id)).run()
+  /* 级联回收项目下会话的终端进程 */
+  sessionIds.forEach((sessionId) => disposeTerminalsBySession(sessionId))
   return sessionIds
 }

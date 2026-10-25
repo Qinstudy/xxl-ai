@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /*
-* 左侧栏外壳：常驻图标栏 + 子菜单栏（首页 / 插件 / 系统设置 按板块切换）
+* 应用侧栏外壳：常驻图标栏 + 子菜单栏（首页 / 插件 / 系统设置 按板块切换）
 * @author xuxueli 2026-10-18
 */
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ActivityRail from '@renderer/components/ActivityRail.vue'
-import SubmenuMenu from '@renderer/components/SubmenuMenu.vue'
-import SidebarHomePanel from '@renderer/modules/chat/components/SidebarHomePanel.vue'
-import { useLayoutStore } from '@renderer/stores/layout'
+import SectionMenu from '@renderer/components/SectionMenu.vue'
+import { ChatSidebarHomePanel } from '@renderer/modules/chat'
+import { useShellStore } from '@renderer/stores/shell'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { usePanelResize } from '@renderer/composables/usePanelResize'
 import { NAV_SECTIONS, pluginItemKey, sectionOfPath, type NavItem } from '@renderer/config/nav'
@@ -16,7 +16,7 @@ import { t } from '@renderer/i18n'
 
 const route = useRoute()
 const router = useRouter()
-const layout = useLayoutStore()
+const shell = useShellStore()
 const settings = useSettingsStore()
 
 /* 当前所属板块 */
@@ -32,14 +32,14 @@ const activeKey = computed(() =>
 
 /* 拖拽右边缘调整子菜单栏宽度（统一复用 usePanelResize） */
 const { startResize } = usePanelResize({
-  getSize: () => layout.panelWidth,
-  setSize: layout.setPanelWidth,
+  getSize: () => shell.panelWidth,
+  setSize: shell.setPanelWidth,
   edge: 'left'
 })
 
 /* 双击拖拽手柄：恢复子菜单栏默认宽度 */
 function resetPanelWidth(): void {
-  layout.resetPanelWidth()
+  shell.resetPanelWidth()
 }
 
 /* 子菜单项点击：插件跳路由；系统设置切分类并进入设置页 */
@@ -60,17 +60,17 @@ function onSubmenuSelect(item: NavItem): void {
 <template>
   <aside
     class="desk-sidebar"
-    :class="{ collapsed: layout.sidebarCollapsed }"
+    :class="{ collapsed: shell.sidebarCollapsed }"
     :style="{
-      width: layout.sidebarCollapsed
+      width: shell.sidebarCollapsed
         ? 'var(--desk-rail-width)'
-        : `calc(var(--desk-rail-width) + ${layout.panelWidth}px)`
+        : `calc(var(--desk-rail-width) + ${shell.panelWidth}px)`
     }"
   >
     <ActivityRail />
 
     <!-- 子菜单栏：折叠时隐藏，仅保留左侧图标栏 -->
-    <div v-show="!layout.sidebarCollapsed" class="sidebar-panel">
+    <div v-show="!shell.sidebarCollapsed" class="sidebar-panel">
       <!-- 右边缘拖拽手柄：拖拽调整面板宽度，双击恢复默认宽度 -->
       <div
         class="sidebar-resizer"
@@ -79,8 +79,8 @@ function onSubmenuSelect(item: NavItem): void {
         @dblclick="resetPanelWidth"
       ></div>
 
-      <SidebarHomePanel v-if="!submenu" />
-      <SubmenuMenu
+      <ChatSidebarHomePanel v-if="!submenu" />
+      <SectionMenu
         v-else
         :title-key="submenu.titleKey"
         :items="submenu.items"

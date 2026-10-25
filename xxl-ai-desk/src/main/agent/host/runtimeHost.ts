@@ -38,11 +38,13 @@ const pendingMcp = new Map<
 /* MCP 请求超时（毫秒）：握手 30s + 列举 30s，留出余量 */
 const MCP_REQUEST_TIMEOUT = 90000
 
-/* 右侧「浏览器」面板打开回调（由 ipc.ts 注册，把 URL 转发到渲染层标签页） */
-let browserOpener: ((url: string, newTab: boolean) => void) | null = null
+/* 右侧「浏览器」面板打开回调（由 ipc.ts 注册，把 URL 转发到对应会话的渲染层标签页） */
+let browserOpener: ((sessionId: string, url: string, newTab: boolean) => void) | null = null
 
 /* 注册浏览器打开回调（主进程窗口就绪后由 IPC 网关注入） */
-export function setBrowserOpener(opener: (url: string, newTab: boolean) => void): void {
+export function setBrowserOpener(
+  opener: (sessionId: string, url: string, newTab: boolean) => void
+): void {
   browserOpener = opener
 }
 
@@ -91,12 +93,12 @@ async function handleMessage(message: WorkerMessage): Promise<void> {
       pendingRuns.get(message.sessionId)?.onEvent(message.event)
       break
     case 'open-browser':
-      /* Agent 工具请求：转交渲染层，在右侧「浏览器」面板打开（newTab 控制是否新建标签页） */
-      browserOpener?.(message.url, message.newTab === true)
+      /* Agent 工具请求：转交渲染层，在该会话的浏览器面板打开（newTab 控制是否新建标签页） */
+      browserOpener?.(message.sessionId, message.url, message.newTab === true)
       break
     case 'browser-action':
       /* Agent 工具请求：经渲染层 webview 执行页面动作，结果回传运行时进程 */
-      void requestBrowserAction(message.action).then((result) => {
+      void requestBrowserAction(message.sessionId, message.action).then((result) => {
         worker?.postMessage({
           type: 'browser-action-result',
           requestId: message.requestId,

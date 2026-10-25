@@ -76,6 +76,26 @@ export interface BrowserTabInfo {
   active: boolean
 }
 
+/* 打开标签页请求（主 → 渲染）：sessionId 为空表示页面内 window.open，由当前会话兜底 */
+export interface BrowserOpenTabRequest {
+  /* 所属会话 ID */
+  sessionId: string
+  /* 目标地址 */
+  url: string
+  /* 是否强制新建标签页 */
+  newTab: boolean
+}
+
+/* 页面动作请求（主 → 渲染）：由对应会话的浏览器执行并回传结果 */
+export interface BrowserActionRequest {
+  /* 请求 ID（结果回传时配对） */
+  requestId: string
+  /* 所属会话 ID */
+  sessionId: string
+  /* 页面动作 */
+  action: BrowserAction
+}
+
 /* 浏览器动作结果（按动作类型填充对应字段） */
 export interface BrowserActionResult {
   /* 是否成功 */

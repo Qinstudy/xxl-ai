@@ -4,8 +4,9 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/ipc'
 import type {
   AppSettings,
-  BrowserAction,
+  BrowserActionRequest,
   BrowserActionResult,
+  BrowserOpenTabRequest,
   ChatApprovalChoice,
   ChatApprovalPrompt,
   ChatEvent,
@@ -138,8 +139,12 @@ const api: DeskApi = {
   },
   /* 终端管理 */
   terminal: {
-    /* 创建终端实例 */
-    create: (input?: TerminalCreateInput) => ipcRenderer.invoke(IPC.terminalCreate, input),
+    /* 创建终端实例（必须归属会话） */
+    create: (input: TerminalCreateInput) => ipcRenderer.invoke(IPC.terminalCreate, input),
+    /* 列举某会话存活的终端实例 */
+    list: (sessionId: string) => ipcRenderer.invoke(IPC.terminalList, sessionId),
+    /* 重连终端：返回实例信息与历史输出片段 */
+    attach: (id: string) => ipcRenderer.invoke(IPC.terminalAttach, id),
     /* 写入终端输入 */
     write: (id: string, data: string) => ipcRenderer.invoke(IPC.terminalWrite, id, data),
     /* 调整终端尺寸 */
@@ -147,6 +152,12 @@ const api: DeskApi = {
       ipcRenderer.invoke(IPC.terminalResize, id, cols, rows),
     /* 销毁终端实例 */
     dispose: (id: string) => ipcRenderer.invoke(IPC.terminalDispose, id),
+    /* 销毁某会话的全部终端实例 */
+    disposeBySession: (sessionId: string) =>
+      ipcRenderer.invoke(IPC.terminalDisposeBySession, sessionId),
+    /* 终端归属会话迁移（新建对话草稿 → 真实会话） */
+    reassign: (fromSessionId: string, toSessionId: string) =>
+      ipcRenderer.invoke(IPC.terminalReassign, fromSessionId, toSessionId),
     /* 订阅终端输出 / 退出事件（返回取消订阅函数） */
     onEvent: (callback: (event: TerminalEvent) => void) => {
       const listener = (_event: unknown, payload: TerminalEvent): void => callback(payload)
@@ -193,16 +204,16 @@ const api: DeskApi = {
   /* 内嵌浏览器 */
   browser: {
     /* 内嵌浏览器：新窗口 / Agent 打开请求 → 渲染层标签页（返回取消订阅函数） */
-    onOpenTab: (callback: (url: string, newTab: boolean) => void) => {
-      const listener = (_event: unknown, url: string, newTab: boolean): void =>
-        callback(url, newTab === true)
+    onOpenTab: (callback: (request: BrowserOpenTabRequest) => void) => {
+      const listener = (_event: unknown, request: BrowserOpenTabRequest): void =>
+        callback(request)
       ipcRenderer.on(IPC.browserOpenTab, listener)
       return () => ipcRenderer.removeListener(IPC.browserOpenTab, listener)
     },
     /* Agent 页面动作请求：渲染层执行脚本并回传结果（返回取消订阅函数） */
-    onActionRequest: (callback: (requestId: string, action: BrowserAction) => void) => {
-      const listener = (_event: unknown, requestId: string, action: BrowserAction): void =>
-        callback(requestId, action)
+    onActionRequest: (callback: (request: BrowserActionRequest) => void) => {
+      const listener = (_event: unknown, request: BrowserActionRequest): void =>
+        callback(request)
       ipcRenderer.on(IPC.browserActionRequest, listener)
       return () => ipcRenderer.removeListener(IPC.browserActionRequest, listener)
     },

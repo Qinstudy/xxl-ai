@@ -2,15 +2,18 @@
 /* 应用外壳：左侧会话栏（可折叠）+ 右侧内容区 + 全局快捷键 */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { ChatSidebar, useTerminalTarget } from '@renderer/modules/chat'
+import { useTerminalTarget } from '@renderer/modules/workspace'
 import { WorkspaceTerminalPanel } from '@renderer/modules/workspace/terminal'
 import ApprovalDialog from '@renderer/components/ApprovalDialog.vue'
+import AppSidebar from '@renderer/components/AppSidebar.vue'
 import AppTopbar from '@renderer/components/AppTopbar.vue'
+import { BrowserHost } from '@renderer/modules/workspace'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useChatStore } from '@renderer/stores/chat'
 import { useProjectStore } from '@renderer/stores/project'
-import { useLayoutStore } from '@renderer/stores/layout'
+import { DRAFT_SESSION_KEY, useWorkspaceStore } from '@renderer/stores/workspace'
 import { useQuickAction } from '@renderer/composables/useQuickAction'
+import { useSessionLifecycle } from '@renderer/composables/useSessionLifecycle'
 import { sectionOfPath } from '@renderer/config/nav'
 import { matchShortcut } from '@renderer/utils/shortcut'
 import { t } from './i18n'
@@ -20,9 +23,17 @@ const route = useRoute()
 const settings = useSettingsStore()
 const chat = useChatStore()
 const project = useProjectStore()
-const layout = useLayoutStore()
+const workspace = useWorkspaceStore()
 const runQuickAction = useQuickAction()
+const sessionLifecycle = useSessionLifecycle()
 const { terminalCwd, terminalName } = useTerminalTarget()
+
+/* 当前工作区 key：真实会话 id；新建对话草稿态使用固定 key */
+const workspaceKey = computed(() => chat.currentId || DRAFT_SESSION_KEY)
+/* 当前会话的工作区切片 */
+const workspaceState = computed(() => workspace.sliceOf(workspaceKey.value))
+
+watch(workspaceKey, (key) => workspace.ensure(key), { immediate: true })
 
 /* 终端面板是否已首次挂载：首次打开后常驻，避免路由切换导致 PTY 重建 */
 const terminalMounted = ref(false)
@@ -30,8 +41,8 @@ const terminalMounted = ref(false)
 /* 是否对话页（终端仅在对话页展示，但组件常驻以保留会话） */
 const isChat = computed(() => sectionOfPath(route.path) === 'home')
 
-/* 终端展示条件：对话页且用户已打开 */
-const terminalVisible = computed(() => isChat.value && layout.terminalVisible)
+/* 终端展示条件：对话页且当前会话已打开终端 */
+const terminalVisible = computed(() => isChat.value && workspaceState.value.terminal.visible)
 
 /* 首次打开后挂载终端组件；此后仅 v-show 切换，PTY 与滚动历史保持 */
 watch(
@@ -72,6 +83,8 @@ onMounted(async () => {
   await settings.load()
   await project.loadProjects()
   await chat.loadSessions()
+  /* 校准并开始监听会话生命周期：清理已删除会话遗留的工作区/浏览器/对话 UI 持久化 */
+  sessionLifecycle.start(chat.sessions.map((session) => session.id))
   /* 默认定位会话：有历史会话则打开最后打开的会话，否则进入新建对话页面 */
   await chat.restoreLastSession()
   /* 启动后延迟静默检查更新（仅发现新版本时弹提示，失败静默） */
@@ -98,7 +111,7 @@ onBeforeUnmount(() => {
     <AppTopbar />
 
     <div class="desk-body">
-      <ChatSidebar />
+      <AppSidebar />
       <div class="desk-main">
         <div class="desk-view">
           <RouterView />
@@ -108,13 +121,17 @@ onBeforeUnmount(() => {
         <WorkspaceTerminalPanel
           v-if="terminalMounted"
           v-show="terminalVisible"
+          :session-id="workspaceKey"
           :cwd="terminalCwd"
           :title="terminalName"
           :visible="terminalVisible"
-          @close="layout.toggleTerminal"
+          @close="workspace.setTerminalVisible(workspaceKey, false)"
         />
       </div>
     </div>
+
+    <!-- 浏览器宿主层：跨会话保活 webview，按工具面板锚点定位 -->
+    <BrowserHost />
 
     <!-- 越界访问审批：全局应用内对话框 -->
     <ApprovalDialog />

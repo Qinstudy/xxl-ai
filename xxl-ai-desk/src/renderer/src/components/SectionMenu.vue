@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
-* 通用子菜单列表：插件 / 系统设置 等板块的二级列表（数据来自 config/nav）
+* 通用二级子菜单列表：插件 / 系统设置 等板块的二级列表（数据来自 config/nav）
 * @author xuxueli 2026-10-18
 */
 import { t } from '@renderer/i18n'

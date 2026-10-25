@@ -12,18 +12,20 @@ import type { ChatMode } from '@shared/ipc'
 const props = defineProps<{ streaming: boolean; disabled?: boolean }>()
 const emit = defineEmits<{ submit: [text: string, mode: ChatMode]; stop: [] }>()
 
+/* 输入草稿：由父组件按会话注入，实现会话间草稿隔离 */
+const draft = defineModel<string>('draft', { default: '' })
+
 const router = useRouter()
 const project = useProjectStore()
 const chat = useChatStore()
 const settings = useSettingsStore()
-const text = ref('')
 const inputRef = ref()
 /* 新建对话草稿模式：会话创建时随会话落库，默认 Build */
 const draftMode = ref<ChatMode>('build')
 
 /* 编辑历史消息：回填内容并聚焦输入框（供对话页调用） */
 function editText(content: string): void {
-  text.value = content
+  draft.value = content
   nextTick(() => inputRef.value?.focus())
 }
 
@@ -76,7 +78,7 @@ async function onModelChange(command: string): Promise<void> {
 
 /* 发送消息：校验内容与运行状态、要求新建对话已选项目，随后交由父组件提交 */
 function onSend(): void {
-  const value = text.value.trim()
+  const value = draft.value.trim()
   if (!value || props.streaming || props.disabled) {
     return
   }
@@ -86,7 +88,7 @@ function onSend(): void {
     return
   }
   emit('submit', value, currentMode.value)
-  text.value = ''
+  draft.value = ''
 }
 
 /* 键盘处理：Enter 发送，Shift+Enter 保留换行 */
@@ -103,7 +105,7 @@ function onKeydown(event: KeyboardEvent): void {
     <div class="composer-box">
       <el-input
         ref="inputRef"
-        v-model="text"
+        v-model="draft"
         type="textarea"
         :autosize="{ minRows: 1, maxRows: 8 }"
         resize="none"
@@ -184,7 +186,7 @@ function onKeydown(event: KeyboardEvent): void {
             v-else
             circle
             type="primary"
-            :disabled="!text.trim() || disabled"
+            :disabled="!draft.trim() || disabled"
             @click="onSend"
           >
             <el-icon><Promotion /></el-icon>

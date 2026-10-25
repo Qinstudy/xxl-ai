@@ -52,8 +52,8 @@
     "modeBuild": "Build",
     "modeTip": "Plan is read-only (reads project files only); Build can read/write files and run commands",
     "thinking": "Thinking",
-    "preparing": "Preparing…",
-    "thinkingActive": "Thinking…",
+    "preparing": "Working",
+    "thinkingActive": "Thinking",
     "thinkingDone": "Thought",
     "generating": "Generating",
     "tool": {
@@ -108,6 +108,7 @@
     "newTerminal": "New terminal",
     "terminal": "Terminal",
     "terminalExited": "Terminal exited (code {0})",
+    "terminalLimit": "Terminal limit reached. Close some terminals or sessions first.",
     "showSidePanel": "Show tools",
     "hideSidePanel": "Hide tools",
     "scrollToBottom": "Scroll to bottom",
@@ -157,6 +158,7 @@
     "loadFailPage": "Failed to load page",
     "emptyTree": "Empty directory",
     "newTab": "New tab",
+    "tabLimit": "Tab limit reached for this session; opened in the current tab",
     "closeTab": "Close tab",
     "untitled": "New tab"
   },

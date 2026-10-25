@@ -9,19 +9,29 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@renderer/api'
 import { t } from '@renderer/i18n'
-import { normalizePath, parentDir } from '../utils/path'
+import { useWorkspaceStore } from '@renderer/stores/workspace'
+import { normalizePath, parentDir } from '../../utils/path'
 import FileViewer from './FileViewer.vue'
 import FileTreePanel from './FileTreePanel.vue'
 import type { FileContent, FsEntry, OpenWithApp } from '@shared/ipc'
 
-const props = defineProps<{ root?: string; projectName?: string }>()
+const props = defineProps<{ sessionId: string; root?: string; projectName?: string }>()
+
+/* 会话工作区 store：选中文件与预览态按会话隔离 */
+const workspace = useWorkspaceStore()
+const fileState = computed(() => workspace.sliceOf(props.sessionId).tool.files)
 
 /* 当前选中节点、文件内容与加载/错误态、是否预览 */
 const selected = ref<FsEntry | null>(null)
 const file = ref<FileContent | null>(null)
 const fileLoading = ref(false)
 const fileError = ref('')
-const preview = ref(false)
+const preview = ref(fileState.value.preview)
+
+/* 预览态回写会话工作区（切换会话后保留） */
+watch(preview, (value) => {
+  fileState.value.preview = value
+})
 
 /* 编辑态：original 为磁盘基线，draft 为编辑内容；二者不一致即未保存 */
 const original = ref('')
@@ -45,6 +55,12 @@ onMounted(async () => {
     openApps.value = await api.shell.openWithApps()
   } catch {
     openApps.value = []
+  }
+  /* 恢复会话上次选中的文件（切换会话后保留文件视图） */
+  const path = fileState.value.selectedPath
+  if (path && props.root) {
+    const entry: FsEntry = { name: path.split(/[\\/]/).pop() || path, path, isDir: false }
+    await select(entry)
   }
 })
 
@@ -96,6 +112,7 @@ async function refreshSelected(): Promise<void> {
   } catch {
     /* 文件已被删除：清空内容 */
     selected.value = null
+    fileState.value.selectedPath = ''
     file.value = null
     fileError.value = ''
     original.value = ''
@@ -122,6 +139,7 @@ async function select(entry: FsEntry): Promise<void> {
     }
   }
   selected.value = entry
+  fileState.value.selectedPath = entry.path
   fileLoading.value = true
   fileError.value = ''
   preview.value = false
@@ -170,6 +188,7 @@ watch(
   () => props.root,
   () => {
     selected.value = null
+    fileState.value.selectedPath = ''
     file.value = null
     fileError.value = ''
     preview.value = false
@@ -317,7 +336,12 @@ function onOpenCommand(command: string): void {
 
     <div class="file-main">
       <!-- 左：项目目录树 -->
-      <FileTreePanel :root="root" :selected-path="selected?.path ?? ''" @select="select" />
+      <FileTreePanel
+        :session-id="props.sessionId"
+        :root="root"
+        :selected-path="selected?.path ?? ''"
+        @select="select"
+      />
 
       <!-- 右：文件内容 -->
       <FileViewer

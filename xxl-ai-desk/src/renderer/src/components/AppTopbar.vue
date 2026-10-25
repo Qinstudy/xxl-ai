@@ -7,13 +7,14 @@ import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ChatCommandPalette,
-  ChatTopbarActions,
+  ChatSearchAction,
   useCommandPalette,
   useSessionActions
 } from '@renderer/modules/chat'
+import { WorkspacePanelActions } from '@renderer/modules/workspace'
 import { useChatStore } from '@renderer/stores/chat'
 import { useSettingsStore } from '@renderer/stores/settings'
-import { useLayoutStore } from '@renderer/stores/layout'
+import { useShellStore } from '@renderer/stores/shell'
 import { NAV_SECTIONS, sectionOfPath } from '@renderer/config/nav'
 import { t } from '@renderer/i18n'
 
@@ -21,7 +22,7 @@ const route = useRoute()
 const router = useRouter()
 const chat = useChatStore()
 const settings = useSettingsStore()
-const layout = useLayoutStore()
+const shell = useShellStore()
 /* 会话操作（重命名 / 删除） */
 const { onChatCommand } = useSessionActions()
 /* 搜索命令面板显隐（顶栏入口与面板共享） */
@@ -55,7 +56,7 @@ const appName = computed(() => settings.settings.appName || t('app.name'))
 
 /* 回到对话模块：展开子菜单栏并进入新建对话页面 */
 function goHome(): void {
-  layout.expandSidebar()
+  shell.expandSidebar()
   chat.startNewChat()
   void router.push('/')
 }
@@ -101,9 +102,10 @@ function goHome(): void {
       </div>
     </div>
 
-    <!-- 对话页操作：搜索 / 底部终端 / 右侧侧栏（侧边任务）显隐开关 -->
+    <!-- 对话页操作：搜索（chat）+ 终端/工具面板（workspace） -->
     <div v-if="isChat" class="desk-topbar-actions">
-      <ChatTopbarActions />
+      <ChatSearchAction />
+      <WorkspacePanelActions />
     </div>
 
     <!-- 会话搜索命令面板：由顶栏搜索入口唤起 -->

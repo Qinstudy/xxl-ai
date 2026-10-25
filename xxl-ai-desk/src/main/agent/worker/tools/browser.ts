@@ -22,30 +22,37 @@ import {
 type TypeBuilder = (typeof import('@earendil-works/pi-ai'))['Type']
 
 /* 打开回调（worker 注入）：newTab=true 时强制新建标签页 */
-let browserOpener: ((url: string, newTab: boolean) => void) | null = null
+let browserOpener: ((sessionId: string, url: string, newTab: boolean) => void) | null = null
 
 /* 动作回调（worker 注入）：请求渲染层执行页面动作并回传结果 */
-let browserActionInvoker: ((action: BrowserAction) => Promise<BrowserActionResult>) | null = null
+let browserActionInvoker:
+  | ((sessionId: string, action: BrowserAction) => Promise<BrowserActionResult>)
+  | null = null
 
 /* 注入打开回调（运行时进程启动时调用一次） */
-export function setBrowserOpener(opener: (url: string, newTab: boolean) => void): void {
+export function setBrowserOpener(
+  opener: (sessionId: string, url: string, newTab: boolean) => void
+): void {
   browserOpener = opener
 }
 
 /* 注入动作回调（运行时进程启动时调用一次） */
 export function setBrowserActionInvoker(
-  invoker: (action: BrowserAction) => Promise<BrowserActionResult>
+  invoker: (sessionId: string, action: BrowserAction) => Promise<BrowserActionResult>
 ): void {
   browserActionInvoker = invoker
 }
 
 /* 调用页面动作并统一处理不可用场景 */
-async function runBrowserAction(action: BrowserAction): Promise<BrowserActionResult> {
+async function runBrowserAction(
+  sessionId: string,
+  action: BrowserAction
+): Promise<BrowserActionResult> {
   if (!browserActionInvoker) {
     return { ok: false, error: '浏览器不可用：请在桌面客户端中使用该工具' }
   }
   try {
-    return await browserActionInvoker(action)
+    return await browserActionInvoker(sessionId, action)
   } catch (error) {
     return { ok: false, error: `浏览器动作失败：${(error as Error).message}` }
   }
@@ -79,7 +86,7 @@ function snapshotText(result: BrowserActionResult): string {
 }
 
 /* 打开浏览器 / 历史导航：默认复用当前标签页，必要时新建 */
-function createOpenBrowserTool(Type: TypeBuilder): AgentTool {
+function createOpenBrowserTool(Type: TypeBuilder, sessionId: string): AgentTool {
   return {
     name: 'open_browser',
     label: '打开浏览器',
@@ -112,7 +119,7 @@ function createOpenBrowserTool(Type: TypeBuilder): AgentTool {
       }
       const command = action ?? 'goto'
       if (command !== 'goto') {
-        const result = await runBrowserAction({ type: 'history', action: command })
+        const result = await runBrowserAction(sessionId, { type: 'history', action: command })
         if (!result.ok) {
           return toolError(result.error || '导航失败')
         }
@@ -134,7 +141,7 @@ function createOpenBrowserTool(Type: TypeBuilder): AgentTool {
         return toolError('浏览器不可用：请在桌面客户端中使用该工具')
       }
       const newTab = new_tab === true
-      browserOpener(raw, newTab)
+      browserOpener(sessionId, raw, newTab)
       return text(
         `已在右侧「浏览器」${newTab ? '新标签页' : '当前标签页'}打开：${raw}`,
         { url: raw, newTab }
@@ -144,7 +151,7 @@ function createOpenBrowserTool(Type: TypeBuilder): AgentTool {
 }
 
 /* 读取网页正文：提取当前标签页正文（可选 CSS 选择器与字符上限） */
-function createReadBrowserTool(Type: TypeBuilder): AgentTool {
+function createReadBrowserTool(Type: TypeBuilder, sessionId: string): AgentTool {
   return {
     name: 'read_browser',
     label: '读取网页',
@@ -159,7 +166,7 @@ function createReadBrowserTool(Type: TypeBuilder): AgentTool {
     execute: async (_toolCallId, params) => {
       const { selector, max_chars } = params as { selector?: string; max_chars?: number }
       const max = Math.min(Math.max(Math.floor(max_chars ?? MAX_OUTPUT), 1000), 50000)
-      const result = await runBrowserAction({
+      const result = await runBrowserAction(sessionId, {
         type: 'read',
         selector: selector?.trim() || undefined,
         maxChars: max
@@ -182,7 +189,7 @@ function createReadBrowserTool(Type: TypeBuilder): AgentTool {
 }
 
 /* 页面快照：列出可交互元素与稳定 ref */
-function createSnapshotBrowserTool(Type: TypeBuilder): AgentTool {
+function createSnapshotBrowserTool(Type: TypeBuilder, sessionId: string): AgentTool {
   return {
     name: 'snapshot_browser',
     label: '读取页面结构',
@@ -195,7 +202,7 @@ function createSnapshotBrowserTool(Type: TypeBuilder): AgentTool {
     }),
     execute: async (_toolCallId, params) => {
       const { max_nodes } = params as { max_nodes?: number }
-      const result = await runBrowserAction({ type: 'snapshot', maxNodes: max_nodes })
+      const result = await runBrowserAction(sessionId, { type: 'snapshot', maxNodes: max_nodes })
       if (!result.ok) {
         return toolError(result.error || '读取页面结构失败')
       }
@@ -213,7 +220,7 @@ function createSnapshotBrowserTool(Type: TypeBuilder): AgentTool {
 }
 
 /* 点击页面元素：ref 优先，selector 兜底 */
-function createClickBrowserTool(Type: TypeBuilder): AgentTool {
+function createClickBrowserTool(Type: TypeBuilder, sessionId: string): AgentTool {
   return {
     name: 'click_browser',
     label: '点击页面元素',
@@ -243,7 +250,7 @@ function createClickBrowserTool(Type: TypeBuilder): AgentTool {
       if (!ref && !selector) {
         return toolError('ref 与 selector 至少提供一个')
       }
-      const result = await runBrowserAction({
+      const result = await runBrowserAction(sessionId, {
         type: 'click',
         ref: ref?.trim() || undefined,
         selector: selector?.trim() || undefined,
@@ -262,7 +269,7 @@ function createClickBrowserTool(Type: TypeBuilder): AgentTool {
 }
 
 /* 填写表单：支持文本 / 下拉 / 复选与提交 */
-function createFillBrowserTool(Type: TypeBuilder): AgentTool {
+function createFillBrowserTool(Type: TypeBuilder, sessionId: string): AgentTool {
   return {
     name: 'fill_browser',
     label: '填写页面表单',
@@ -291,7 +298,7 @@ function createFillBrowserTool(Type: TypeBuilder): AgentTool {
       if (!fields || fields.length === 0) {
         return toolError('fields 不能为空')
       }
-      const result = await runBrowserAction({ type: 'fill', fields, submit: submit === true })
+      const result = await runBrowserAction(sessionId, { type: 'fill', fields, submit: submit === true })
       if (!result.ok) {
         return toolError(result.error || '填写失败')
       }
@@ -313,7 +320,7 @@ function createFillBrowserTool(Type: TypeBuilder): AgentTool {
 }
 
 /* 等待页面条件：选择器 / 文本 / URL */
-function createWaitBrowserTool(Type: TypeBuilder): AgentTool {
+function createWaitBrowserTool(Type: TypeBuilder, sessionId: string): AgentTool {
   return {
     name: 'wait_browser',
     label: '等待页面状态',
@@ -337,7 +344,7 @@ function createWaitBrowserTool(Type: TypeBuilder): AgentTool {
       if (!selector && !expectedText && !url) {
         return toolError('selector / text / url 至少提供一个')
       }
-      const result = await runBrowserAction({
+      const result = await runBrowserAction(sessionId, {
         type: 'wait',
         selector: selector?.trim() || undefined,
         text: expectedText?.trim() || undefined,
@@ -359,7 +366,7 @@ function createWaitBrowserTool(Type: TypeBuilder): AgentTool {
 }
 
 /* 页面截图：返回图片供视觉模型核对 */
-function createScreenshotBrowserTool(Type: TypeBuilder): AgentTool {
+function createScreenshotBrowserTool(Type: TypeBuilder, sessionId: string): AgentTool {
   return {
     name: 'screenshot_browser',
     label: '页面截图',
@@ -369,7 +376,7 @@ function createScreenshotBrowserTool(Type: TypeBuilder): AgentTool {
     ),
     parameters: Type.Object({}),
     execute: async () => {
-      const result = await runBrowserAction({ type: 'screenshot' })
+      const result = await runBrowserAction(sessionId, { type: 'screenshot' })
       if (!result.ok || !result.screenshot) {
         return toolError(result.error || '截图失败')
       }
@@ -398,7 +405,7 @@ function createScreenshotBrowserTool(Type: TypeBuilder): AgentTool {
 }
 
 /* 页面诊断：控制台告警/错误与加载失败 */
-function createInspectBrowserTool(Type: TypeBuilder): AgentTool {
+function createInspectBrowserTool(Type: TypeBuilder, sessionId: string): AgentTool {
   return {
     name: 'inspect_browser',
     label: '页面诊断',
@@ -408,7 +415,7 @@ function createInspectBrowserTool(Type: TypeBuilder): AgentTool {
     ),
     parameters: Type.Object({}),
     execute: async () => {
-      const result = await runBrowserAction({ type: 'diagnostics' })
+      const result = await runBrowserAction(sessionId, { type: 'diagnostics' })
       if (!result.ok) {
         return toolError(result.error || '读取诊断信息失败')
       }
@@ -431,7 +438,7 @@ function createInspectBrowserTool(Type: TypeBuilder): AgentTool {
 }
 
 /* 标签页管理：列出 / 切换 / 关闭 */
-function createTabsBrowserTool(Type: TypeBuilder): AgentTool {
+function createTabsBrowserTool(Type: TypeBuilder, sessionId: string): AgentTool {
   return {
     name: 'browser_tabs',
     label: '管理浏览器标签页',
@@ -450,7 +457,7 @@ function createTabsBrowserTool(Type: TypeBuilder): AgentTool {
         operation: 'list' | 'select' | 'close'
         tab_id?: string
       }
-      const result = await runBrowserAction({
+      const result = await runBrowserAction(sessionId, {
         type: 'tabs',
         operation,
         tabId: tab_id?.trim() || undefined
@@ -472,7 +479,7 @@ function createTabsBrowserTool(Type: TypeBuilder): AgentTool {
 /* 工具定义：元信息 + 构建器（顺序即装配顺序） */
 const BROWSER_TOOL_DEFINITIONS: Array<{
   meta: ToolEntry['meta']
-  create: (Type: TypeBuilder) => AgentTool
+  create: (Type: TypeBuilder, sessionId: string) => AgentTool
 }> = [
   {
     meta: { group: 'browser', readOnly: true, modes: ALL_MODES, maxOutput: 2000 },
@@ -521,6 +528,6 @@ export async function createBrowserTools(context: ToolContext): Promise<ToolEntr
   const { Type } = await import('@earendil-works/pi-ai')
   return BROWSER_TOOL_DEFINITIONS.map(({ meta, create }) => ({
     meta,
-    tool: create(Type)
+    tool: create(Type, context.sessionId)
   }))
 }

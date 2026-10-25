@@ -100,8 +100,8 @@ export type WorkerRequest =
 /* 运行时进程 → 主进程 */
 export type WorkerMessage =
   | { type: 'event'; sessionId: string; event: HostEvent } /* 流式事件 */
-  | { type: 'open-browser'; url: string; newTab?: boolean } /* 在右侧「浏览器」面板打开页面（Agent 工具触发） */
-  | { type: 'browser-action'; requestId: string; action: BrowserAction } /* 执行页面动作（跨进程请求渲染层） */
+  | { type: 'open-browser'; sessionId: string; url: string; newTab?: boolean } /* 在右侧「浏览器」面板打开页面（Agent 工具触发） */
+  | { type: 'browser-action'; requestId: string; sessionId: string; action: BrowserAction } /* 执行页面动作（跨进程请求渲染层） */
   | { type: 'run-done'; sessionId: string; messages: unknown[] } /* 运行完成（返回最新上下文） */
   | { type: 'run-error'; sessionId: string; message: string } /* 运行失败 */
   | ({ type: 'approval-request'; requestId: string } & ApprovalRequest) /* 越界审批请求 */

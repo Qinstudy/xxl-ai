@@ -7,6 +7,7 @@ import { randomUUID } from 'crypto'
 import { and, asc, eq, gt, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
 import { messageTable, sessionTable } from '../db/schema'
+import { disposeTerminalsBySession } from './terminalService'
 import type { SessionDTO, StoredMessage } from '@shared/ipc'
 
 type SessionRow = typeof sessionTable.$inferSelect
@@ -94,6 +95,8 @@ export function deleteSession(id: string): void {
   const db = getDb()
   db.delete(messageTable).where(eq(messageTable.sessionId, id)).run()
   db.delete(sessionTable).where(eq(sessionTable.id, id)).run()
+  /* 级联回收该会话的终端进程（服务层统一闭环） */
+  disposeTerminalsBySession(id)
 }
 
 /* 会话消息（按 seq 升序） */

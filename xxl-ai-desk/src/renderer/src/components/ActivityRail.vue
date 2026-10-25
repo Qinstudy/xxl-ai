@@ -5,13 +5,13 @@
 */
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useLayoutStore } from '@renderer/stores/layout'
+import { useShellStore } from '@renderer/stores/shell'
 import { SECTION_ENTRY, SECTION_ICON, sectionOfPath, type SectionKey } from '@renderer/config/nav'
 import { t } from '@renderer/i18n'
 
 const route = useRoute()
 const router = useRouter()
-const layout = useLayoutStore()
+const shell = useShellStore()
 
 /* 当前所属板块（高亮对应入口） */
 const section = computed(() => sectionOfPath(route.path))
@@ -19,10 +19,10 @@ const section = computed(() => sectionOfPath(route.path))
 /* 切换板块：点击其它板块展开子菜单栏并跳转入口地址；点击当前板块则折叠/展开子菜单栏 */
 function go(key: SectionKey): void {
   if (section.value === key) {
-    layout.toggleSidebar()
+    shell.toggleSidebar()
     return
   }
-  layout.expandSidebar()
+  shell.expandSidebar()
   void router.push(SECTION_ENTRY[key])
 }
 </script>

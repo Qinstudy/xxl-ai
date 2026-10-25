@@ -3,7 +3,7 @@
  * @author xuxueli 2026-10-25
  */
 
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@renderer/api'
 import { normalizePath, parentDir } from '../utils/path'
@@ -12,15 +12,19 @@ import type { FsEntry } from '@shared/ipc'
 export interface UseProjectFileTreeOptions {
   /* 项目根目录（响应式取值） */
   root: () => string | undefined
+  /* 外部维护的过滤关键字（按会话隔离时传入；缺省使用组件内部状态） */
+  keyword?: Ref<string>
+  /* 外部维护的目录展开态（按会话隔离时传入；缺省使用组件内部状态） */
+  expanded?: Ref<Record<string, boolean>>
 }
 
 export function useProjectFileTree(options: UseProjectFileTreeOptions) {
   /* 目录 → 子项（懒加载缓存）、展开态、加载态 */
   const childrenMap = ref<Record<string, FsEntry[]>>({})
-  const expandedMap = ref<Record<string, boolean>>({})
+  const expandedMap = options.expanded ?? ref<Record<string, boolean>>({})
   const loadingMap = ref<Record<string, boolean>>({})
   /* 过滤关键字 */
-  const keyword = ref('')
+  const keyword = options.keyword ?? ref('')
 
   /* 已注册监听的目录集合（避免重复 IPC）与正在重载的目录集合 */
   const watchedDirs = new Set<string>()
@@ -144,19 +148,30 @@ export function useProjectFileTree(options: UseProjectFileTreeOptions) {
     }
   }
 
-  /* 重置面板状态并在根目录变化时重新加载 */
+  /* 重置面板状态并在根目录变化时重新加载（外部展开态/关键字仅随根目录切换清空） */
+  let lastRoot: string | undefined
   function reset(): void {
     for (const dir of [...watchedDirs]) {
       unwatch(dir)
     }
     watchedDirs.clear()
     childrenMap.value = {}
-    expandedMap.value = {}
     loadingMap.value = {}
-    keyword.value = ''
     const root = options.root()
+    /* 首次挂载保留会话持久化的展开态与关键字；根目录真正变化时才清空 */
+    if (lastRoot !== undefined && lastRoot !== root) {
+      expandedMap.value = {}
+      keyword.value = ''
+    }
+    lastRoot = root
     if (root) {
       void loadDir(root)
+      /* 恢复已展开目录的子项（会话切换后保持树展开状态） */
+      for (const [dir, open] of Object.entries(expandedMap.value)) {
+        if (open && dir !== root) {
+          void loadDir(dir)
+        }
+      }
     }
   }
 

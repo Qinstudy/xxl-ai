@@ -5,5 +5,5 @@
 import { defineAsyncComponent } from 'vue'
 
 export const WorkspaceTerminalPanel = defineAsyncComponent(
-  () => import('./components/TerminalPanel.vue')
+  () => import('./components/terminal/TerminalPanel.vue')
 )

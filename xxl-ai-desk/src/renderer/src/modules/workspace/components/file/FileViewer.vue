@@ -6,8 +6,9 @@
 import { computed, nextTick, ref } from 'vue'
 import { renderMarkdown } from '@renderer/composables/useMarkdown'
 import { onCodeCopyClick } from '@renderer/composables/useCodeCopy'
+import { onContentLinkClick } from '@renderer/composables/useContentLink'
 import { escapeHtml, highlightCode, languageOf } from '@renderer/composables/useHighlight'
-import { parentDir } from '../utils/path'
+import { parentDir } from '../../utils/path'
 import { t } from '@renderer/i18n'
 import type { FileContent } from '@shared/ipc'
 
@@ -26,6 +27,14 @@ const props = defineProps<{
 }>()
 const draft = defineModel<string>('draft', { required: true })
 const emit = defineEmits<{ save: [] }>()
+
+/* Markdown 预览点击：链接交给系统浏览器，其余交给代码复制事件委托 */
+function onContentClick(event: MouseEvent): void {
+  if (onContentLinkClick(event)) {
+    return
+  }
+  void onCodeCopyClick(event)
+}
 
 /* 编辑区着色长度上限：超过则退化为纯文本，保证大文件编辑流畅 */
 const MAX_EDITOR_HIGHLIGHT = 100000
@@ -109,7 +118,7 @@ function syncGutter(): void {
       <div
         v-else-if="showPreview && isMarkdown"
         class="viewer-markdown markdown-body"
-        @click="onCodeCopyClick"
+        @click="onContentClick"
         v-html="renderMarkdown(file.content, parentDir(file.path))"
       ></div>
       <div v-else-if="file.binary" class="viewer-empty">{{ t('panel.binary') }}</div>

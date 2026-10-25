@@ -4,13 +4,17 @@
  *   - 窗口缺失或渲染层无响应时返回可读错误，避免工具调用永久挂起。
  */
 
-import type { BrowserAction, BrowserActionResult } from '@shared/ipc'
+import type {
+  BrowserAction,
+  BrowserActionRequest,
+  BrowserActionResult
+} from '@shared/ipc'
 
 /* 动作超时（毫秒）：覆盖 wait_browser 最长 30s 轮询与页面加载余量 */
 const ACTION_TIMEOUT = 60000
 
 /* 渲染层发送函数（由 IPC 网关注入） */
-type ActionSender = (requestId: string, action: BrowserAction) => void
+type ActionSender = (request: BrowserActionRequest) => void
 let sender: ActionSender | null = null
 
 /* 待响应请求：requestId → 结算与超时定时器 */
@@ -36,7 +40,10 @@ export function resolveBrowserAction(requestId: string, result: BrowserActionRes
 }
 
 /* 请求执行页面动作；无窗口/超时统一转为失败结果 */
-export function requestBrowserAction(action: BrowserAction): Promise<BrowserActionResult> {
+export function requestBrowserAction(
+  sessionId: string,
+  action: BrowserAction
+): Promise<BrowserActionResult> {
   const send = sender
   if (!send) {
     return Promise.resolve({ ok: false, error: '浏览器不可用：窗口尚未就绪' })
@@ -48,7 +55,7 @@ export function requestBrowserAction(action: BrowserAction): Promise<BrowserActi
       resolve({ ok: false, error: '浏览器动作超时：请确认右侧浏览器已打开页面后重试' })
     }, ACTION_TIMEOUT)
     pending.set(requestId, { resolve, timer })
-    send(requestId, action)
+    send({ requestId, sessionId, action })
   })
 }
 

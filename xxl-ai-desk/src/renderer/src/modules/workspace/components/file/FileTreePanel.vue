@@ -3,16 +3,34 @@
  * 项目文件树：目录过滤、懒加载展开与文件选中。
  * @author xuxueli 2026-10-25
  */
-import { useProjectFileTree } from '../composables/useProjectFileTree'
+import { computed } from 'vue'
+import { useProjectFileTree } from '../../composables/useProjectFileTree'
+import { useWorkspaceStore } from '@renderer/stores/workspace'
 import FileTreeNode from './FileTreeNode.vue'
 import { t } from '@renderer/i18n'
 import type { FsEntry } from '@shared/ipc'
 
-const props = defineProps<{ root?: string; selectedPath: string }>()
+const props = defineProps<{ sessionId: string; root?: string; selectedPath: string }>()
 const emit = defineEmits<{ select: [entry: FsEntry] }>()
 
-const { childrenMap, expandedMap, loadingMap, keyword, rootChildren, visibleRoot, toggle } =
-  useProjectFileTree({ root: () => props.root })
+/* 会话工作区 store：关键字与目录展开态按会话隔离 */
+const workspace = useWorkspaceStore()
+const fileState = computed(() => workspace.sliceOf(props.sessionId).tool.files)
+const keyword = computed({
+  get: () => fileState.value.keyword,
+  set: (value: string) => {
+    fileState.value.keyword = value
+  }
+})
+const expanded = computed({
+  get: () => fileState.value.expanded,
+  set: (value: Record<string, boolean>) => {
+    fileState.value.expanded = value
+  }
+})
+
+const { childrenMap, expandedMap, loadingMap, rootChildren, visibleRoot, toggle } =
+  useProjectFileTree({ root: () => props.root, keyword, expanded })
 </script>
 
 <template>
