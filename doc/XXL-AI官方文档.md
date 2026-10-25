@@ -1348,7 +1348,9 @@ docker compose down
 
 ### v1.2.2 Release Notes[ING]
 - 1、【优化】SKILL与MCP导入优化（Desk版），移除非必要文件和大小限制，提升导入效率和兼容性；
-- 【TODO】Desk版本：记忆；
+- 2、【TODO】SKILL支持从Github安装；
+- 3、【TODO】侧边工具栏优化：会话级别工具栏状态隔离；
+- 4、【TODO】Desk版本：记忆；
 
 
 ### TODO LIST
