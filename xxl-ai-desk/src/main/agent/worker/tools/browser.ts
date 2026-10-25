@@ -118,8 +118,7 @@ function createOpenBrowserTool(Type: TypeBuilder): AgentTool {
         }
         return text(
           `${result.summary || '已执行导航'}\n${pageHeader(result)}`,
-          { action: command, url: result.url ?? '' },
-          2000
+          { action: command, url: result.url ?? '' }
         )
       }
       const raw = url?.trim() ?? ''
@@ -138,8 +137,7 @@ function createOpenBrowserTool(Type: TypeBuilder): AgentTool {
       browserOpener(raw, newTab)
       return text(
         `已在右侧「浏览器」${newTab ? '新标签页' : '当前标签页'}打开：${raw}`,
-        { url: raw, newTab },
-        2000
+        { url: raw, newTab }
       )
     }
   }
@@ -177,8 +175,7 @@ function createReadBrowserTool(Type: TypeBuilder): AgentTool {
           title: result.title ?? '',
           chars: body.length,
           truncated: Boolean(result.truncated)
-        },
-        max + 1000
+        }
       )
     }
   }
@@ -209,8 +206,7 @@ function createSnapshotBrowserTool(Type: TypeBuilder): AgentTool {
           title: result.title ?? '',
           nodes: result.nodes?.length ?? 0,
           totalNodes: result.totalNodes ?? 0
-        },
-        MAX_OUTPUT
+        }
       )
     }
   }
@@ -259,8 +255,7 @@ function createClickBrowserTool(Type: TypeBuilder): AgentTool {
       }
       return text(
         `${result.summary || '已点击'}\n${pageHeader(result)}`,
-        { url: result.url ?? '', title: result.title ?? '' },
-        2000
+        { url: result.url ?? '', title: result.title ?? '' }
       )
     }
   }
@@ -311,8 +306,7 @@ function createFillBrowserTool(Type: TypeBuilder): AgentTool {
           title: result.title ?? '',
           filled: result.filled ?? 0,
           missing: result.missing ?? []
-        },
-        3000
+        }
       )
     }
   }
@@ -358,8 +352,7 @@ function createWaitBrowserTool(Type: TypeBuilder): AgentTool {
         : `等待超时（${result.waitedMs ?? 0}ms），条件未满足`
       return text(
         `${status}\n${pageHeader(result)}`,
-        { matched: Boolean(result.matched), waitedMs: result.waitedMs ?? 0, url: result.url ?? '' },
-        2000
+        { matched: Boolean(result.matched), waitedMs: result.waitedMs ?? 0, url: result.url ?? '' }
       )
     }
   }
@@ -431,8 +424,7 @@ function createInspectBrowserTool(Type: TypeBuilder): AgentTool {
       ]
       return text(
         sections.join('\n'),
-        { url: result.url ?? '', console: consoleLines.length, failedLoads: loadLines.length },
-        8000
+        { url: result.url ?? '', console: consoleLines.length, failedLoads: loadLines.length }
       )
     }
   }
@@ -472,7 +464,7 @@ function createTabsBrowserTool(Type: TypeBuilder): AgentTool {
       return text(`标签页（${lines.length}）：\n${lines.join('\n') || '（无）'}`, {
         activeTabId: result.activeTabId ?? '',
         tabs: result.tabs?.length ?? 0
-      }, 4000)
+      })
     }
   }
 }
@@ -487,7 +479,7 @@ const BROWSER_TOOL_DEFINITIONS: Array<{
     create: createOpenBrowserTool
   },
   {
-    meta: { group: 'browser', readOnly: true, modes: ALL_MODES, maxOutput: MAX_OUTPUT + 1000 },
+    meta: { group: 'browser', readOnly: true, modes: ALL_MODES, maxOutput: 51000 },
     create: createReadBrowserTool
   },
   {

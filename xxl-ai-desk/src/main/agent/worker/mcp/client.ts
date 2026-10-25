@@ -29,7 +29,7 @@ const LIST_TIMEOUT = 30000
 const CALL_TIMEOUT = 60000
 
 /* 单服务工具数量上限 */
-const MAX_TOOLS = 200
+const MAX_TOOLS = 1000
 
 /* 客户端标识（随 MCP 握手发送给服务端） */
 const CLIENT_INFO = { name: 'xxl-ai-desk', version: '1.2.1' }

@@ -2,16 +2,20 @@
  * SKILL 导入服务：负责本地目录 / Zip 的文件系统落位与 SKILL.md 解析。
  *   - 只做文件操作与元信息解析，不读写数据库（由 skillService 统一登记）；
  *   - 所有写入先落临时目录，校验通过后原子移动，避免半成品技能；
- *   - 统一做路径穿越、符号链接、体积与文件数限制，防止恶意包。
+ *   - 统一做路径穿越与符号链接校验，不限制体积、文件数与技能数量。
+ * @author xuxueli 2026-10-25
  */
 
 import AdmZip from 'adm-zip'
 import {
+  closeSync,
   existsSync,
   lstatSync,
   mkdirSync,
+  openSync,
   readFileSync,
   readdirSync,
+  readSync,
   rmSync,
   statSync,
   writeFileSync
@@ -21,24 +25,10 @@ import { promises as fs } from 'fs'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path'
 import { parse as parseYaml } from 'yaml'
 import { ensureSkillsDir, getSkillsDir } from '../config/paths'
-import type { SkillImportFailure } from '@shared/ipc'
+import type { SkillContentChunk, SkillImportFailure } from '@shared/ipc'
 
-/* 单技能体积上限（字节） */
-const MAX_SKILL_BYTES = 20 * 1024 * 1024
-/* 单技能文件数上限 */
-const MAX_SKILL_FILES = 500
-/* 一次导入的技能数量上限 */
-const MAX_SKILL_COUNT = 20
-/* Zip 压缩包体积上限 */
-const MAX_ZIP_BYTES = 50 * 1024 * 1024
-/* Zip 解压后总体积上限 */
-const MAX_UNZIP_BYTES = 100 * 1024 * 1024
-/* Zip 解压后文件数上限 */
-const MAX_UNZIP_FILES = 1000
-/* SKILL.md 读取上限（字节） */
-const MAX_META_BYTES = 64 * 1024
-/* 识别技能目录的最大扫描深度（兼容 repo/skills/foo 这类多层包） */
-const MAX_SCAN_DEPTH = 4
+/* SKILL.md 正文分页块大小（字节，仅控制单次读取负载，不是内容上限） */
+const CONTENT_CHUNK_BYTES = 512 * 1024
 /* 遍历时跳过的目录 */
 const SKIP_DIRS = new Set(['.git', 'node_modules', '.svn', '.hg'])
 
@@ -98,31 +88,25 @@ export function uniqueSkillId(preferred: string): string {
   return candidate
 }
 
-/* 读取文本文件（超限截断） */
-function readTextLimit(file: string, limit: number): string {
-  const buffer = readFileSync(file)
-  return buffer.subarray(0, limit).toString('utf-8')
-}
-
 /* 取正文第一段（frontmatter 缺失描述时的兜底） */
 function firstParagraph(body: string): string {
   const line = body
     .split('\n')
     .map((item) => item.trim())
     .find((item) => item !== '' && !item.startsWith('#') && !item.startsWith('---'))
-  return (line ?? '').slice(0, 200)
+  return line ?? ''
 }
 
 /*
  * 解析 SKILL.md：读取 YAML frontmatter 的 name / description / version。
- * 无 frontmatter 时 name 回落目录名、description 回落正文首段。
+ * 无 frontmatter 时 name 回落目录名、description 回落正文首段；内容完整读取，不做截断。
  */
 export function parseSkillMeta(dir: string, fallbackName: string): ParsedSkillMeta {
   const file = join(dir, 'SKILL.md')
   if (!existsSync(file)) {
     throw new Error('未找到 SKILL.md')
   }
-  const raw = readTextLimit(file, MAX_META_BYTES).replace(/\r\n/g, '\n')
+  const raw = readFileSync(file, 'utf-8').replace(/\r\n/g, '\n')
   let body = raw
   let data: Record<string, unknown> = {}
   if (raw.startsWith('---')) {
@@ -147,56 +131,9 @@ export function parseSkillMeta(dir: string, fallbackName: string): ParsedSkillMe
   const description =
     String(data.description ?? '').trim() || firstParagraph(body) || '（暂无描述）'
   return {
-    name: name.slice(0, 120),
-    description: description.replace(/\s+/g, ' ').slice(0, 500),
-    version: String(data.version ?? '').trim().slice(0, 40)
-  }
-}
-
-/* 递归统计目录体积与文件数（跳过符号链接与依赖目录） */
-function measureDir(dir: string): { size: number; files: number } {
-  let size = 0
-  let files = 0
-  const stack = [dir]
-  while (stack.length > 0) {
-    const current = stack.pop() as string
-    let entries: Dirent[]
-    try {
-      entries = readdirSync(current, { withFileTypes: true })
-    } catch {
-      continue
-    }
-    for (const entry of entries) {
-      if (SKIP_DIRS.has(entry.name)) {
-        continue
-      }
-      const full = join(current, entry.name)
-      if (entry.isSymbolicLink()) {
-        continue
-      }
-      if (entry.isDirectory()) {
-        stack.push(full)
-      } else if (entry.isFile()) {
-        files += 1
-        try {
-          size += statSync(full).size
-        } catch {
-          /* 忽略读取失败的单个文件 */
-        }
-      }
-    }
-  }
-  return { size, files }
-}
-
-/* 校验目录体积与文件数 */
-function assertSkillSize(dir: string): void {
-  const { size, files } = measureDir(dir)
-  if (files > MAX_SKILL_FILES) {
-    throw new Error(`技能文件过多（${files} 个，最多 ${MAX_SKILL_FILES} 个）`)
-  }
-  if (size > MAX_SKILL_BYTES) {
-    throw new Error(`技能体积过大（${Math.round(size / 1024 / 1024)}MB，最多 20MB）`)
+    name,
+    description: description.replace(/\s+/g, ' '),
+    version: String(data.version ?? '').trim()
   }
 }
 
@@ -224,7 +161,7 @@ async function copySkillDir(source: string, target: string): Promise<void> {
 /*
  * 在指定根目录内识别技能目录：
  *   - 根目录自身含 SKILL.md 即为单技能（Zip 常把技能打在一个顶层目录里）；
- *   - 否则逐层向下扫描（最多 MAX_SCAN_DEPTH 层），命中 SKILL.md 即收下并停止深入该分支，
+ *   - 否则逐层向下扫描（不限制深度与数量），命中 SKILL.md 即收下并停止深入该分支，
  *     既兼容 repo/skills/foo 的多技能包，也避免把技能内部示例目录误判为新技能。
  */
 function resolveSkillRoots(root: string): string[] {
@@ -232,15 +169,12 @@ function resolveSkillRoots(root: string): string[] {
     return [root]
   }
   const roots: string[] = []
-  const queue: { dir: string; depth: number }[] = [{ dir: root, depth: 0 }]
-  while (queue.length > 0 && roots.length < MAX_SKILL_COUNT) {
-    const current = queue.shift() as { dir: string; depth: number }
-    if (current.depth >= MAX_SCAN_DEPTH) {
-      continue
-    }
+  const queue = [root]
+  while (queue.length > 0) {
+    const current = queue.shift() as string
     let entries: Dirent[]
     try {
-      entries = readdirSync(current.dir, { withFileTypes: true })
+      entries = readdirSync(current, { withFileTypes: true })
     } catch {
       continue
     }
@@ -248,15 +182,12 @@ function resolveSkillRoots(root: string): string[] {
       if (!entry.isDirectory() || entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) {
         continue
       }
-      const child = join(current.dir, entry.name)
+      const child = join(current, entry.name)
       if (existsSync(join(child, 'SKILL.md'))) {
         roots.push(child)
-        if (roots.length >= MAX_SKILL_COUNT) {
-          break
-        }
         continue
       }
-      queue.push({ dir: child, depth: current.depth + 1 })
+      queue.push(child)
     }
   }
   return roots
@@ -276,7 +207,6 @@ function createTempDir(): string {
  *   - copy=false 时直接移动已解压的目录（Zip 导入）。
  */
 async function commitSkillRoot(root: string, copy: boolean): Promise<ImportedSkill> {
-  assertSkillSize(root)
   const meta = parseSkillMeta(root, basename(root))
   const id = uniqueSkillId(meta.name)
   const target = join(getSkillsDir(), id)
@@ -308,7 +238,7 @@ export async function importSkillDirectory(sourceDir: string): Promise<SkillImpo
     }
   }
   const outcome: SkillImportOutcome = { imported: [], failed: [] }
-  for (const root of roots.slice(0, MAX_SKILL_COUNT)) {
+  for (const root of roots) {
     try {
       outcome.imported.push(await commitSkillRoot(root, true))
     } catch (error) {
@@ -343,19 +273,10 @@ function isSymlinkEntry(entry: AdmZip.IZipEntry): boolean {
   return ((attr >>> 16) & 0o170000) === 0o120000
 }
 
-/* 解压 Zip 到临时目录（逐条校验，防 Zip Slip / Zip Bomb / 符号链接） */
+/* 解压 Zip 到临时目录（逐条校验，防 Zip Slip 与符号链接；不限制体积与条目数） */
 function extractZip(zipFile: string, dest: string): void {
-  const size = statSync(zipFile).size
-  if (size > MAX_ZIP_BYTES) {
-    throw new Error('Zip 文件过大（最多 50MB）')
-  }
   const zip = new AdmZip(zipFile)
-  const entries = zip.getEntries()
-  if (entries.length > MAX_UNZIP_FILES) {
-    throw new Error(`Zip 文件数过多（最多 ${MAX_UNZIP_FILES} 个）`)
-  }
-  let total = 0
-  for (const entry of entries) {
+  for (const entry of zip.getEntries()) {
     const safe = assertZipEntrySafe(entry.entryName)
     if (!safe) {
       continue
@@ -371,13 +292,8 @@ function extractZip(zipFile: string, dest: string): void {
       mkdirSync(target, { recursive: true })
       continue
     }
-    const data = entry.getData()
-    total += data.length
-    if (total > MAX_UNZIP_BYTES) {
-      throw new Error('Zip 解压后体积过大（最多 100MB）')
-    }
     mkdirSync(dirname(target), { recursive: true })
-    writeFileSync(target, data)
+    writeFileSync(target, entry.getData())
   }
 }
 
@@ -395,7 +311,7 @@ export async function importSkillZip(zipFile: string): Promise<SkillImportOutcom
       }
     }
     const outcome: SkillImportOutcome = { imported: [], failed: [] }
-    for (const root of roots.slice(0, MAX_SKILL_COUNT)) {
+    for (const root of roots) {
       try {
         outcome.imported.push(await commitSkillRoot(root, false))
       } catch (error) {
@@ -410,11 +326,11 @@ export async function importSkillZip(zipFile: string): Promise<SkillImportOutcom
   }
 }
 
-/* 列出技能目录内的附属文件（相对路径 + 大小，最多 200 个） */
+/* 列出技能目录内的全部附属文件（相对路径 + 大小，不设数量上限） */
 export function listSkillFiles(dir: string): { path: string; size: number }[] {
   const files: { path: string; size: number }[] = []
   const stack = [dir]
-  while (stack.length > 0 && files.length < 200) {
+  while (stack.length > 0) {
     const current = stack.pop() as string
     let entries: Dirent[]
     try {
@@ -436,19 +352,58 @@ export function listSkillFiles(dir: string): { path: string; size: number }[] {
           /* 忽略读取失败的单个文件 */
         }
       }
-      if (files.length >= 200) {
-        break
-      }
     }
   }
   return files.sort((a, b) => a.path.localeCompare(b.path))
 }
 
-/* 读取 SKILL.md 正文（详情预览用，超限截断） */
-export function readSkillContent(dir: string): string {
+/*
+ * 计算 UTF-8 完整字符边界：分页末尾若落在多字节字符中间，回退到完整字符。
+ * 返回本次可安全解码的字节数。
+ */
+function trimIncompleteUtf8(buffer: Buffer, length: number): number {
+  const end = length
+  for (let back = 1; back <= 3 && end - back >= 0; back += 1) {
+    const byte = buffer[end - back]
+    if ((byte & 0x80) === 0) {
+      /* ASCII 字节，边界完整 */
+      return end
+    }
+    if ((byte & 0xc0) === 0xc0) {
+      /* 多字节起始字节：判断该字符是否已被完整读入 */
+      const need = byte >= 0xf0 ? 4 : byte >= 0xe0 ? 3 : 2
+      return back < need ? end - back : end
+    }
+  }
+  return end
+}
+
+/* 读取 SKILL.md 正文分页（offset 为字节偏移，返回本次片段与下一次偏移） */
+export function readSkillContentChunk(
+  dir: string,
+  offset = 0,
+  limit = CONTENT_CHUNK_BYTES
+): SkillContentChunk {
   const file = join(dir, 'SKILL.md')
   if (!existsSync(file)) {
-    return ''
+    return { content: '', offset: 0, nextOffset: 0, total: 0, eof: true }
   }
-  return readTextLimit(file, 200 * 1024)
+  const total = statSync(file).size
+  const start = Math.min(Math.max(0, Math.floor(offset)), total)
+  const size = Math.max(0, Math.min(limit, total - start))
+  let content = ''
+  let readBytes = 0
+  if (size > 0) {
+    const fd = openSync(file, 'r')
+    try {
+      const buffer = Buffer.alloc(size)
+      readBytes = readSync(fd, buffer, 0, size, start)
+      readBytes = trimIncompleteUtf8(buffer, readBytes)
+      content = buffer.subarray(0, readBytes).toString('utf-8')
+    } finally {
+      closeSync(fd)
+    }
+  }
+  const nextOffset = start + readBytes
+  return { content, offset: start, nextOffset, total, eof: nextOffset >= total }
 }

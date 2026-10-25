@@ -2,7 +2,7 @@
  * GitHub 技能安装器：按 skills.sh 的 source / skillId 定位仓库内技能目录并下载到本地。
  *   - 只访问 GitHub 固定域名（api.github.com），经 Electron net 走系统代理；
  *   - 通过 Git Tree 获取文件 SHA，再用 Blob 接口按需下载，避免下载整仓；
- *   - 先落临时目录，校验 SKILL.md 后原子移动，并限制文件数与总体积。
+ *   - 先落临时目录，校验 SKILL.md 后原子移动，并限制单文件与总体积（文件数不设卡）。
  */
 
 import { mkdirSync, rmSync } from 'fs'
@@ -15,6 +15,7 @@ import {
   uniqueSkillId,
   type ImportedSkill
 } from '../../../services/skillImportService'
+import { SKILL_MAX_BYTES, SKILL_MAX_FILE_BYTES } from '../../../services/skillLimits'
 
 /* GitHub API 根地址 */
 const GITHUB_API = 'https://api.github.com'
@@ -25,15 +26,6 @@ const TIMEOUT = 20000
 /* 仓库信息 / 目录树缓存时间（毫秒） */
 const CACHE_TTL = 10 * 60 * 1000
 
-/* 单文件体积上限 */
-const MAX_FILE_BYTES = 2 * 1024 * 1024
-
-/* 技能总体积上限 */
-const MAX_TOTAL_BYTES = 20 * 1024 * 1024
-
-/* 技能文件数上限 */
-const MAX_FILES = 200
-
 /* 下载并发数 */
 const CONCURRENCY = 4
 
@@ -43,10 +35,11 @@ interface RepoRef {
   repo: string
 }
 
-/* 仓库文件节点（路径 + blob SHA） */
+/* 仓库文件节点（路径 + blob SHA + 体积，体积用于下载前预检） */
 interface RepoFile {
   path: string
   sha: string
+  size: number
 }
 
 /* 仓库信息缓存：owner/repo → 默认分支与过期时间 */
@@ -141,12 +134,16 @@ async function listRepoFiles(owner: string, repo: string, branch: string): Promi
   )
   const tree = Array.isArray(payload.tree) ? payload.tree : []
   const files = tree
-    .map((node) => node as { path?: unknown; type?: unknown; sha?: unknown })
+    .map((node) => node as { path?: unknown; type?: unknown; sha?: unknown; size?: unknown })
     .filter(
       (node) =>
         node.type === 'blob' && typeof node.path === 'string' && typeof node.sha === 'string'
     )
-    .map((node) => ({ path: String(node.path), sha: String(node.sha) }))
+    .map((node) => ({
+      path: String(node.path),
+      sha: String(node.sha),
+      size: Number(node.size ?? 0) || 0
+    }))
   treeCache.set(key, { files, expireAt: Date.now() + CACHE_TTL })
   return files
 }
@@ -202,8 +199,10 @@ async function downloadBlob(
     `${GITHUB_API}/repos/${repoRef.owner}/${repoRef.repo}/git/blobs/${sha}`,
     'application/vnd.github.raw'
   )
-  if (buffer.byteLength > MAX_FILE_BYTES) {
-    throw new Error(`技能文件过大（${path}）`)
+  if (buffer.byteLength > SKILL_MAX_FILE_BYTES) {
+    throw new Error(
+      `技能文件过大（${path}，实际 ${Math.ceil(buffer.byteLength / 1024 / 1024)}MB，上限 ${SKILL_MAX_FILE_BYTES / 1024 / 1024}MB）`
+    )
   }
   mkdirSync(dirname(dest), { recursive: true })
   await fs.writeFile(dest, buffer)
@@ -224,8 +223,12 @@ async function downloadSkillFiles(
   if (relativeFiles.length === 0) {
     throw new Error('技能目录为空')
   }
-  if (relativeFiles.length > MAX_FILES) {
-    throw new Error(`技能文件过多（${relativeFiles.length} 个，最多 ${MAX_FILES} 个）`)
+  /* 下载前按目录树体积预检，超限直接失败，避免下载到一半才中断 */
+  const planned = relativeFiles.reduce((sum, file) => sum + file.size, 0)
+  if (planned > SKILL_MAX_BYTES) {
+    throw new Error(
+      `技能体积过大（预检约 ${Math.ceil(planned / 1024 / 1024)}MB，上限 ${SKILL_MAX_BYTES / 1024 / 1024}MB）`
+    )
   }
 
   let total = 0
@@ -241,8 +244,10 @@ async function downloadSkillFiles(
       }
       const size = await downloadBlob(repoRef, file.sha, file.path, dest)
       total += size
-      if (total > MAX_TOTAL_BYTES) {
-        throw new Error('技能体积过大（最多 20MB）')
+      if (total > SKILL_MAX_BYTES) {
+        throw new Error(
+          `技能体积过大（实际已下载 ${Math.ceil(total / 1024 / 1024)}MB，上限 ${SKILL_MAX_BYTES / 1024 / 1024}MB）`
+        )
       }
     }
   }

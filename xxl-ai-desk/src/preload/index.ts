@@ -23,6 +23,7 @@ import type {
   SessionDTO,
   SkillDiscoverDetail,
   SkillDiscoverQuery,
+  SkillContentChunk,
   SkillDTO,
   SkillDetail,
   SkillImportResult,
@@ -234,6 +235,9 @@ const api: DeskApi = {
     list: (): Promise<SkillDTO[]> => ipcRenderer.invoke(IPC.skillList),
     /* 技能详情 */
     detail: (id: string): Promise<SkillDetail> => ipcRenderer.invoke(IPC.skillDetail, id),
+    /* 技能正文续读 */
+    content: (id: string, offset: number): Promise<SkillContentChunk> =>
+      ipcRenderer.invoke(IPC.skillContent, id, offset),
     /* 从本地目录导入 */
     importDirectory: (): Promise<SkillImportResult | null> =>
       ipcRenderer.invoke(IPC.skillImportDir),

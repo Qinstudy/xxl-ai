@@ -35,11 +35,25 @@ export interface SkillFileMeta {
   size: number
 }
 
+/* SKILL.md 正文分页片段（按字节偏移续读，内容不做截断） */
+export interface SkillContentChunk {
+  /* 本次读取的正文片段 */
+  content: string
+  /* 本次起始字节偏移 */
+  offset: number
+  /* 下一次读取的字节偏移 */
+  nextOffset: number
+  /* 正文总字节数 */
+  total: number
+  /* 是否已读到末尾 */
+  eof: boolean
+}
+
 /* 技能详情：正文 + 文件清单 */
 export interface SkillDetail extends SkillDTO {
-  /* SKILL.md 正文（超限截断） */
-  content: string
-  /* 附属文件列表（不含隐藏文件） */
+  /* SKILL.md 正文首屏（完整内容经 skill.content 按偏移续读） */
+  content: SkillContentChunk
+  /* 附属文件列表（不含隐藏文件，全量返回） */
   files: SkillFileMeta[]
 }
 
@@ -110,7 +124,7 @@ export interface SkillDiscoverPage {
 
 /* 发现 SKILL：检索入参 */
 export interface SkillDiscoverQuery {
-  /* 关键字（空则返回榜单；有值需至少 2 个字符） */
+  /* 关键字（空则返回榜单；任意长度均可检索） */
   keyword: string
   /* 搜索最大条数（1-100，默认 100） */
   limit?: number

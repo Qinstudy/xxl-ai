@@ -88,7 +88,8 @@ export async function createSkillTools(context: ToolContext): Promise<ToolEntry[
         group: 'skill',
         readOnly: true,
         modes: ALL_MODES,
-        maxOutput: 20000
+        /* 技能说明可能较长，放宽到 10 万字符（仍受单次上下文预算约束） */
+        maxOutput: 100000
       },
       tool: readSkill
     }

@@ -17,9 +17,18 @@ const props = defineProps<{ skillId: string }>()
 const skill = useSkillStore()
 const detail = ref<SkillDetail | null>(null)
 const loading = ref(false)
+/* 已加载正文（首屏 + 分页追加），内容不截断 */
+const content = ref('')
+/* 下一次续读的字节偏移 */
+const contentNext = ref(0)
+/* 正文总字节数 */
+const contentTotal = ref(0)
+/* 是否已读到正文末尾 */
+const contentEof = ref(true)
+const loadingContent = ref(false)
 
 /* 正文渲染（已消毒） */
-const html = computed(() => renderMarkdown(detail.value?.content ?? ''))
+const html = computed(() => renderMarkdown(content.value))
 
 /* 文件体积展示 */
 function formatSize(size: number): string {
@@ -40,12 +49,38 @@ async function loadDetail(): Promise<void> {
   }
   loading.value = true
   try {
-    detail.value = await skill.detail(props.skillId)
+    const data = await skill.detail(props.skillId)
+    detail.value = data
+    /* 首屏正文 + 续读游标 */
+    content.value = data.content.content
+    contentNext.value = data.content.nextOffset
+    contentTotal.value = data.content.total
+    contentEof.value = data.content.eof
   } catch (error) {
     detail.value = null
+    content.value = ''
     ElMessage.error(ipcErrorMessage(error))
   } finally {
     loading.value = false
+  }
+}
+
+/* 加载更多正文：按字节偏移续读并追加，直到读完 */
+async function loadMoreContent(): Promise<void> {
+  if (!detail.value || contentEof.value) {
+    return
+  }
+  loadingContent.value = true
+  try {
+    const chunk = await skill.content(detail.value.id, contentNext.value)
+    content.value += chunk.content
+    contentNext.value = chunk.nextOffset
+    contentTotal.value = chunk.total
+    contentEof.value = chunk.eof
+  } catch (error) {
+    ElMessage.error(ipcErrorMessage(error))
+  } finally {
+    loadingContent.value = false
   }
 }
 
@@ -131,6 +166,14 @@ async function onReveal(): Promise<void> {
 
         <div class="section-title">{{ t('plugin.skillCenter.detailContent') }}</div>
         <div class="markdown-body" v-html="html" />
+        <div v-if="!contentEof" class="content-more">
+          <el-button text type="primary" :loading="loadingContent" @click="loadMoreContent">
+            {{ t('plugin.skillCenter.loadMore') }}
+          </el-button>
+          <span class="content-progress">
+            {{ t('plugin.skillCenter.loadedCount', [formatSize(contentNext), formatSize(contentTotal)]) }}
+          </span>
+        </div>
 
         <div class="section-title">{{ t('plugin.skillCenter.detailFiles') }}</div>
         <div v-if="detail.files.length === 0" class="empty-files">
@@ -222,6 +265,18 @@ async function onReveal(): Promise<void> {
 
 .markdown-body :deep(code) {
   font-family: var(--el-font-family-mono, monospace);
+}
+
+.content-more {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.content-progress {
+  font-size: 12px;
+  color: var(--desk-text-tertiary);
 }
 
 .empty-files {

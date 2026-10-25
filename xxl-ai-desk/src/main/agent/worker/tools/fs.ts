@@ -59,7 +59,7 @@ export async function createFsTools(context: ToolContext): Promise<ToolEntry[]> 
           totalLines: lines.length,
           startLine: start + 1,
           endLine: Math.min(end, lines.length)
-        }, MAX_OUTPUT)
+        })
       } catch (error) {
         return toolError(`读取失败：${(error as Error).message}`)
       }
@@ -91,7 +91,7 @@ export async function createFsTools(context: ToolContext): Promise<ToolEntry[]> 
         return text(lines.join('\n') || '（空目录）', {
           path: displayPath(rootDir, checked.abs),
           count: entries.length
-        }, 12000)
+        })
       } catch (error) {
         return toolError(`列出目录失败：${(error as Error).message}`)
       }
@@ -121,7 +121,7 @@ export async function createFsTools(context: ToolContext): Promise<ToolEntry[]> 
       const matched = files
         .map((file) => displayPath(rootDir, file))
         .filter((file) => matcher.test(file))
-      return text(matched.join('\n') || '未找到匹配文件', { count: matched.length }, 12000)
+      return text(matched.join('\n') || '未找到匹配文件', { count: matched.length })
     }
   }
 
@@ -184,7 +184,7 @@ export async function createFsTools(context: ToolContext): Promise<ToolEntry[]> 
       return text(output.join('\n') || '未找到匹配内容', {
         count: output.length,
         max
-      }, MAX_OUTPUT)
+      })
     }
   }
 
@@ -213,8 +213,7 @@ export async function createFsTools(context: ToolContext): Promise<ToolEntry[]> 
         await fs.writeFile(checked.abs, content, 'utf-8')
         return text(
           `已写入 ${displayPath(rootDir, checked.abs)}（${content.length} 字符）`,
-          { path: displayPath(rootDir, checked.abs), chars: content.length },
-          2000
+          { path: displayPath(rootDir, checked.abs), chars: content.length }
         )
       } catch (error) {
         return toolError(`写入失败：${(error as Error).message}`)
@@ -266,8 +265,7 @@ export async function createFsTools(context: ToolContext): Promise<ToolEntry[]> 
         await fs.writeFile(checked.abs, updated, 'utf-8')
         return text(
           `已更新 ${displayPath(rootDir, checked.abs)}（替换 ${count} 处）`,
-          { path: displayPath(rootDir, checked.abs), replaced: count },
-          2000
+          { path: displayPath(rootDir, checked.abs), replaced: count }
         )
       } catch (error) {
         return toolError(`编辑失败：${(error as Error).message}`)

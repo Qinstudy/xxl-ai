@@ -147,8 +147,8 @@ function normalizeInput(input: Partial<McpDTO>, existing: McpDTO | null): Omit<M
   if (!name) {
     throw new Error('请填写 MCP 名称')
   }
-  if (name.length > 60) {
-    throw new Error('MCP 名称过长（最多 60 个字符）')
+  if (name.length > 64) {
+    throw new Error('MCP 名称过长（最多 64 个字符）')
   }
 
   const type: McpType = (input.type ?? existing?.type ?? 'remote') === 'local' ? 'local' : 'remote'

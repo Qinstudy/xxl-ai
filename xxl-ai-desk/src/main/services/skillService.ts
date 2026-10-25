@@ -15,11 +15,12 @@ import {
   importSkillZip,
   listSkillFiles,
   parseSkillMeta,
-  readSkillContent,
+  readSkillContentChunk,
   type ImportedSkill
 } from './skillImportService'
 import { resetAgents } from '../agent/host/runtimeHost'
 import type {
+  SkillContentChunk,
   SkillDTO,
   SkillDetail,
   SkillImportResult,
@@ -208,7 +209,7 @@ export function deleteSkill(id: string): void {
   resetAgents()
 }
 
-/* 技能详情：元信息 + SKILL.md 正文 + 附属文件清单 */
+/* 技能详情：元信息 + SKILL.md 正文首屏 + 附属文件清单 */
 export function getSkillDetail(id: string): SkillDetail {
   const list = listSkills()
   const dto = list.find((item) => item.id === id)
@@ -218,9 +219,14 @@ export function getSkillDetail(id: string): SkillDetail {
   const dir = getSkillDir(id)
   return {
     ...dto,
-    content: readSkillContent(dir),
+    content: readSkillContentChunk(dir),
     files: listSkillFiles(dir)
   }
+}
+
+/* 技能正文续读：按字节偏移返回下一段（详情页「加载更多」使用，内容不截断） */
+export function getSkillContent(id: string, offset: number): SkillContentChunk {
+  return readSkillContentChunk(getSkillDir(id), offset)
 }
 
 /* 已启用技能（对话下发用；目录缺失的自动跳过，避免每轮对话全量扫描） */

@@ -71,7 +71,7 @@ async function fetchText(url: string): Promise<string> {
         throw new Error('skills.sh 请求过于频繁，请稍后重试')
       }
       if (response.status === 400) {
-        throw new Error(detail || 'skills.sh 检索参数不合法（关键字至少 2 个字符）')
+        throw new Error(detail || 'skills.sh 检索参数不合法（请尝试更具体的关键字）')
       }
       throw new Error(`skills.sh 访问失败（HTTP ${response.status}）${detail ? `：${detail}` : ''}`)
     }

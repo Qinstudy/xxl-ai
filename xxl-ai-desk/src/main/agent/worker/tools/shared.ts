@@ -1,10 +1,10 @@
 /*
  * 内置工具公共能力：工具元信息类型、统一结果构造、路径闸门与目录遍历。
  *   - 所有文件类工具统一经 createGuard 走沙箱闸门（目录内放行、越界审批）；
- *   - 结果文本统一按工具声明的 maxOutput 截断，避免大输出撑爆上下文。
+ *   - 结果文本统一由注册表按工具声明的 maxOutput 截断，工具实现不再各自裁剪。
  */
 
-import type { AgentTool } from '@earendil-works/pi-agent-core'
+import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core'
 import { promises as fs } from 'fs'
 import type { Dirent } from 'fs'
 import { basename, relative, resolve, sep } from 'path'
@@ -61,15 +61,12 @@ export function describe(zh: string, en: string): string {
   return `${zh}\n${en}`
 }
 
-/* 文本结果（details 供 UI / 落库展示结构化信息） */
+/* 文本结果（details 供 UI / 落库展示结构化信息；长度裁剪由注册表按 maxOutput 统一执行） */
 export function text(
   value: string,
-  details: Record<string, unknown> = {},
-  maxOutput = MAX_OUTPUT
+  details: Record<string, unknown> = {}
 ): { content: { type: 'text'; text: string }[]; details: Record<string, unknown> } {
-  const clipped =
-    value.length > maxOutput ? `${value.slice(0, maxOutput)}\n...(已截断)` : value
-  return { content: [{ type: 'text' as const, text: clipped }], details }
+  return { content: [{ type: 'text' as const, text: value }], details }
 }
 
 /* 错误结果（模型可见，UI 标记为失败） */
@@ -79,6 +76,23 @@ export function toolError(value: string): {
   isError: true
 } {
   return { content: [{ type: 'text' as const, text: value }], details: {}, isError: true }
+}
+
+/*
+ * 按工具声明的 maxOutput 裁剪结果文本：
+ *   - 由注册表统一调用，保证 meta 声明与实际裁剪一致；
+ *   - 仅裁剪文本块，图片内容、details 与 structuredContent 原样保留。
+ */
+export function clipToolResult<T>(
+  result: AgentToolResult<T>,
+  maxOutput: number
+): AgentToolResult<T> {
+  const content = result.content.map((block) =>
+    block.type === 'text' && block.text.length > maxOutput
+      ? { ...block, text: `${block.text.slice(0, maxOutput)}\n...(已截断)` }
+      : block
+  )
+  return { ...result, content }
 }
 
 /*

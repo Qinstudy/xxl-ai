@@ -69,6 +69,7 @@ import { listMcpTools, testMcp } from './services/mcpRuntimeService'
 import { discoverMcp, discoverMcpDetail, listMcpCategories } from './services/mcpDiscoverService'
 import {
   deleteSkill,
+  getSkillContent,
   getSkillDetail,
   getSkillRevealPath,
   importSkillsFromDirectory,
@@ -323,6 +324,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   /* --- SKILL 技能中心（导入 / 启停 / 删除均由 service 统一失效运行时缓存） --- */
   ipcMain.handle(IPC.skillList, () => listSkills())
   ipcMain.handle(IPC.skillDetail, (_event, id: string) => getSkillDetail(id))
+  ipcMain.handle(IPC.skillContent, (_event, id: string, offset: number) =>
+    getSkillContent(id, offset)
+  )
   ipcMain.handle(IPC.skillImportDir, async () => {
     const result = await dialog.showOpenDialog({
       title: '选择技能目录',

@@ -92,18 +92,15 @@ function normalizeBoard(value: SkillDiscoverQuery['board']): SkillLeaderboard {
 
 /*
  * 发现 SKILL：
- *   - 有关键字（≥2 字符）搜索，保留站点相关性顺序；
+ *   - 有关键字即搜索（长度不设卡），保留站点相关性顺序；
  *   - 无关键字读取全站榜单（默认 all-time，可切 trending），按 page 分页。
  */
 export async function discoverSkills(query: SkillDiscoverQuery): Promise<SkillDiscoverPage> {
-  const keyword = (query.keyword ?? '').trim().slice(0, 64)
+  const keyword = (query.keyword ?? '').trim()
   const limit = Math.min(Math.max(Math.floor(query.limit ?? DEFAULT_LIMIT), 1), 100)
-  if (keyword.length === 1) {
-    throw new Error('关键字至少输入 2 个字符')
-  }
 
   const board = normalizeBoard(query.board)
-  const page = Math.min(Math.max(Math.floor(query.page ?? 0), 0), 500)
+  const page = Math.max(Math.floor(query.page ?? 0), 0)
   const key = keyword ? `search:${keyword}:${limit}` : `board:${board}:${page}`
 
   let remote = readCache(key)

@@ -9,6 +9,7 @@ import { computed, ref } from 'vue'
 import { api } from '@renderer/api'
 import { ipcErrorMessage } from '@renderer/utils/ipcError'
 import type {
+  SkillContentChunk,
   SkillDetail,
   SkillDiscoverItem,
   SkillDTO,
@@ -139,6 +140,11 @@ export const useSkillStore = defineStore('skill', () => {
   /* 读取技能详情 */
   async function detail(id: string): Promise<SkillDetail> {
     return api.skill.detail(id)
+  }
+
+  /* 技能正文续读（按字节偏移，内容不截断） */
+  async function content(id: string, offset: number): Promise<SkillContentChunk> {
+    return api.skill.content(id, offset)
   }
 
   /* 发现：加载榜单首页（切换榜单类型时重置排序与分页） */
@@ -292,6 +298,7 @@ export const useSkillStore = defineStore('skill', () => {
     remove,
     reveal,
     detail,
+    content,
     loadBoard,
     loadMore,
     setBoard,

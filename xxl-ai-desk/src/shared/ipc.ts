@@ -41,6 +41,7 @@ import type {
   McpToolMeta
 } from './contracts/mcp'
 import type {
+  SkillContentChunk,
   SkillDetail,
   SkillDiscoverDetail,
   SkillDiscoverPage,
@@ -211,8 +212,10 @@ export interface DeskApi {
   skill: {
     /* 技能列表（扫描数据目录并对账） */
     list(): Promise<SkillDTO[]>
-    /* 技能详情（SKILL.md 正文 + 文件清单） */
+    /* 技能详情（SKILL.md 正文首屏 + 文件清单） */
     detail(id: string): Promise<SkillDetail>
+    /* 技能正文续读（按字节偏移，内容不截断） */
+    content(id: string, offset: number): Promise<SkillContentChunk>
     /* 从本地目录导入（弹目录选择框，取消返回 null） */
     importDirectory(): Promise<SkillImportResult | null>
     /* 从 Zip 导入（弹文件选择框，取消返回 null） */
@@ -312,6 +315,7 @@ export const IPC = {
   /* SKILL 技能中心 */
   skillList: 'desk:skill:list',
   skillDetail: 'desk:skill:detail',
+  skillContent: 'desk:skill:content',
   skillImportDir: 'desk:skill:import-dir',
   skillImportZip: 'desk:skill:import-zip',
   skillSetEnabled: 'desk:skill:set-enabled',

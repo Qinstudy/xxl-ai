@@ -36,7 +36,7 @@ export async function createGeneralTools(context: ToolContext): Promise<ToolEntr
       } catch {
         /* 时区非法时回退本地时间 */
       }
-      return text(value, { timezone: timezone ?? '' }, 2000)
+      return text(value, { timezone: timezone ?? '' })
     }
   }
 

@@ -152,7 +152,7 @@ export async function createShellTools(context: ToolContext): Promise<ToolEntry[
                 exitCode,
                 timedOut: Boolean(error && (error as { killed?: boolean }).killed),
                 aborted: Boolean(signal?.aborted)
-              }, MAX_OUTPUT)
+              })
             )
           }
         )

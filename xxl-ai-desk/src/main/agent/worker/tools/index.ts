@@ -6,7 +6,7 @@
  */
 
 import type { AgentTool } from '@earendil-works/pi-agent-core'
-import { type ToolContext, type ToolEntry } from './shared'
+import { clipToolResult, MAX_OUTPUT, type ToolContext, type ToolEntry } from './shared'
 import { createGeneralTools } from './general'
 import { createFsTools } from './fs'
 import { createShellTools } from './shell'
@@ -22,10 +22,27 @@ const FACTORIES: Array<(context: ToolContext) => Promise<ToolEntry[]>> = [
   createSkillTools
 ]
 
+/* 按 meta.maxOutput 统一裁剪工具输出（声明与实现同源，避免各处各自裁剪） */
+function withOutputLimit(entry: ToolEntry): ToolEntry {
+  const maxOutput = entry.meta.maxOutput ?? MAX_OUTPUT
+  const execute = entry.tool.execute
+  return {
+    meta: entry.meta,
+    tool: {
+      ...entry.tool,
+      execute: (async (...args: Parameters<typeof execute>) =>
+        clipToolResult(await execute(...args), maxOutput)) as typeof execute
+    }
+  }
+}
+
 /* 构建当前模式下的工具条目（含元信息，供提示生成使用） */
 export async function createBuiltinToolEntries(context: ToolContext): Promise<ToolEntry[]> {
   const groups = await Promise.all(FACTORIES.map((factory) => factory(context)))
-  return groups.flat().filter((entry) => entry.meta.modes.includes(context.mode))
+  return groups
+    .flat()
+    .filter((entry) => entry.meta.modes.includes(context.mode))
+    .map(withOutputLimit)
 }
 
 /* 构建当前模式下的 Pi 工具集合 */

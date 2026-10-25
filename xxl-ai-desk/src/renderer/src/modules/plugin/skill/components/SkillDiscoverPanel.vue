@@ -33,10 +33,7 @@ const installsLabel = computed(() =>
     : t('plugin.skillCenter.installs')
 )
 
-/* 关键字是否过短（1 个字符时提示，不发起检索） */
-const tooShort = computed(() => keyword.value.trim().length === 1)
-
-/* 防抖检索：空关键字回到榜单，≥2 字符发起搜索 */
+/* 防抖检索：空关键字回到榜单，非空即发起搜索（长度不设卡） */
 function onKeywordChange(): void {
   if (timer) {
     clearTimeout(timer)
@@ -47,9 +44,7 @@ function onKeywordChange(): void {
       void skill.loadBoard(skill.discoverBoard)
       return
     }
-    if (value.length >= 2) {
-      void skill.search(value)
-    }
+    void skill.search(value)
   }, 400)
 }
 
@@ -60,9 +55,6 @@ function onSearch(): void {
     timer = null
   }
   const value = keyword.value.trim()
-  if (value.length === 1) {
-    return
-  }
   if (value.length === 0) {
     void skill.loadBoard(skill.discoverBoard)
     return
@@ -212,7 +204,7 @@ onUnmounted(() => {
     <div class="discover-body">
       <el-empty
         v-if="!skill.discovering && skill.discoverItems.length === 0 && !skill.discoverError"
-        :description="tooShort ? t('plugin.skillCenter.discoverHint') : t('plugin.skillCenter.discoverEmpty')"
+        :description="t('plugin.skillCenter.discoverEmpty')"
       />
 
       <el-table v-else v-loading="skill.discovering" :data="skill.sortedDiscoverItems" row-key="id">
