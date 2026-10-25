@@ -29,7 +29,8 @@
     "saved": "保存成功",
     "deleted": "删除成功",
     "copy": "复制",
-    "copied": "已复制"
+    "copied": "已复制",
+    "unknownError": "未知错误"
   },
   "layout": {
     "collapseSidebar": "收起侧栏",
@@ -123,7 +124,37 @@
     "approvalSession": "本会话允许",
     "approvalDeny": "拒绝",
     "requestFailed": "请求失败",
-    "toolFields": "{0} 个字段"
+    "toolFields": "{0} 个字段",
+    "browser": {
+      "noPage": "右侧浏览器尚未打开页面，请先使用 open_browser 打开页面",
+      "notReady": "浏览器尚未就绪，请稍后重试",
+      "selectorMissing": "未找到选择器匹配的元素：{0}",
+      "readFailed": "读取页面失败：{0}",
+      "snapshotFailed": "读取页面结构失败：{0}",
+      "clickNotFound": "点击失败：未找到目标元素",
+      "clickFailed": "点击失败：{0}",
+      "clicked": "已{0}{1}",
+      "rightClick": "右键点击",
+      "leftClick": "点击",
+      "target": "目标元素",
+      "fieldsEmpty": "fields 不能为空",
+      "fillFailed": "填写失败",
+      "fillFailedDetail": "填写失败：{0}",
+      "filled": "已填写 {0} 个字段{1}",
+      "filledSubmit": "并提交表单",
+      "waitNeedCondition": "至少提供 selector / text / url 之一",
+      "screenshotFailed": "截图失败：{0}",
+      "tabIdRequired": "tabId 不能为空",
+      "tabMissing": "标签页不存在：{0}",
+      "noSession": "缺少会话标识，无法定位浏览器",
+      "unsupported": "不支持的浏览器动作",
+      "back": "已后退",
+      "forward": "已前进",
+      "reload": "已刷新页面",
+      "errorCode": "错误码 {0}",
+      "snapshotRefMissing": "未找到目标元素，请先调用 snapshot_browser 获取最新 ref",
+      "formMissing": "字段未关联表单，无法提交"
+    }
   },
   "panel": {
     "files": "文件",
@@ -270,7 +301,9 @@
     "autoCheckUpdate": "启动时自动检查更新",
     "github": "GitHub 仓库",
     "docs": "官方文档",
-    "headersExample": "示例："
+    "headersExample": "示例：",
+    "languageZh": "中文",
+    "languageEn": "English"
   },
   "plugin": {
     "title": "插件",
@@ -465,5 +498,24 @@
         "time": "获取本地当前日期与时间，支持指定 IANA 时区"
       }
     }
+  },
+  "runtime": {
+    "abortNote": "[异常] 用户主动终止任务。",
+    "thinkingOnlyNote": "[异常] 本轮只有思考内容，未生成正文或工具调用。",
+    "truncated": "输出内容超过限制，内容已被截断",
+    "modelError": "模型返回错误",
+    "nonRetryable": "[异常] 不可重试的请求错误：{0}",
+    "unknownState": "模型返回未知结束状态（{0}）",
+    "retry": "[异常] 第 {0} 次请求异常：{1}。已记录，继续重试。",
+    "final": "[异常] 连续异常 {0} 次，已结束：{1}",
+    "sessionMissing": "会话不存在",
+    "providerMissing": "模型供应商不存在或已被删除，请在会话中重新选择模型",
+    "providerDisabled": "供应商「{0}」已停用，请在会话中重新选择模型",
+    "modelMissing": "模型「{0}」不存在或已被删除，请在会话中重新选择模型",
+    "providerNoModel": "请为供应商配置至少一个模型",
+    "apiKeyMissing": "供应商「{0}」未配置 API Key，无法调用模型「{1}」，请在「设置」中补全后重试",
+    "callFailed": "模型「{0}」（供应商「{1}」）调用失败{2}",
+    "defaultSystemPrompt": "你是 XXL-AI-Desk 智能助手，回答简洁、准确、有条理。",
+    "continuePrompt": "[异常] 上一轮未正常结束，请继续输出剩余正文或工具调用，不要重复已有内容。"
   }
 }

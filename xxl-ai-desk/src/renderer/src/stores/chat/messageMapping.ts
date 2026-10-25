@@ -6,7 +6,8 @@
  */
 
 import type { MessagePart, ToolCallState, UiMessage } from '@renderer/types'
-import { AUTO_CONTINUE_PROMPT, THINKING_ONLY_NOTE } from '@shared/ipc'
+import { isAutoContinuePrompt } from '@shared/i18n'
+import { t } from '@renderer/i18n'
 import type { StoredMessage } from '@shared/ipc'
 
 /* 持久化的 Pi 原始消息结构（仅取渲染所需字段） */
@@ -57,7 +58,7 @@ function markFailedPart(message: UiMessage, startIndex: number): void {
       return
     }
   }
-  appendPart(message, { type: 'text', text: THINKING_ONLY_NOTE, error: true })
+  appendPart(message, { type: 'text', text: t('runtime.thinkingOnlyNote'), error: true })
 }
 
 /* 向助手消息追加片段：同类相邻文本合并，保持片段发生顺序（思考 → 工具 → 正文 交错） */
@@ -113,7 +114,7 @@ export function mapStoredMessages(stored: StoredMessage[]): UiMessage[] {
   for (const record of stored) {
     if (record.role === 'user') {
       /* 自动续写消息仅驱动模型，不进入界面 */
-      if (record.content === AUTO_CONTINUE_PROMPT) {
+      if (isAutoContinuePrompt(record.content)) {
         continue
       }
       result.push({
@@ -142,11 +143,11 @@ export function mapStoredMessages(stored: StoredMessage[]): UiMessage[] {
     const raw = parseData(record.data)
     const parts = Array.isArray(raw?.content) ? raw.content : []
     const hasVisiblePart = parts.some((part) => part.type === 'text' || part.type === 'toolCall')
-    /* 失败、截断、只有 thinking / 空内容：统一按 error 展示 */
+    const aborted = raw?.stopReason === 'aborted'
+    /* 用户主动终止不是异常；失败、截断、只有 thinking / 空内容才标记 error */
     const failed =
-      raw?.stopReason === 'error' ||
-      raw?.stopReason === 'length' ||
-      !hasVisiblePart
+      !aborted &&
+      (raw?.stopReason === 'error' || raw?.stopReason === 'length' || !hasVisiblePart)
 
     /* 合并到本轮已存在的助手消息 */
     let last = result[result.length - 1]
@@ -200,6 +201,9 @@ export function mapStoredMessages(stored: StoredMessage[]): UiMessage[] {
     /* 失败/截断消息：至少给出一段可读的异常说明 */
     if (failed) {
       markFailedPart(last, partStart)
+    } else if (aborted && !hasVisiblePart) {
+      /* 用户主动终止：保留思考并写入终止备注，不标记为异常 */
+      appendPart(last, { type: 'text', text: t('runtime.abortNote'), error: true })
     }
   }
 

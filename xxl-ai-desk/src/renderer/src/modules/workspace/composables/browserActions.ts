@@ -71,10 +71,10 @@ async function resolveActivePage(
     view = tab ? webviews.get(tab.id) : undefined
   }
   if (!tab?.hasPage) {
-    return { ok: false, error: '右侧浏览器尚未打开页面，请先使用 open_browser 打开页面' }
+    return { ok: false, error: t('chat.browser.noPage') }
   }
   if (!view) {
-    return { ok: false, error: '浏览器尚未就绪，请稍后重试' }
+    return { ok: false, error: t('chat.browser.notReady') }
   }
   await waitForPageReady(tab, view, Math.max(1000, timeout - (Date.now() - started)))
   return { tab, view }
@@ -113,7 +113,7 @@ export async function readActiveTab(
       missing?: boolean
     }
     if (raw?.missing) {
-      return { ok: false, error: `未找到选择器匹配的元素：${action.selector ?? ''}` }
+      return { ok: false, error: t('chat.browser.selectorMissing', [action.selector ?? '']) }
     }
     const full = raw?.text ?? ''
     return {
@@ -124,7 +124,7 @@ export async function readActiveTab(
       truncated: full.length > max
     }
   } catch (error) {
-    return { ok: false, error: `读取页面失败：${(error as Error).message}` }
+    return { ok: false, error: t('chat.browser.readFailed', [(error as Error).message]) }
   }
 }
 
@@ -159,7 +159,7 @@ export async function snapshotActiveTab(
       truncated: Boolean(raw?.truncated)
     }
   } catch (error) {
-    return { ok: false, error: `读取页面结构失败：${(error as Error).message}` }
+    return { ok: false, error: t('chat.browser.snapshotFailed', [(error as Error).message]) }
   }
 }
 
@@ -179,17 +179,20 @@ export async function clickActiveTab(
   try {
     const raw = (await view.executeJavaScript(script)) as { ok?: boolean; error?: string }
     if (!raw?.ok) {
-      return { ok: false, error: raw?.error || '点击失败：未找到目标元素' }
+      return { ok: false, error: raw?.error || t('chat.browser.clickNotFound') }
     }
   } catch (error) {
-    return { ok: false, error: `点击失败：${(error as Error).message}` }
+    return { ok: false, error: t('chat.browser.clickFailed', [(error as Error).message]) }
   }
   await settlePage(sessionId, tab.id)
   return {
     ok: true,
     title: tab.title,
     url: tab.currentUrl,
-    summary: `已${button === 'right' ? '右键点击' : '点击'}${action.ref || action.selector || '目标元素'}`
+    summary: t('chat.browser.clicked', [
+      button === 'right' ? t('chat.browser.rightClick') : t('chat.browser.leftClick'),
+      action.ref || action.selector || t('chat.browser.target')
+    ])
   }
 }
 
@@ -204,7 +207,7 @@ export async function fillActiveTab(
   }
   const { tab, view } = page
   if (!action.fields || action.fields.length === 0) {
-    return { ok: false, error: 'fields 不能为空' }
+    return { ok: false, error: t('chat.browser.fieldsEmpty') }
   }
   const script = buildFillScript(action.fields, action.submit === true)
   try {
@@ -217,7 +220,7 @@ export async function fillActiveTab(
     if (!raw?.ok) {
       return {
         ok: false,
-        error: raw?.error || '填写失败',
+        error: raw?.error || t('chat.browser.fillFailed'),
         filled: raw?.filled,
         missing: raw?.missing
       }
@@ -229,10 +232,13 @@ export async function fillActiveTab(
       url: tab.currentUrl,
       filled: raw.filled ?? 0,
       missing: raw.missing ?? [],
-      summary: `已填写 ${raw.filled ?? 0} 个字段${action.submit ? '并提交表单' : ''}`
+      summary: t('chat.browser.filled', [
+      raw.filled ?? 0,
+      action.submit ? t('chat.browser.filledSubmit') : ''
+    ])
     }
   } catch (error) {
-    return { ok: false, error: `填写失败：${(error as Error).message}` }
+    return { ok: false, error: t('chat.browser.fillFailedDetail', [(error as Error).message]) }
   }
 }
 
@@ -247,7 +253,7 @@ export async function waitActiveTab(
   }
   const { tab, view } = page
   if (!action.selector && !action.text && !action.url) {
-    return { ok: false, error: '至少提供 selector / text / url 之一' }
+    return { ok: false, error: t('chat.browser.waitNeedCondition') }
   }
   const timeout = Math.min(Math.max(Math.floor(action.timeoutMs ?? 8000), 500), 30000)
   const started = Date.now()
@@ -310,7 +316,7 @@ export async function screenshotActiveTab(sessionId: string): Promise<BrowserAct
       screenshotHeight: size.height
     }
   } catch (error) {
-    return { ok: false, error: `截图失败：${(error as Error).message}` }
+    return { ok: false, error: t('chat.browser.screenshotFailed', [(error as Error).message]) }
   }
 }
 
@@ -351,7 +357,7 @@ export async function historyActiveTab(
   const tab = activeTabOf(state)
   const view = tab ? webviews.get(tab.id) : undefined
   if (!tab) {
-    return { ok: false, error: '浏览器尚未就绪' }
+    return { ok: false, error: t('chat.browser.notReady') }
   }
   if (action.action === 'back') {
     if (view?.canGoBack()) {
@@ -370,6 +376,10 @@ export async function historyActiveTab(
     title: tab.title,
     url: tab.currentUrl,
     summary:
-      action.action === 'back' ? '已后退' : action.action === 'forward' ? '已前进' : '已刷新页面'
+      action.action === 'back'
+      ? t('chat.browser.back')
+      : action.action === 'forward'
+        ? t('chat.browser.forward')
+        : t('chat.browser.reload')
   }
 }

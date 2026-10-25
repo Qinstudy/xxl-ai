@@ -266,7 +266,7 @@ function ensureWebview(id: string, sessionId: string): WebviewElement | null {
       const fail = event as FailLoadEvent & { validatedURL?: string; errorDescription?: string }
       const url = fail.validatedURL || current?.currentUrl || ''
       const list = failedLoads.get(id) ?? []
-      list.push(`${url}（${fail.errorDescription || `错误码 ${fail.errorCode}`}）`)
+      list.push(`${url}（${fail.errorDescription || t('chat.browser.errorCode', [fail.errorCode])}）`)
       failedLoads.set(id, list.slice(-MAX_DIAGNOSTICS))
     }
   })
@@ -328,10 +328,10 @@ async function manageTabs(
 ): Promise<BrowserActionResult> {
   if (action.operation !== 'list') {
     if (!action.tabId) {
-      return { ok: false, error: 'tabId 不能为空' }
+      return { ok: false, error: t('chat.browser.tabIdRequired') }
     }
     if (!findTab(sessionId, action.tabId)) {
-      return { ok: false, error: `标签页不存在：${action.tabId}` }
+      return { ok: false, error: t('chat.browser.tabMissing', [action.tabId]) }
     }
     if (action.operation === 'select') {
       await selectTab(sessionId, action.tabId)
@@ -352,7 +352,7 @@ export async function executeBrowserAction(
   action: BrowserAction
 ): Promise<BrowserActionResult> {
   if (!sessionId) {
-    return { ok: false, error: '缺少会话标识，无法定位浏览器' }
+    return { ok: false, error: t('chat.browser.noSession') }
   }
   return enqueueSessionTask(sessionId, () => runBrowserAction(sessionId, action))
 }
@@ -383,7 +383,7 @@ async function runBrowserAction(
     case 'history':
       return historyActiveTab(sessionId, action)
     default:
-      return { ok: false, error: '不支持的浏览器动作' }
+      return { ok: false, error: t('chat.browser.unsupported') }
   }
 }
 

@@ -6,9 +6,11 @@
  * @author xuxueli 2026-10-25
  */
 
+import { t } from '@renderer/i18n'
 import type { BrowserFillField } from '@shared/ipc'
 
 /* 读取正文 */
+
 export function buildReadScript(selector?: string): string {
   const selectorValue = selector ? JSON.stringify(selector) : 'null'
   return `(() => {
@@ -100,7 +102,7 @@ export function buildClickScript(input: {
     const ref = ${ref};
     const selector = ${selector};
     const el = ref ? store?.refs.get(ref) : selector ? document.querySelector(selector) : null;
-    if (!el) return { ok: false, error: '未找到目标元素，请先调用 snapshot_browser 获取最新 ref' };
+    if (!el) return { ok: false, error: t('chat.browser.snapshotRefMissing') };
     el.scrollIntoView({ block: 'center', inline: 'center' });
     const rect = el.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
@@ -170,7 +172,7 @@ export function buildFillScript(fields: BrowserFillField[], submit: boolean): st
           submitted = true;
         }
       }
-      if (!submitted && forms.size === 0) return { ok: false, filled, missing, error: '字段未关联表单，无法提交' };
+      if (!submitted && forms.size === 0) return { ok: false, filled, missing, error: t('chat.browser.formMissing') };
     }
     return { ok: true, filled, missing };
   })()`

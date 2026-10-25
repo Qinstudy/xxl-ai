@@ -7,7 +7,7 @@
  * @author xuxueli 2026-10-26
  */
 
-import { AUTO_CONTINUE_PROMPT, THINKING_ONLY_NOTE } from './defaults'
+import { isAutoContinuePrompt, translate } from './i18n'
 
 /* 历史窗口上限 */
 const HISTORY_MAX_MESSAGES = 50
@@ -32,7 +32,9 @@ function isTurnStart(message: HistoryMessage): boolean {
     return false
   }
   const first = contentBlocks(message)[0] as { type?: string; text?: string } | undefined
-  return !(first?.type === 'text' && first.text === AUTO_CONTINUE_PROMPT)
+  return !(
+    first?.type === 'text' && typeof first.text === 'string' && isAutoContinuePrompt(first.text)
+  )
 }
 
 /*
@@ -40,7 +42,7 @@ function isTurnStart(message: HistoryMessage): boolean {
  *   - 有正文/工具调用：只剔除 thinking；
  *   - 只有 thinking：不静默丢弃，转为 error + 正文异常说明。
  */
-function stripThinking(message: HistoryMessage): HistoryMessage | null {
+function stripThinking(message: HistoryMessage, language: string): HistoryMessage | null {
   if (message.role !== 'assistant') {
     return message
   }
@@ -50,20 +52,28 @@ function stripThinking(message: HistoryMessage): HistoryMessage | null {
   }
   const kept = blocks.filter((block) => (block as { type?: string })?.type !== 'thinking')
   if (kept.length === 0) {
+    /* 用户主动终止：写入终止备注，继续进入模型上下文 */
+    if (message.stopReason === 'aborted') {
+      return {
+        ...message,
+        errorMessage: translate(language, 'runtime.abortNote'),
+        content: [{ type: 'text', text: translate(language, 'runtime.abortNote'), error: true }]
+      }
+    }
     return {
       ...message,
       stopReason: 'error',
-      errorMessage: THINKING_ONLY_NOTE,
-      content: [{ type: 'text', text: THINKING_ONLY_NOTE, error: true }]
+      errorMessage: translate(language, 'runtime.thinkingOnlyNote'),
+      content: [{ type: 'text', text: translate(language, 'runtime.thinkingOnlyNote'), error: true }]
     }
   }
   return kept.length === blocks.length ? message : { ...message, content: kept }
 }
 
 /* 按消息条数与字符上限裁剪历史 */
-export function trimHistory(messages: unknown[]): unknown[] {
-  const cleaned = (messages as HistoryMessage[])
-    .map(stripThinking)
+export function trimHistory(input: unknown[], language = 'zh'): unknown[] {
+  const cleaned = (input as HistoryMessage[])
+    .map((message) => stripThinking(message, language))
     .filter((message): message is HistoryMessage => message !== null)
 
   /* 最近 50 条；若起点在半轮中间，向后对齐到真实用户消息 */

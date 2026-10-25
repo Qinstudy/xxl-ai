@@ -10,7 +10,8 @@ import { createMcpTools } from './mcp/tools'
 import { setMcpRuntimePath } from './mcp/client'
 import type { ChatMode } from '@shared/ipc'
 import type { HostEvent } from '@shared/agentProtocol'
-import { AUTO_CONTINUE_PROMPT, contentBlocks } from '@shared/ipc'
+import { contentBlocks } from '@shared/ipc'
+import { translate, type AppLanguage } from '@shared/i18n'
 import type { McpRuntimeConfig, SkillRuntimeConfig } from '@shared/ipc'
 
 /* 创建/获取会话 Agent 所需的运行时配置 */
@@ -99,6 +100,14 @@ function hasUserText(agent: Agent, text: string): boolean {
           (block as { text?: string }).text === text
       )
   )
+}
+
+/* 用户终止：在当前助手消息或新消息中写入终止备注 */
+function appendAbortNote(agent: Agent, start: number, note: string): void {
+  const hasNewAssistant = (agent.state.messages as RuntimeMessage[])
+    .slice(start)
+    .some((message) => message.role === 'assistant')
+  appendAssistantNote(agent, note, hasNewAssistant)
 }
 
 /* 最后一轮助手消息 */
@@ -272,8 +281,11 @@ export async function runPrompt(
   agent: Agent,
   text: string,
   sink: (event: HostEvent) => void,
-  sessionId = ''
+  sessionId = '',
+  language: AppLanguage = 'zh'
 ): Promise<RuntimeMessage[]> {
+  const tr = (key: string, params?: Array<string | number>): string =>
+    translate(language, key, params)
   const unsubscribe = agent.subscribe((event) => {
     switch (event.type) {
       case 'message_update': {
@@ -317,12 +329,14 @@ export async function runPrompt(
   try {
     while (true) {
       if (sessionId && isSessionAborted(sessionId)) {
+        appendAbortNote(agent, start, tr('runtime.abortNote'))
+        sink({ type: 'notice', message: tr('runtime.abortNote') })
         sink({ type: 'done' })
         return takeNew()
       }
 
       let thrown: unknown = null
-      const promptText = first ? text : AUTO_CONTINUE_PROMPT
+      const promptText = first ? text : tr('runtime.continuePrompt')
       first = false
       try {
         await agent.prompt(promptText)
@@ -332,6 +346,8 @@ export async function runPrompt(
 
       /* 用户终止：直接结束 */
       if (thrown && (isAbortError(thrown) || (sessionId && isSessionAborted(sessionId)))) {
+        appendAbortNote(agent, start, tr('runtime.abortNote'))
+        sink({ type: 'notice', message: tr('runtime.abortNote') })
         sink({ type: 'done' })
         return takeNew()
       }
@@ -340,7 +356,15 @@ export async function runPrompt(
       const reason = thrown ? 'exception' : last?.stopReason
 
       /* 模型明确结束 */
-      if (reason === 'stop' || reason === 'aborted') {
+      if (reason === 'stop') {
+        sink({ type: 'done' })
+        return takeNew()
+      }
+
+      /* 用户终止：写入终止备注后结束 */
+      if (reason === 'aborted') {
+        appendAbortNote(agent, start, tr('runtime.abortNote'))
+        sink({ type: 'notice', message: tr('runtime.abortNote') })
         sink({ type: 'done' })
         return takeNew()
       }
@@ -349,10 +373,10 @@ export async function runPrompt(
       const detail = thrown
         ? (thrown as Error)?.message || String(thrown)
         : reason === 'length'
-          ? '输出内容超过限制，内容已被截断'
+          ? tr('runtime.truncated')
           : reason === 'error'
-            ? last?.errorMessage || '模型返回错误'
-            : `模型返回未知结束状态（${reason || '未知'}）`
+            ? last?.errorMessage || tr('runtime.modelError')
+            : tr('runtime.unknownState', [reason || 'unknown'])
 
       /* 当前助手消息标记为 error，并写入可读原因 */
       if (!thrown && last) {
@@ -362,7 +386,7 @@ export async function runPrompt(
 
       /* 不可重试错误（401/402/403/404）：直接结束 */
       if (!thrown && isNonRetryable(detail)) {
-        const note = `\n\n[系统] 不可重试的请求错误：${detail}`
+        const note = `\n\n${tr('runtime.nonRetryable', [detail])}`
         appendAssistantNote(agent, note, !thrown)
         sink({ type: 'error', message: note })
         return takeNew()
@@ -372,8 +396,8 @@ export async function runPrompt(
       const appendToLast = !thrown
       const final = failures > MAX_REQUEST_RETRIES
       const note = final
-        ? `\n\n[系统] 连续异常 ${MAX_REQUEST_RETRIES + 1} 次，已结束：${detail}`
-        : `\n\n[系统] 第 ${failures} 次异常：${detail}。已记录，继续重试。`
+        ? `\n\n${tr('runtime.final', [MAX_REQUEST_RETRIES + 1, detail])}`
+        : `\n\n${tr('runtime.retry', [failures, detail])}`
       appendAssistantNote(agent, note, appendToLast)
 
       if (final) {

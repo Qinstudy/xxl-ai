@@ -6,7 +6,7 @@
 import { onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSettingsStore } from '@renderer/stores/settings'
-import { DEFAULT_SYSTEM_PROMPT } from '@shared/ipc'
+
 import { t } from '@renderer/i18n'
 
 const settings = useSettingsStore()
@@ -42,7 +42,7 @@ async function savePersonalization(): Promise<void> {
 function restorePersonalization(): void {
   appName.value = t('app.name')
   slogan.value = t('chat.emptyTitle')
-  systemPrompt.value = DEFAULT_SYSTEM_PROMPT
+  systemPrompt.value = t('runtime.defaultSystemPrompt')
 }
 </script>
 

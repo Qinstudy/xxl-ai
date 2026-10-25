@@ -6,6 +6,7 @@
 import { getDb } from '../db'
 import { settingTable } from '../db/schema'
 import { DEFAULT_APP_SETTINGS, DEFAULT_SHORTCUTS, type AppSettings } from '@shared/ipc'
+import { translate } from '@shared/i18n'
 
 /* 解析快捷键配置（JSON 存储，缺省项回退默认值） */
 function parseShortcuts(raw: string | undefined): AppSettings['shortcuts'] {
@@ -27,12 +28,13 @@ function parseShortcuts(raw: string | undefined): AppSettings['shortcuts'] {
 export function getSettings(): AppSettings {
   const rows = getDb().select().from(settingTable).all()
   const map = new Map(rows.map((row) => [row.key, row.value]))
+  const language = (map.get('language') as AppSettings['language']) || DEFAULT_APP_SETTINGS.language
   return {
     theme: (map.get('theme') as AppSettings['theme']) || DEFAULT_APP_SETTINGS.theme,
-    language: (map.get('language') as AppSettings['language']) || DEFAULT_APP_SETTINGS.language,
+    language,
     providerId: map.get('providerId') || DEFAULT_APP_SETTINGS.providerId,
     modelId: map.get('modelId') || DEFAULT_APP_SETTINGS.modelId,
-    systemPrompt: map.get('systemPrompt') ?? DEFAULT_APP_SETTINGS.systemPrompt,
+    systemPrompt: map.get('systemPrompt') ?? translate(language, 'runtime.defaultSystemPrompt'),
     appName: map.get('appName') ?? DEFAULT_APP_SETTINGS.appName,
     slogan: map.get('slogan') ?? DEFAULT_APP_SETTINGS.slogan,
     shortcuts: parseShortcuts(map.get('shortcuts')),

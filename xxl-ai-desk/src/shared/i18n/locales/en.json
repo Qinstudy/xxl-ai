@@ -29,7 +29,8 @@
     "saved": "Saved",
     "deleted": "Deleted",
     "copy": "Copy",
-    "copied": "Copied"
+    "copied": "Copied",
+    "unknownError": "Unknown error"
   },
   "layout": {
     "collapseSidebar": "Collapse sidebar",
@@ -123,7 +124,37 @@
     "approvalSession": "Allow for session",
     "approvalDeny": "Deny",
     "requestFailed": "Request failed",
-    "toolFields": "{0} fields"
+    "toolFields": "{0} fields",
+    "browser": {
+      "noPage": "The browser has no page open. Use open_browser first.",
+      "notReady": "The browser is not ready yet. Please try again.",
+      "selectorMissing": "No element matches the selector: {0}",
+      "readFailed": "Failed to read the page: {0}",
+      "snapshotFailed": "Failed to read the page structure: {0}",
+      "clickNotFound": "Click failed: target element not found",
+      "clickFailed": "Click failed: {0}",
+      "clicked": "{0} {1}",
+      "rightClick": "Right-clicked",
+      "leftClick": "Clicked",
+      "target": "the target element",
+      "fieldsEmpty": "fields cannot be empty",
+      "fillFailed": "Fill failed",
+      "fillFailedDetail": "Fill failed: {0}",
+      "filled": "Filled {0} field(s){1}",
+      "filledSubmit": " and submitted the form",
+      "waitNeedCondition": "Provide at least one of selector / text / url",
+      "screenshotFailed": "Screenshot failed: {0}",
+      "tabIdRequired": "tabId cannot be empty",
+      "tabMissing": "Tab not found: {0}",
+      "noSession": "Missing session ID; cannot locate the browser",
+      "unsupported": "Unsupported browser action",
+      "back": "Went back",
+      "forward": "Went forward",
+      "reload": "Page reloaded",
+      "errorCode": "Error code {0}",
+      "snapshotRefMissing": "Target element not found. Call snapshot_browser to get the latest ref.",
+      "formMissing": "The field is not associated with a form; cannot submit"
+    }
   },
   "panel": {
     "files": "Files",
@@ -270,7 +301,9 @@
     "autoCheckUpdate": "Check for updates on startup",
     "github": "GitHub Repository",
     "docs": "Documentation",
-    "headersExample": "Example: "
+    "headersExample": "Example: ",
+    "languageZh": "中文",
+    "languageEn": "English"
   },
   "plugin": {
     "title": "Plugins",
@@ -465,5 +498,24 @@
         "time": "Get the current local date and time, with an optional IANA timezone"
       }
     }
+  },
+  "runtime": {
+    "abortNote": "[Error] The user stopped the task.",
+    "thinkingOnlyNote": "[Error] This turn produced only reasoning, without text or tool calls.",
+    "truncated": "The output exceeded the limit and was truncated",
+    "modelError": "The model returned an error",
+    "nonRetryable": "[Error] Non-retryable request error: {0}",
+    "unknownState": "The model returned an unknown stop state ({0})",
+    "retry": "[Error] Attempt {0} failed: {1}. Recorded; retrying.",
+    "final": "[Error] Failed {0} consecutive times; stopped: {1}",
+    "sessionMissing": "Session not found",
+    "providerMissing": "The model provider was deleted. Select another model in this session.",
+    "providerDisabled": "Provider \"{0}\" is disabled. Select another model in this session.",
+    "modelMissing": "Model \"{0}\" was deleted. Select another model in this session.",
+    "providerNoModel": "Configure at least one model for this provider.",
+    "apiKeyMissing": "Provider \"{0}\" has no API key, so model \"{1}\" cannot be called. Configure it in Settings and retry.",
+    "callFailed": "Model \"{0}\" (provider \"{1}\") call failed{2}",
+    "defaultSystemPrompt": "You are the XXL-AI-Desk assistant. Answer concisely, accurately, and clearly.",
+    "continuePrompt": "[Error] The previous turn did not finish normally. Continue with the remaining text or tool calls without repeating existing content."
   }
 }

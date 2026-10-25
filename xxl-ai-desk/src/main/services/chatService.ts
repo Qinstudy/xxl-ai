@@ -7,6 +7,7 @@
 
 import { app } from 'electron'
 import { trimHistory } from '@shared/ipc'
+import { translate } from '@shared/i18n'
 import type {
   ChatMode,
   AppSettings,
@@ -58,13 +59,21 @@ function contentToText(message: unknown): string {
 }
 
 /* 将底层异常翻译为可读提示：明确指向具体供应商与模型 */
-function describeError(raw: string, providerName: string, modelId: string): string {
+function describeError(
+  raw: string,
+  providerName: string,
+  modelId: string,
+  language: string
+): string {
   const message = (raw || '').trim()
   if (/api key/i.test(message)) {
-    return `供应商「${providerName}」未配置 API Key，无法调用模型「${modelId}」，请在「设置」中补全后重试`
+    return translate(language, 'runtime.apiKeyMissing', [providerName, modelId])
   }
-  const suffix = message ? `：${message}` : ''
-  return `模型「${modelId}」（供应商「${providerName}」）调用失败${suffix}`
+  return translate(language, 'runtime.callFailed', [
+    modelId,
+    providerName,
+    message ? `：${message}` : ''
+  ])
 }
 
 /*
@@ -74,21 +83,22 @@ function describeError(raw: string, providerName: string, modelId: string): stri
  */
 function resolveRuntimeTarget(
   session: SessionDTO,
-  settings: AppSettings
+  settings: AppSettings,
+  language: string
 ): { provider: ProviderDTO; model: string } | { error: string } {
   /* 供应商：会话已指定则必须仍存在且启用；未指定时回退设置默认供应商 */
   const providerId = session.providerId || settings.providerId
   const provider = providerId ? getProvider(providerId) : null
   if (!provider) {
-    return { error: '模型供应商不存在或已被删除，请在会话中重新选择模型' }
+    return { error: translate(language, 'runtime.providerMissing') }
   }
   if (!provider.enabled) {
-    return { error: `供应商「${provider.name}」已停用，请在会话中重新选择模型` }
+    return { error: translate(language, 'runtime.providerDisabled', [provider.name]) }
   }
   /* 模型：会话已指定则必须仍在供应商模型列表内，否则提示更换 */
   if (session.modelId) {
     if (!provider.models.includes(session.modelId)) {
-      return { error: `模型「${session.modelId}」不存在或已被删除，请在会话中重新选择模型` }
+      return { error: translate(language, 'runtime.modelMissing', [session.modelId]) }
     }
     return { provider, model: session.modelId }
   }
@@ -98,7 +108,7 @@ function resolveRuntimeTarget(
       ? settings.modelId
       : (provider.models[0] ?? '')
   if (!fallback) {
-    return { error: '请为供应商配置至少一个模型' }
+    return { error: translate(language, 'runtime.providerNoModel') }
   }
   return { provider, model: fallback }
 }
@@ -204,6 +214,8 @@ export async function sendChat(
   let contextReady = false
   /* 本轮是否已完整落库；异常兜底据此避免重复追加失败轮次 */
   let committed = false
+  const settings = getSettings()
+  const language = settings.language
   const emitEvent = (event: HostEvent): void => {
     /* 用户已终止：错误事件转成正常结束，避免弹出「调用失败」 */
     if (event.type === 'error' && abortRequested.has(sessionId)) {
@@ -212,13 +224,13 @@ export async function sendChat(
     }
     const payload =
       event.type === 'error' && contextReady
-        ? { ...event, message: describeError(event.message, providerName, modelId) }
+        ? { ...event, message: describeError(event.message, providerName, modelId, language) }
         : event
     emit({ sessionId, ...payload })
   }
   /* 失败兜底：把「用户提问 + 可读错误提示」落库并下发，避免重载/切换会话后提示丢失 */
   const fail = (raw: string): void => {
-    const tip = contextReady ? describeError(raw, providerName, modelId) : raw
+    const tip = contextReady ? describeError(raw, providerName, modelId, language) : raw
     if (!committed) {
       persistFailureRound(sessionId, text, tip)
     }
@@ -228,7 +240,7 @@ export async function sendChat(
   try {
     const session = getSession(sessionId)
     if (!session) {
-      emitEvent({ type: 'error', message: '会话不存在' })
+      emitEvent({ type: 'error', message: translate(language, 'runtime.sessionMissing') })
       return
     }
     /* 首次对话立即以提问作为会话标题并落库：不等到生成结束，避免侧栏长时间停留在「新对话」 */
@@ -236,9 +248,8 @@ export async function sendChat(
       updateSession(sessionId, { title: text.slice(0, 24) })
     }
 
-    const settings = getSettings()
     /* 会话引用的供应商/模型若已删除或停用，直接提示用户重新选择，不做静默切换 */
-    const target = resolveRuntimeTarget(session, settings)
+    const target = resolveRuntimeTarget(session, settings, language)
     if ('error' in target) {
       fail(target.error)
       return
@@ -269,7 +280,8 @@ export async function sendChat(
             return null
           }
         })
-        .filter((item) => item !== null)
+        .filter((item) => item !== null),
+      settings.language
     )
 
     /* 交运行时进程执行：只下发模型上下文，结束后回传本轮新增消息供追加落库 */
@@ -279,6 +291,7 @@ export async function sendChat(
       modelId,
       systemPrompt,
       messages: history,
+      language: settings.language,
       mode,
       rootDir,
       runtimePath: buildRuntimePath(),

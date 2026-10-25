@@ -147,7 +147,7 @@ function showDetectResult(result: RuntimeDetectResult): void {
   if (result.ok) {
     ElMessage.success(t('settings.detectOk', [result.version]))
   } else {
-    ElMessage.error(result.message || t('settings.detectFail', ['未知错误']))
+    ElMessage.error(result.message || t('settings.detectFail', [t('common.unknownError')]))
   }
 }
 </script>

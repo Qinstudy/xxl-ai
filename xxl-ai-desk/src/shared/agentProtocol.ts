@@ -67,6 +67,8 @@ export interface RunAgentInput {
   systemPrompt: string
   /* 模型上下文（最近窗口，不含 thinking） */
   messages: unknown[]
+  /* 应用语言：运行期异常备注使用对应语言 */
+  language: 'zh' | 'en'
   /* 对话模式 */
   mode: ChatMode
   /* 项目根目录（文件沙箱根） */

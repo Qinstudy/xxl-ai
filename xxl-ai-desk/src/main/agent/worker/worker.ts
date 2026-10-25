@@ -29,6 +29,7 @@ import type {
   WorkerMessage,
   WorkerRequest
 } from '@shared/agentProtocol'
+import { translate } from '@shared/i18n'
 import type { BrowserAction, BrowserActionResult, McpRuntimeConfig } from '@shared/ipc'
 
 /* 与主进程通信的端口（utilityProcess 中始终存在） */
@@ -155,7 +156,18 @@ async function handleRun(input: RunAgentInput): Promise<void> {
     /* 创建 Agent 期间已被终止：不再发起模型请求，本次没有新增消息 */
     if (isSessionAborted(input.sessionId)) {
       flushDelta(input.sessionId)
-      post({ type: 'run-done', sessionId: input.sessionId, messages: [] })
+      post({
+        type: 'run-done',
+        sessionId: input.sessionId,
+        messages: [
+          {
+            role: 'assistant',
+            content: [{ type: 'text', text: translate(input.language, 'runtime.abortNote'), error: true }],
+            stopReason: 'aborted',
+            timestamp: Date.now()
+          }
+        ]
+      })
       return
     }
     const newMessages = await runPrompt(
@@ -169,7 +181,8 @@ async function handleRun(input: RunAgentInput): Promise<void> {
             : event
         emitEvent(input.sessionId, normalized)
       },
-      input.sessionId
+      input.sessionId,
+      input.language
     )
     /* 结束前冲刷残余增量，保证文本完整落库/展示 */
     flushDelta(input.sessionId)

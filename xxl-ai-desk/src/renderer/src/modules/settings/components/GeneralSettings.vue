@@ -40,8 +40,8 @@ const language = computed<AppSettings['language']>({
       </el-form-item>
       <el-form-item :label="t('settings.language')">
         <el-radio-group v-model="language" class="soft-radio">
-          <el-radio-button value="zh">中文</el-radio-button>
-          <el-radio-button value="en">English</el-radio-button>
+          <el-radio-button value="zh">{{ t('settings.languageZh') }}</el-radio-button>
+          <el-radio-button value="en">{{ t('settings.languageEn') }}</el-radio-button>
         </el-radio-group>
       </el-form-item>
       <el-form-item :label="t('settings.autoCheckUpdate')">
