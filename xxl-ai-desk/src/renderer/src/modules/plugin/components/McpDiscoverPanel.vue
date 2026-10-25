@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
- * 发现 MCP 面板：在线检索 mcp.so 社区 MCP 服务，支持分页加载与详情查看。
+ * 发现 MCP 面板：在线检索 mcp.so 社区 MCP 服务，支持关键字搜索、结果排序、分页加载与详情查看。
  * @author xuxueli 2026-10-24
  */
 import { onMounted, onUnmounted, ref } from 'vue'
@@ -9,7 +9,7 @@ import { ipcErrorMessage } from '@renderer/utils/ipcError'
 import { api } from '@renderer/api'
 import { t } from '@renderer/i18n'
 import McpDiscoverDetailDrawer from './McpDiscoverDetailDrawer.vue'
-import type { McpDiscoverDetail, McpDiscoverItem } from '@shared/ipc'
+import type { McpDiscoverDetail, McpDiscoverItem, McpDiscoverSort } from '@shared/ipc'
 
 const emit = defineEmits<{ add: [detail: McpDiscoverDetail, snippet: string] }>()
 
@@ -30,6 +30,21 @@ function onKeywordChange(): void {
   timer = setTimeout(() => {
     void mcp.search(keyword.value)
   }, 400)
+}
+
+/* 立即检索（回车 / 搜索按钮） */
+function onSearch(): void {
+  if (timer) {
+    clearTimeout(timer)
+    timer = null
+  }
+  void mcp.search(keyword.value)
+}
+
+/* 清除关键字：回到当前分类的浏览列表 */
+function onClear(): void {
+  keyword.value = ''
+  void mcp.search('')
 }
 
 /* 打开详情 */
@@ -56,6 +71,11 @@ function formatStars(value: number): string {
     return `${(value / 1000).toFixed(1)}K`
   }
   return String(value)
+}
+
+/* 切换浏览排序：由 mcp.so 服务端排序并重新请求第 1 页 */
+function onSortChange(value: McpDiscoverSort): void {
+  void mcp.setSort(value)
 }
 
 /* 社区首页（在浏览器打开） */
@@ -91,8 +111,8 @@ onUnmounted(() => {
         clearable
         :placeholder="t('plugin.mcpCenter.discoverSearch')"
         @input="onKeywordChange"
-        @clear="onKeywordChange"
-        @keyup.enter="mcp.search(keyword)"
+        @clear="onClear"
+        @keyup.enter="onSearch"
       >
         <template #prefix>
           <el-icon><Search /></el-icon>
@@ -103,8 +123,23 @@ onUnmounted(() => {
           mcp.so
           <el-icon><TopRight /></el-icon>
         </span>
-        <el-button :loading="mcp.discovering" @click="mcp.search(keyword)">
-          <el-icon><Refresh /></el-icon>{{ t('plugin.mcpCenter.refresh') }}
+        <el-select
+          :model-value="mcp.discoverSort"
+          class="sort-select"
+          :disabled="mcp.isSearchMode"
+          @change="onSortChange"
+        >
+          <template v-if="mcp.isSearchMode">
+            <el-option value="star" :label="t('plugin.mcpCenter.sortRecommended')" />
+          </template>
+          <template v-else>
+            <el-option value="star" :label="t('plugin.mcpCenter.sortStars')" />
+            <el-option value="latest" :label="t('plugin.mcpCenter.sortLatest')" />
+            <el-option value="name" :label="t('plugin.mcpCenter.sortName')" />
+          </template>
+        </el-select>
+        <el-button :loading="mcp.discovering" @click="onSearch">
+          <el-icon><Search /></el-icon>{{ t('common.search') }}
         </el-button>
       </div>
     </div>
@@ -140,7 +175,7 @@ onUnmounted(() => {
       :title="mcp.discoverError"
     >
       <div class="error-actions">
-        <el-button size="small" @click="mcp.search(keyword)">{{ t('plugin.mcpCenter.retry') }}</el-button>
+        <el-button size="small" @click="onSearch">{{ t('plugin.mcpCenter.retry') }}</el-button>
         <el-button size="small" @click="openCommunity">
           {{ t('plugin.mcpCenter.openInBrowser') }}
         </el-button>
@@ -233,6 +268,10 @@ onUnmounted(() => {
   color: var(--desk-primary);
 }
 
+.sort-select {
+  width: 132px;
+}
+
 .discover-error {
   margin-bottom: 12px;
 }
@@ -266,12 +305,12 @@ onUnmounted(() => {
 
 .category-chip:hover {
   color: var(--desk-text);
-  border-color: var(--desk-primary);
+  border-color: var(--desk-border-strong);
 }
 
 .category-chip.active {
   color: var(--desk-text);
-  border-color: var(--desk-primary);
+  border-color: var(--desk-border-strong);
   background: var(--desk-primary-soft);
   font-weight: 600;
 }
@@ -312,7 +351,7 @@ onUnmounted(() => {
 }
 
 .discover-card:hover {
-  border-color: var(--desk-primary);
+  border-color: var(--desk-border-strong);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
 }
 

@@ -9,6 +9,7 @@ import { promises as fs } from 'fs'
 import type { Dirent } from 'fs'
 import { basename, relative, resolve, sep } from 'path'
 import type { ChatMode } from '@shared/ipc'
+import type { SkillRuntimeConfig } from '@shared/ipc'
 import { guardPath, type PathAction } from '../sandbox'
 
 /* 工具装配上下文 */
@@ -16,10 +17,12 @@ export interface ToolContext {
   mode: ChatMode
   rootDir: string
   sessionId: string
+  /* 已启用的技能索引（正文由 read_skill 按需读取） */
+  skills?: SkillRuntimeConfig[]
 }
 
 /* 工具分组：便于按域拆分文件与后续扩展 */
-export type ToolGroup = 'fs' | 'shell' | 'ui' | 'system'
+export type ToolGroup = 'fs' | 'shell' | 'ui' | 'system' | 'skill'
 
 /* 工具元信息：能力声明与装配策略（模式过滤由 registry 统一执行） */
 export interface ToolMeta {

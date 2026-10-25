@@ -4,7 +4,7 @@
  * 避免 LLM 流式与工具重活占用主进程事件循环。
  */
 
-import type { ChatMode, McpRuntimeConfig, McpTestResult, McpToolMeta } from './ipc'
+import type { ChatMode, McpRuntimeConfig, McpTestResult, McpToolMeta, SkillRuntimeConfig } from './ipc'
 import type { BrowserReadParams, BrowserReadResult } from './contracts/browser'
 
 /* 供应商运行时配置（主进程解密后传给运行时，与 Pi Models 构建入参一致） */
@@ -74,6 +74,8 @@ export interface RunAgentInput {
   runtimePath: string
   /* 已生效的 MCP 服务配置（未开启的不下发） */
   mcpServers: McpRuntimeConfig[]
+  /* 已启用的技能清单（只下发索引，正文由 read_skill 按需读取） */
+  skills: SkillRuntimeConfig[]
   /* 本轮用户输入 */
   text: string
 }

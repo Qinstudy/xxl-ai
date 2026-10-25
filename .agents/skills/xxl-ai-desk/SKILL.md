@@ -107,6 +107,7 @@ xxl-ai-desk/src/
 - **失败隔离**：单个外部服务失败只跳过自身并记录可定位日志，不阻断主流程。
 - **副作用集中**：配置变更后的缓存失效（如 `resetAgents()`）在一个入口统一完成。
 - **官方方案优先**：有官方/上游 SDK 或推荐接入方式时禁止自写协议。例：MCP 使用 `@earendil-works/pi-mcp`；模型/Agent 使用 `@earendil-works/pi-ai`、`pi-agent-core`。
+- **依赖版本锁定**：`package.json` 依赖一律写精确版本（如 `"yaml": "2.9.1"`），禁止 `^` / `~` / `*` / 区间写法；新增或升级依赖同步更新 `package-lock.json`（根 `packages[""]` 也须为精确版本）。上游包的传递依赖浮动由 lock 文件固化，不在此限。
 
 ### 2.3 UI 与样式 [硬]
 
@@ -280,6 +281,7 @@ desk-shell（纵向）
 - [ ] 结构一致：`schema.ts` / `DDL`。
 - [ ] `services/*` 是唯一 `getDb()` 出口；`ipc.ts` 仅网关；契约 / IPC 常量 / `DeskApi` / preload 齐备。
 - [ ] 依赖方向符合 §1.3；配置与运行时未耦合；运行时使用官方方案。
+- [ ] 新增/变更依赖为精确版本（无 `^` / `~` / 区间），`package-lock.json` 已同步。
 - [ ] 通道 `desk:{module}:{action}`；时间 ISO；布尔归一。
 - [ ] 渲染仅经 `api`；路由已登记；文案 `t()` 且 zh/en 成对；无硬编码中文。
 - [ ] UI 复用 tokens/外壳/列表规范；弹层 append-to-body 且拖拽区可用；全局样式已验证影响面。

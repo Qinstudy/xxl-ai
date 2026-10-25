@@ -1194,14 +1194,16 @@ docker compose down
 - 7、【升级】项目前后端依赖版本升级，提升稳定性和安全性；
 
 ### v1.2.1 Release Notes[ING]
-- 1、【新增】MCP工具（Desk版）：新增支持MCP工具管理，支持远程（Streamable HTTP）/ 本地（stdio）MCP服务在线管理、检索发现及连通测试，Agent运行时自动装配可用工具；
+- 1、【新增】MCP工具（Desk版）：新增支持MCP工具管理，支持远程（Streamable HTTP）/ 本地（stdio）MCP服务在线管理、社区检索发现及连通测试，Agent运行时自动装配可用工具；
 - 2、【优化】工具组件（Desk版）：工具组件交互升级，操作体验及可用性升级；工具组件代码重构，提升可维护性和可扩展性；
 - 3、【新增】会话渲染增强（Desk版）：Markdown渲染升级，支持远程图片、本地图片及文件预览，提升会话内容可读性；
 - 4、【ING】浏览器工具（Desk版）：内置浏览器工具增强，支持Agent调用浏览器工具进行网页操作，强化Agent的网页交互能力；
-- 5、【ING】SKILL技能：
+- 5、【ING】SKILL技能（Desk版）：新增SKILL技能管理，支持SKILL内容的在线管理、社区检索发现及安装，Agent运行时自动装配可用技能；
+- 6、【升级】项目前后端依赖版本升级，提升稳定性和安全性；
 
+
+### v1.2.2 Release Notes[ING]
 - 【TODO】Desk版本：记忆；
-- 【TODO】Desk版本：支持浏览器工具操作；
 
 
 ### TODO LIST

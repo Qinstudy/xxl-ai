@@ -167,11 +167,12 @@ async function onDelete(row: McpDTO): Promise<void> {
       </el-table-column>
       <template #empty>
         <el-empty :description="t('plugin.mcpCenter.emptyTitle')">
+          <div class="empty-tip">{{ t('plugin.mcpCenter.emptyTip') }}</div>
           <el-button type="primary" @click="emit('create')">
-            {{ t('plugin.mcpCenter.new') }}
+            <el-icon><Plus /></el-icon>{{ t('plugin.mcpCenter.new') }}
           </el-button>
           <el-button @click="emit('discover')">
-            {{ t('plugin.mcpCenter.goDiscover') }}
+            {{ t('plugin.mcpCenter.browseDiscover') }}
           </el-button>
         </el-empty>
       </template>
@@ -206,6 +207,12 @@ async function onDelete(row: McpDTO): Promise<void> {
 }
 
 .enabled-tip {
+  font-size: 12px;
+  color: var(--desk-text-tertiary);
+}
+
+.empty-tip {
+  margin-bottom: 12px;
   font-size: 12px;
   color: var(--desk-text-tertiary);
 }

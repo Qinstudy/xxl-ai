@@ -143,6 +143,7 @@ async function handleRun(input: RunAgentInput): Promise<void> {
       rootDir: input.rootDir,
       runtimePath: input.runtimePath,
       mcpServers: input.mcpServers ?? [],
+      skills: input.skills ?? [],
       isAborted: () => isSessionAborted(input.sessionId)
     })
     /* 创建 Agent 期间已被终止：不再发起模型请求，直接回传当前上下文 */

@@ -5,6 +5,7 @@
 
 import {
   browseCategoryMcpSo,
+  browseMcpSo,
   detailMcpSo,
   listMcpSoCategories,
   searchMcpSo
@@ -13,7 +14,8 @@ import type {
   McpCategory,
   McpDiscoverDetail,
   McpDiscoverPage,
-  McpDiscoverQuery
+  McpDiscoverQuery,
+  McpDiscoverSort
 } from '@shared/ipc'
 
 /* 缓存有效期（毫秒） */
@@ -64,22 +66,37 @@ export async function listMcpCategories(): Promise<McpCategory[]> {
   return result
 }
 
-/* 在线检索 MCP：有关键字走搜索，无关键字且指定分类时按分类浏览；结果缓存 5 分钟 */
+/* 校验浏览排序值：非法值回落最热门（star） */
+function normalizeSort(value: McpDiscoverQuery['sort']): McpDiscoverSort {
+  return value === 'latest' || value === 'name' ? value : 'star'
+}
+
+/*
+ * 在线检索 MCP：有关键字走搜索（站点搜索不支持排序），无关键字时按站点服务端排序浏览；
+ * 结果缓存 5 分钟，缓存 key 包含排序，避免不同排序互相污染。
+ */
 export async function discoverMcp(query: McpDiscoverQuery): Promise<McpDiscoverPage> {
   const keyword = (query.keyword ?? '').trim().slice(0, 64)
   const category = (query.category ?? '').trim()
   const page = Math.min(Math.max(Math.floor(query.page ?? 1), 1), 20)
+  const sort = normalizeSort(query.sort)
   const byCategory = Boolean(category) && !keyword
-  const key = byCategory ? `category:${category}:${page}` : `search:${keyword}:${page}`
+  const key = keyword
+    ? `search:${keyword}:${page}`
+    : byCategory
+      ? `category:${category}:${sort}:${page}`
+      : `all:${sort}:${page}`
 
   const cached = readCache<McpDiscoverPage>(key)
   if (cached) {
     return { ...cached, cached: true }
   }
 
-  const result = byCategory
-    ? await browseCategoryMcpSo(category, page)
-    : await searchMcpSo(keyword, page)
+  const result = keyword
+    ? await searchMcpSo(keyword, page)
+    : byCategory
+      ? await browseCategoryMcpSo(category, page, sort)
+      : await browseMcpSo(page, sort)
   writeCache(key, result)
   return result
 }

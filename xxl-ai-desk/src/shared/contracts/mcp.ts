@@ -122,6 +122,9 @@ export interface McpDiscoverPage {
   cached: boolean
 }
 
+/* 发现 MCP：站点支持的浏览排序（搜索固定推荐顺序，不传 sort） */
+export type McpDiscoverSort = 'star' | 'latest' | 'name'
+
 /* 发现 MCP：检索入参 */
 export interface McpDiscoverQuery {
   /* 关键字（空则浏览社区列表 / 指定分类） */
@@ -130,6 +133,8 @@ export interface McpDiscoverQuery {
   page?: number
   /* 分类 slug（有值且无关键字时按分类浏览） */
   category?: string
+  /* 浏览排序：star 最热门 / latest 最近添加 / name 名称 */
+  sort?: McpDiscoverSort
 }
 
 /* 发现 MCP：社区分类 */

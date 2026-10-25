@@ -17,6 +17,7 @@ import type {
   RuntimeExecInput,
   RuntimeInfo,
   SessionDTO,
+  SkillDiscoverQuery,
   StoredMessage,
   TerminalCreateInput
 } from '@shared/ipc'
@@ -65,6 +66,21 @@ import {
 } from './services/mcpService'
 import { listMcpTools, testMcp } from './services/mcpRuntimeService'
 import { discoverMcp, discoverMcpDetail, listMcpCategories } from './services/mcpDiscoverService'
+import {
+  deleteSkill,
+  getSkillDetail,
+  getSkillRevealPath,
+  importSkillsFromDirectory,
+  importSkillsFromZip,
+  listSkills,
+  refreshSkills,
+  setSkillEnabled
+} from './services/skillService'
+import {
+  discoverSkillDetail,
+  discoverSkills,
+  installDiscoveredSkill
+} from './services/skillDiscoverService'
 import {
   clearSessionPermissions,
   disposeAgentRuntime,
@@ -298,4 +314,40 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.mcpDiscover, (_event, query: McpDiscoverQuery) => discoverMcp(query))
   ipcMain.handle(IPC.mcpCategories, () => listMcpCategories())
   ipcMain.handle(IPC.mcpDetail, (_event, slug: string) => discoverMcpDetail(slug))
+
+  /* --- SKILL 技能中心（导入 / 启停 / 删除均由 service 统一失效运行时缓存） --- */
+  ipcMain.handle(IPC.skillList, () => listSkills())
+  ipcMain.handle(IPC.skillDetail, (_event, id: string) => getSkillDetail(id))
+  ipcMain.handle(IPC.skillImportDir, async () => {
+    const result = await dialog.showOpenDialog({
+      title: '选择技能目录',
+      properties: ['openDirectory']
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return null
+    }
+    return importSkillsFromDirectory(result.filePaths[0])
+  })
+  ipcMain.handle(IPC.skillImportZip, async () => {
+    const result = await dialog.showOpenDialog({
+      title: '选择技能 Zip 文件',
+      properties: ['openFile'],
+      filters: [{ name: 'Zip', extensions: ['zip'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return null
+    }
+    return importSkillsFromZip(result.filePaths[0])
+  })
+  ipcMain.handle(IPC.skillSetEnabled, (_event, id: string, enabled: boolean) =>
+    setSkillEnabled(id, enabled)
+  )
+  ipcMain.handle(IPC.skillRemove, (_event, id: string) => deleteSkill(id))
+  ipcMain.handle(IPC.skillReveal, (_event, id: string) => {
+    shell.showItemInFolder(getSkillRevealPath(id))
+  })
+  ipcMain.handle(IPC.skillRefresh, () => refreshSkills())
+  ipcMain.handle(IPC.skillDiscover, (_event, query: SkillDiscoverQuery) => discoverSkills(query))
+  ipcMain.handle(IPC.skillDiscoverDetail, (_event, id: string) => discoverSkillDetail(id))
+  ipcMain.handle(IPC.skillInstall, (_event, id: string) => installDiscoveredSkill(id))
 }

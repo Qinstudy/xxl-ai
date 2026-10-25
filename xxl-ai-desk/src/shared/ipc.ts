@@ -13,6 +13,7 @@ export * from './contracts/terminal'
 export * from './contracts/fs'
 export * from './contracts/shell'
 export * from './contracts/mcp'
+export * from './contracts/skill'
 export * from './contracts/browser'
 
 import type {
@@ -39,6 +40,14 @@ import type {
   McpTestResult,
   McpToolMeta
 } from './contracts/mcp'
+import type {
+  SkillDetail,
+  SkillDiscoverDetail,
+  SkillDiscoverPage,
+  SkillDiscoverQuery,
+  SkillDTO,
+  SkillImportResult
+} from './contracts/skill'
 
 /* 预加载暴露给渲染进程的 API */
 export interface DeskApi {
@@ -198,6 +207,31 @@ export interface DeskApi {
     /* 发现 MCP：详情 */
     detail(slug: string): Promise<McpDiscoverDetail>
   }
+  /* SKILL 技能中心（本地管理 + 发现安装） */
+  skill: {
+    /* 技能列表（扫描数据目录并对账） */
+    list(): Promise<SkillDTO[]>
+    /* 技能详情（SKILL.md 正文 + 文件清单） */
+    detail(id: string): Promise<SkillDetail>
+    /* 从本地目录导入（弹目录选择框，取消返回 null） */
+    importDirectory(): Promise<SkillImportResult | null>
+    /* 从 Zip 导入（弹文件选择框，取消返回 null） */
+    importZip(): Promise<SkillImportResult | null>
+    /* 启用 / 停用技能 */
+    setEnabled(id: string, enabled: boolean): Promise<SkillDTO>
+    /* 删除技能（目录与记录一并清理） */
+    remove(id: string): Promise<void>
+    /* 在文件管理器中显示技能目录 */
+    reveal(id: string): Promise<void>
+    /* 重新扫描技能目录（刷新后清空运行时缓存） */
+    refresh(): Promise<SkillDTO[]>
+    /* 发现 SKILL：检索 / 榜单（空关键字返回榜单） */
+    discover(query: SkillDiscoverQuery): Promise<SkillDiscoverPage>
+    /* 发现 SKILL：详情描述（按需读取站点详情页） */
+    discoverDetail(id: string): Promise<SkillDiscoverDetail>
+    /* 发现 SKILL：安装（仅 GitHub 来源） */
+    install(id: string): Promise<SkillDTO>
+  }
 }
 
 /* IPC 通道名（统一 desk:{module}:{action}；主进程经 ipcMain.handle 注册，preload 经 ipcRenderer.invoke/on 使用） */
@@ -274,5 +308,17 @@ export const IPC = {
   mcpTools: 'desk:mcp:tools',
   mcpDiscover: 'desk:mcp:discover',
   mcpCategories: 'desk:mcp:categories',
-  mcpDetail: 'desk:mcp:detail'
+  mcpDetail: 'desk:mcp:detail',
+  /* SKILL 技能中心 */
+  skillList: 'desk:skill:list',
+  skillDetail: 'desk:skill:detail',
+  skillImportDir: 'desk:skill:import-dir',
+  skillImportZip: 'desk:skill:import-zip',
+  skillSetEnabled: 'desk:skill:set-enabled',
+  skillRemove: 'desk:skill:remove',
+  skillReveal: 'desk:skill:reveal',
+  skillRefresh: 'desk:skill:refresh',
+  skillDiscover: 'desk:skill:discover',
+  skillDiscoverDetail: 'desk:skill:discover-detail',
+  skillInstall: 'desk:skill:install'
 } as const

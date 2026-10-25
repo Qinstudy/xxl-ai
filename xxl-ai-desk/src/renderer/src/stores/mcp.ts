@@ -13,6 +13,7 @@ import type {
   McpDiscoverDetail,
   McpDiscoverItem,
   McpDiscoverPage,
+  McpDiscoverSort,
   McpDTO,
   McpTestResult,
   McpToolMeta
@@ -52,8 +53,15 @@ export const useMcpStore = defineStore('mcp', () => {
   /* 社区分类：分类列表与当前选中分类（空串为全部） */
   const categories = ref<McpCategory[]>([])
   const category = ref('')
-  /* 检索缓存：key = 分类 + 关键字 + 页码 */
+  /* 浏览排序：由 mcp.so 服务端处理（star 最热门 / latest 最近添加 / name 名称） */
+  const discoverSort = ref<McpDiscoverSort>('star')
+  /* 当前是否处于搜索视图（站点搜索不支持排序） */
+  const isSearchMode = computed(() => discoverKeyword.value.trim() !== '')
+  /* 检索缓存：key = 分类 + 关键字 + 排序 + 页码 */
   const discoverCache = new Map<string, McpDiscoverPage>()
+
+  /* 请求序号：快速切换关键字 / 分类时只接受最后一次响应 */
+  let requestSeq = 0
 
   /* 加载 MCP 列表 */
   async function loadServers(): Promise<void> {
@@ -107,23 +115,31 @@ export const useMcpStore = defineStore('mcp', () => {
     await search('')
   }
 
-  /* 发现：检索（append 为追加下一页；有关键字时忽略分类，改为全局搜索） */
+  /* 发现：检索（append 为追加下一页；有关键字时忽略分类与排序，改为全局搜索） */
   async function search(keywordValue: string, page = 1, append = false): Promise<void> {
+    const seq = ++requestSeq
     const key0 = keywordValue.trim()
     if (key0) {
       category.value = ''
+      /* 站点搜索不支持排序，统一回到推荐顺序 */
+      discoverSort.value = 'star'
     }
-    const key = `${category.value}|${key0}:${page}`
+    /* 缓存 key 包含排序，避免最热门 / 最近添加共用同一份结果 */
+    const key = `${category.value}|${key0}|${key0 ? 'star' : discoverSort.value}:${page}`
     discoverKeyword.value = keywordValue
     if (!append) {
       discoverPage.value = 1
     }
     const cached = discoverCache.get(key)
     if (cached) {
+      if (seq !== requestSeq) {
+        return
+      }
       discoverItems.value = append ? [...discoverItems.value, ...cached.items] : cached.items
       discoverPage.value = page
       discoverHasMore.value = cached.hasMore
       discoverError.value = ''
+      discovering.value = false
       return
     }
 
@@ -133,20 +149,28 @@ export const useMcpStore = defineStore('mcp', () => {
       const result = await api.mcp.discover({
         keyword: key0,
         page,
-        category: category.value || undefined
+        category: category.value || undefined,
+        sort: key0 ? 'star' : discoverSort.value
       })
+      if (seq !== requestSeq) {
+        return
+      }
       discoverCache.set(key, result)
       discoverItems.value = append ? [...discoverItems.value, ...result.items] : result.items
       discoverPage.value = page
       discoverHasMore.value = result.hasMore
     } catch (error) {
-      discoverError.value = ipcErrorMessage(error)
-      if (!append) {
-        discoverItems.value = []
-        discoverHasMore.value = false
+      if (seq === requestSeq) {
+        discoverError.value = ipcErrorMessage(error)
+        if (!append) {
+          discoverItems.value = []
+          discoverHasMore.value = false
+        }
       }
     } finally {
-      discovering.value = false
+      if (seq === requestSeq) {
+        discovering.value = false
+      }
     }
   }
 
@@ -156,6 +180,15 @@ export const useMcpStore = defineStore('mcp', () => {
       return
     }
     await search(discoverKeyword.value, discoverPage.value + 1, true)
+  }
+
+  /* 发现：切换浏览排序（重新请求第 1 页） */
+  async function setSort(sort: McpDiscoverSort): Promise<void> {
+    if (sort === discoverSort.value) {
+      return
+    }
+    discoverSort.value = sort
+    await search(discoverKeyword.value, 1, false)
   }
 
   /* 发现：详情 */
@@ -177,6 +210,8 @@ export const useMcpStore = defineStore('mcp', () => {
     discoverKeyword,
     categories,
     category,
+    discoverSort,
+    isSearchMode,
     loadServers,
     saveServer,
     removeServer,
@@ -186,6 +221,7 @@ export const useMcpStore = defineStore('mcp', () => {
     selectCategory,
     search,
     loadMore,
+    setSort,
     loadDetail
   }
 })

@@ -182,8 +182,8 @@ function onAdd(): void {
 }
 
 .snippet.active {
-  border-color: var(--desk-primary);
-  box-shadow: inset 0 0 0 1px var(--desk-primary);
+  border-color: var(--desk-border-strong);
+  box-shadow: inset 0 0 0 1px var(--desk-border-strong);
 }
 
 .snippet-text {

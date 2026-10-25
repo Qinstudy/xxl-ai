@@ -9,7 +9,8 @@ import type {
   McpCategory,
   McpDiscoverDetail,
   McpDiscoverItem,
-  McpDiscoverPage
+  McpDiscoverPage,
+  McpDiscoverSort
 } from '@shared/ipc'
 
 /* 桌面端 UA：与站点普通浏览器请求保持一致 */
@@ -147,7 +148,7 @@ function parseCards(html: string, page: number): { items: McpDiscoverItem[]; has
   return { items, hasMore: maxPage > page && items.length > 0 }
 }
 
-/* 检索列表：关键字为空时浏览社区全部服务 */
+/* 搜索列表：站点搜索页不支持排序，固定使用其推荐顺序 */
 export async function searchMcpSo(keyword: string, page: number): Promise<McpDiscoverPage> {
   const key = keyword.trim()
   const query = new URLSearchParams()
@@ -155,17 +156,30 @@ export async function searchMcpSo(keyword: string, page: number): Promise<McpDis
     query.set('q', key)
   }
   query.set('page', String(page))
-  const url = `${BASE_URL}/zh/${key ? 'search' : 'servers'}?${query.toString()}`
+  const url = `${BASE_URL}/zh/search?${query.toString()}`
   const { items, hasMore } = parseCards(await fetchHtml(url), page)
   return { source: 'mcpso', items, page, hasMore, cached: false }
 }
 
-/* 按分类浏览（复用服务列表布局以拿到 Star 数；slug 白名单校验） */
-export async function browseCategoryMcpSo(slug: string, page: number): Promise<McpDiscoverPage> {
+/* 浏览全部服务：排序交由站点服务端处理（star 最热门 / latest 最近添加 / name 名称） */
+export async function browseMcpSo(page: number, sort: McpDiscoverSort): Promise<McpDiscoverPage> {
+  const query = new URLSearchParams({ sort, page: String(page) })
+  const url = `${BASE_URL}/zh/servers?${query.toString()}`
+  const { items, hasMore } = parseCards(await fetchHtml(url), page)
+  return { source: 'mcpso', items, page, hasMore, cached: false }
+}
+
+/* 按分类浏览：站点同样支持 sort 与 page（slug 白名单校验） */
+export async function browseCategoryMcpSo(
+  slug: string,
+  page: number,
+  sort: McpDiscoverSort
+): Promise<McpDiscoverPage> {
   if (!/^[a-zA-Z0-9-]+$/.test(slug)) {
     throw new Error('非法的分类标识')
   }
-  const url = `${BASE_URL}/zh/servers?category=${encodeURIComponent(slug)}&page=${page}`
+  const query = new URLSearchParams({ category: slug, sort, page: String(page) })
+  const url = `${BASE_URL}/zh/servers?${query.toString()}`
   const { items, hasMore } = parseCards(await fetchHtml(url), page)
   return { source: 'mcpso', items, page, hasMore, cached: false }
 }

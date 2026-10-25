@@ -8,6 +8,8 @@
   --desk-chrome-bg: #ececec;
   --desk-panel-bg: #f6f6f6;
   --desk-border: #ececec;
+  /* 选中/悬浮边框：比常规边框稍强，但避免纯黑 */
+  --desk-border-strong: #d4d4d4;
   --desk-border-soft: rgba(0, 0, 0, 0.06);
   --desk-text: #0d0d0d;
   --desk-text-secondary: #5d5d5d;
@@ -77,6 +79,8 @@
   --desk-chrome-bg: #101010;
   --desk-panel-bg: #191919;
   --desk-border: #333333;
+  /* 选中/悬浮边框：比常规边框稍强，但避免纯黑 */
+  --desk-border-strong: #4a4a4a;
   --desk-border-soft: rgba(255, 255, 255, 0.09);
   --desk-text: #ececec;
   --desk-text-secondary: #b0b0b0;

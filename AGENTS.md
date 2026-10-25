@@ -193,6 +193,7 @@ com/xxl/ai/api/business/harness          ← 运行时支撑层：无 controller
 - 布尔属性不使用 `isXxx` 前缀命名，避免与 getter 冲突。
 - 注释覆盖 Java 与前端文件：文件顶部一行功能描述，间隔一行加 `@author 作者 yyyy-mm-dd`；方法注释用 `/* xxx */` 多行；属性注释在右侧 `/* xxx */` 垂直对齐；方法内部分支逻辑也需注释；已有注释需符合上述要求。
 - 避免过度设计，注重复用、易理解、易维护；同一类场景保持同一套实现方案。
+- **依赖版本一律固定**：`package.json` / `pom.xml` 的依赖必须写精确版本（`"yaml": "2.9.1"`、`<xxl-sso.version>2.4.1</xxl-sso.version>`），**禁止 `^` / `~` / `*` / 区间等浮动写法**；新增或升级依赖须同步 lock 文件（`package-lock.json` 根 `packages[""]` 亦为精确版本），保证任何环境安装结果一致。
 - Desk 专项约束（依赖方向、模块边界、硬/软约束、规模阈值、官方运行时优先）见 `xxl-ai-desk` skill §1–§2。
 
 ### 6.2 后端分层与接口规范

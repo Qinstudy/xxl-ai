@@ -11,13 +11,15 @@ import { createSystemTools } from './system'
 import { createFsTools } from './fs'
 import { createShellTools } from './shell'
 import { createBrowserTools } from './browser'
+import { createSkillTools } from './skill'
 
 /* 按域聚合的工具工厂（新增域在此登记） */
 const FACTORIES: Array<(context: ToolContext) => Promise<ToolEntry[]>> = [
   createSystemTools,
   createFsTools,
   createShellTools,
-  createBrowserTools
+  createBrowserTools,
+  createSkillTools
 ]
 
 /* 构建当前模式下的工具条目（含元信息，供提示生成使用） */

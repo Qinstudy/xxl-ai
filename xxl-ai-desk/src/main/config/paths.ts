@@ -53,6 +53,16 @@ export function getDbFile(): string {
   return join(getDataDir(), 'xxl-ai-desk.sqlite')
 }
 
+/* SKILL 技能根目录（统一维护在数据目录下的 skills） */
+export function getSkillsDir(): string {
+  return join(getDataDir(), 'skills')
+}
+
+/* 确保 SKILL 技能目录存在 */
+export function ensureSkillsDir(): void {
+  mkdirSync(getSkillsDir(), { recursive: true })
+}
+
 /*
  * 保存运行时数据目录：空值或等于默认目录时清除配置。
  * 仅持久化配置并创建目录，实际切换在应用重启后生效。

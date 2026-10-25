@@ -21,6 +21,11 @@ import type {
   RuntimeDetectResult,
   RuntimeExecInput,
   SessionDTO,
+  SkillDiscoverDetail,
+  SkillDiscoverQuery,
+  SkillDTO,
+  SkillDetail,
+  SkillImportResult,
   StoredMessage,
   TerminalCreateInput,
   TerminalEvent,
@@ -222,6 +227,34 @@ const api: DeskApi = {
     categories: () => ipcRenderer.invoke(IPC.mcpCategories),
     /* 发现 MCP：详情 */
     detail: (slug: string) => ipcRenderer.invoke(IPC.mcpDetail, slug)
+  },
+  /* SKILL 技能中心 */
+  skill: {
+    /* 技能列表 */
+    list: (): Promise<SkillDTO[]> => ipcRenderer.invoke(IPC.skillList),
+    /* 技能详情 */
+    detail: (id: string): Promise<SkillDetail> => ipcRenderer.invoke(IPC.skillDetail, id),
+    /* 从本地目录导入 */
+    importDirectory: (): Promise<SkillImportResult | null> =>
+      ipcRenderer.invoke(IPC.skillImportDir),
+    /* 从 Zip 导入 */
+    importZip: (): Promise<SkillImportResult | null> => ipcRenderer.invoke(IPC.skillImportZip),
+    /* 启用 / 停用 */
+    setEnabled: (id: string, enabled: boolean): Promise<SkillDTO> =>
+      ipcRenderer.invoke(IPC.skillSetEnabled, id, enabled),
+    /* 删除技能 */
+    remove: (id: string) => ipcRenderer.invoke(IPC.skillRemove, id),
+    /* 在文件管理器中显示技能目录 */
+    reveal: (id: string) => ipcRenderer.invoke(IPC.skillReveal, id),
+    /* 重新扫描 */
+    refresh: (): Promise<SkillDTO[]> => ipcRenderer.invoke(IPC.skillRefresh),
+    /* 发现 SKILL：检索 / 榜单 */
+    discover: (query: SkillDiscoverQuery) => ipcRenderer.invoke(IPC.skillDiscover, query),
+    /* 发现 SKILL：详情描述 */
+    discoverDetail: (id: string): Promise<SkillDiscoverDetail> =>
+      ipcRenderer.invoke(IPC.skillDiscoverDetail, id),
+    /* 发现 SKILL：安装 */
+    install: (id: string): Promise<SkillDTO> => ipcRenderer.invoke(IPC.skillInstall, id)
   }
 }
 

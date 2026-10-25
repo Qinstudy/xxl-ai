@@ -8,7 +8,7 @@ import { homedir } from 'os'
 import { dirname } from 'path'
 import Database from 'better-sqlite3'
 import { drizzle, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
-import { getDbFile } from '../config/paths'
+import { getDbFile, getSkillsDir } from '../config/paths'
 import * as schema from './schema'
 
 /* SQLite 建表脚本：桌面端本地库，无需外部服务 */
@@ -76,6 +76,19 @@ CREATE TABLE IF NOT EXISTS desk_mcp (
   update_time TEXT NOT NULL DEFAULT ''
 );
 CREATE UNIQUE INDEX IF NOT EXISTS i_desk_mcp_name ON desk_mcp (name);
+CREATE TABLE IF NOT EXISTS desk_skill (
+  id          TEXT PRIMARY KEY,
+  name        TEXT NOT NULL DEFAULT '',
+  description TEXT NOT NULL DEFAULT '',
+  version     TEXT NOT NULL DEFAULT '',
+  source      TEXT NOT NULL DEFAULT 'local',
+  source_id   TEXT NOT NULL DEFAULT '',
+  enabled     INTEGER NOT NULL DEFAULT 1,
+  add_time    TEXT NOT NULL DEFAULT '',
+  update_time TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS i_desk_skill_source_id ON desk_skill (source_id) WHERE source_id <> '';
+CREATE INDEX IF NOT EXISTS i_desk_skill_enabled ON desk_skill (enabled);
 `
 
 /* 原生 better-sqlite3 连接（迁移直接执行 SQL 用） */
@@ -87,6 +100,8 @@ let database: BetterSQLite3Database<typeof schema> | null = null
 export function initDatabase(): void {
   const file = getDbFile()
   mkdirSync(dirname(file), { recursive: true })
+  /* 技能统一维护在数据目录下的 skills（与数据库同生命周期） */
+  mkdirSync(getSkillsDir(), { recursive: true })
   sqlite = new Database(file)
   sqlite.pragma('journal_mode = WAL')
   sqlite.exec(DDL)

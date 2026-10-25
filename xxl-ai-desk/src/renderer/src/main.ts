@@ -48,6 +48,7 @@ import {
   ScaleToOriginal,
   Tools,
   TopRight,
+  UploadFilled,
   User,
   VideoPause,
   WarningFilled
@@ -107,6 +108,7 @@ const icons = {
   ScaleToOriginal,
   Tools,
   TopRight,
+  UploadFilled,
   User,
   VideoPause,
   WarningFilled

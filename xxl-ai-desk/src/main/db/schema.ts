@@ -57,6 +57,19 @@ export const settingTable = sqliteTable('desk_setting', {
   value: text('value').notNull().default('') /* 设置项值（对象以 JSON 存储） */
 })
 
+/* SKILL 技能表：目录内容为权威，本表保存启停、来源等可变状态 */
+export const skillTable = sqliteTable('desk_skill', {
+  id: text('id').primaryKey(), /* 技能目录名 */
+  name: text('name').notNull().default(''), /* 技能名（frontmatter） */
+  description: text('description').notNull().default(''), /* 技能描述 */
+  version: text('version').notNull().default(''), /* 版本（可选） */
+  source: text('source').notNull().default('local'), /* local / skillssh */
+  sourceId: text('source_id').notNull().default(''), /* skills.sh 标识 */
+  enabled: integer('enabled').notNull().default(1), /* 1 启用 / 0 停用 */
+  addTime: text('add_time').notNull().default(''),
+  updateTime: text('update_time').notNull().default('')
+})
+
 /* MCP 服务表：远程（Streamable HTTP）/ 本地（stdio），开启后参与对话 */
 export const mcpTable = sqliteTable('desk_mcp', {
   id: text('id').primaryKey(),

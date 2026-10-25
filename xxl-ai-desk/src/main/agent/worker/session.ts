@@ -10,7 +10,7 @@ import { createMcpTools } from './mcp/tools'
 import { setMcpRuntimePath } from './mcp/client'
 import type { ChatMode } from '@shared/ipc'
 import type { HostEvent } from '@shared/agentProtocol'
-import type { McpRuntimeConfig } from '@shared/ipc'
+import type { McpRuntimeConfig, SkillRuntimeConfig } from '@shared/ipc'
 
 /* 创建/获取会话 Agent 所需的运行时配置 */
 export interface AgentRuntimeOptions {
@@ -26,6 +26,8 @@ export interface AgentRuntimeOptions {
   runtimePath: string
   /* 已生效的 MCP 服务配置 */
   mcpServers: McpRuntimeConfig[]
+  /* 已启用的技能索引 */
+  skills: SkillRuntimeConfig[]
   /* 会话是否已被终止（Agent 创建阶段用于提前跳出） */
   isAborted?: () => boolean
 }
@@ -57,7 +59,8 @@ async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
   const entries = await createBuiltinToolEntries({
     mode: options.mode,
     rootDir: options.rootDir,
-    sessionId: options.sessionId
+    sessionId: options.sessionId,
+    skills: options.skills
   })
   const tools = entries.map((entry) => entry.tool)
   /* MCP 工具：随会话装配（未开启的服务不下发，连接失败的服务自动跳过） */
