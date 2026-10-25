@@ -36,10 +36,15 @@ export const useLayoutStore = defineStore('layout', () => {
 
   /* 右侧侧栏宽度（拖拽调整、持久化）：默认宽度按文件面板实用尺寸设定，避免选中工具时二次变宽 */
   /* 存储键升级 v2：让旧版本遗留的窄默认值（320）失效，首次打开即为合适宽度 */
+  /* 最大宽度与会话区联动：会话内容最大 880px（左右内边距 64px），
+     窗口多出的空间优先留给右侧；小窗口保底 820px，不设固定封顶 */
+  const CHAT_MAX_WIDTH = 944
+  const RAIL_WIDTH = 44
   const rightPanel = createPersistedWidth('desk-right-panel-width-v2', {
     default: 520,
     min: 240,
-    max: 720
+    max: () =>
+      Math.max(820, window.innerWidth - RAIL_WIDTH - panel.width.value - CHAT_MAX_WIDTH)
   })
 
   /* 切换侧栏折叠状态 */

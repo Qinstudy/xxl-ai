@@ -4,11 +4,11 @@
 */
 import { ref, type Ref } from 'vue'
 
-/* 宽度约束与默认值 */
+/* 宽度约束与默认值（max 支持函数，便于按窗口宽度动态限制） */
 export interface PersistedWidthOptions {
   default: number
   min: number
-  max: number
+  max: number | (() => number)
 }
 
 /* 返回：响应式宽度 + 设置（夹取并持久化）+ 恢复默认 */
@@ -24,22 +24,24 @@ export function createPersistedWidth(
   options: PersistedWidthOptions
 ): PersistedWidth {
   const stored = Number(localStorage.getItem(storageKey))
+  /* 解析最大宽度（支持按窗口宽度动态计算） */
+  const maxWidth = (): number => (typeof options.max === 'function' ? options.max() : options.max)
   const width = ref(
-    Number.isFinite(stored) && stored >= options.min && stored <= options.max
+    Number.isFinite(stored) && stored >= options.min && stored <= maxWidth()
       ? Math.round(stored)
       : options.default
   )
 
   /* 设置宽度：夹取到 [min, max] 并持久化 */
   function setWidth(next: number): void {
-    width.value = Math.min(options.max, Math.max(options.min, Math.round(next)))
+    width.value = Math.min(maxWidth(), Math.max(options.min, Math.round(next)))
     localStorage.setItem(storageKey, String(width.value))
   }
 
   /* 恢复默认宽度并持久化 */
   function resetWidth(): void {
-    width.value = options.default
-    localStorage.setItem(storageKey, String(options.default))
+    width.value = Math.min(maxWidth(), Math.max(options.min, options.default))
+    localStorage.setItem(storageKey, String(width.value))
   }
 
   return { width, setWidth, resetWidth }
