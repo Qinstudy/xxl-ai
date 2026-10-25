@@ -43,8 +43,8 @@
   --code-subst: #1f2328;
   /* 顶部栏高度（左侧 Logo 顶部与之下的正文区顶部对齐） */
   --desk-header-height: 38px;
-  /* 左侧常驻图标栏（活动栏）宽度 */
-  --desk-rail-width: 44px;
+  /* 左侧常驻图标栏（活动栏）宽度：与顶栏高度保持一致 */
+  --desk-rail-width: var(--desk-header-height);
   --desk-radius-sm: 10px;
   --desk-radius: 16px;
   --desk-radius-lg: 22px;

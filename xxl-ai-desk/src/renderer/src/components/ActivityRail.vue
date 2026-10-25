@@ -71,7 +71,7 @@ function go(key: SectionKey): void {
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0 8px;
+  padding: 8px 0;
   background: var(--desk-chrome-bg);
 }
 
@@ -79,15 +79,16 @@ function go(key: SectionKey): void {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
+/* 图标按钮：宽度收紧至图标栏内留出等距外边距 */
 .rail-btn {
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   background: transparent;
   color: var(--desk-text-secondary);
   font-size: 18px;

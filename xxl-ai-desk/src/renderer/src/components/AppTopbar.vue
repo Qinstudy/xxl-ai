@@ -136,6 +136,7 @@ function goHome(): void {
   flex-shrink: 0;
   width: 1px;
   height: 15px;
+  margin: 0 4px;
   background: var(--desk-text-tertiary);
   opacity: 0.45;
 }

@@ -214,13 +214,15 @@ onBeforeUnmount(() => {
 }
 
 .tab:hover {
-  background: var(--desk-primary-soft);
+  background: var(--desk-bg-elevated);
   color: var(--desk-text);
 }
 
+/* 选中态：与工具栏 Tab 一致，浅色高亮底 + 加粗文字，保证与未选中明显区分 */
 .tab.active {
-  background: var(--desk-bg-elevated);
+  background: var(--desk-primary-soft);
   color: var(--desk-text);
+  font-weight: 600;
 }
 
 .tab-title {
