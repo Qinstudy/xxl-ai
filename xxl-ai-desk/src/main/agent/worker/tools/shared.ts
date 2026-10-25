@@ -98,8 +98,11 @@ export function clipToolResult<T>(
 /*
  * 统一路径闸门：目录内直接放行，越界转主进程审批；拒绝则返回可直接回填模型的错误。
  * 具体工具只需声明动作类型（read / write）与工具名。
+ * SKILL 内容（已启用技能目录）读取时放行，不打断会话。
  */
 export function createGuard(context: ToolContext) {
+  /* 技能目录只读放行：随 Agent 装配的技能清单保持一致，无需额外全局状态 */
+  const readRoots = (context.skills ?? []).map((skill) => skill.dir)
   return async function guard(
     target: string | undefined,
     action: PathAction,
@@ -112,7 +115,8 @@ export function createGuard(context: ToolContext) {
       rootDir: context.rootDir,
       target,
       action,
-      tool
+      tool,
+      readRoots
     })
     if (!outcome.allowed) {
       return { ok: false, result: toolError(outcome.reason ?? '已拦截：超出项目目录') }

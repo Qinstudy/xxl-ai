@@ -3,7 +3,7 @@
  * 助手消息执行过程时间线：按发生顺序渲染 思考 → 工具 → 正文，并展示生成中与耗时状态。
  * @author xuxueli 2026-10-25
  */
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, type ComponentPublicInstance } from 'vue'
 import { renderMarkdown } from '@renderer/composables/useMarkdown'
 import { onCodeCopyClick } from '@renderer/composables/useCodeCopy'
 import { toolArgsText, toolView } from '@renderer/composables/useToolView'
@@ -70,7 +70,7 @@ const thinkingBodies = new Map<number, HTMLElement>()
 const thinkingSticky = new Map<number, boolean>()
 
 /* 登记思考正文容器（v-for 中 ref 需用函数形式） */
-function bindThinkingBody(index: number, el: Element | { $el?: unknown } | null): void {
+function bindThinkingBody(index: number, el: Element | ComponentPublicInstance | null): void {
   if (el instanceof HTMLElement) {
     thinkingBodies.set(index, el)
   } else {
@@ -88,7 +88,10 @@ function onThinkingScroll(index: number, event: Event): void {
 watch(
   () => {
     const part = props.message.parts[lastIndex.value]
-    return props.message.pending && part?.type === 'thinking' ? part.text.length : -1
+    /* 以「片段时间/下标 + 长度」作为触发键：新片段替换旧片段时也能重新吸底 */
+    return props.message.pending && part?.type === 'thinking'
+      ? `${lastIndex.value}:${part.text.length}`
+      : ''
   },
   () => {
     const index = lastIndex.value

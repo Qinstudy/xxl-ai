@@ -1,6 +1,7 @@
 /*
  * 文件沙箱：把 Agent 的本地文件读写限制在当前项目目录内。
  *   - 目录内：直接放行；
+ *   - 软件数据目录下的 SKILL 内容：只读放行（技能是用户主动安装的可信资料，不打断会话）；
  *   - 目录外：拦截并转交主进程弹应用内对话框人工确认（允许本次 / 本会话允许 / 拒绝），
  *     「本会话允许」记入会话级白名单，后续同路径不再重复询问。
  * 路径解析对符号链接做归一化，避免用软链接绕过目录限制。
@@ -93,10 +94,19 @@ export async function guardPath(options: {
   target?: string
   action: PathAction
   tool: string
+  /* 只读放行目录（如已启用技能目录）：读取越界到这些目录时直接放行 */
+  readRoots?: string[]
 }): Promise<{ allowed: boolean; abs: string; reason?: string }> {
   const root = canonicalize(options.rootDir)
   const abs = canonicalize(resolveTarget(options.rootDir, options.target))
   if (isWithinRoot(root, abs)) {
+    return { allowed: true, abs }
+  }
+  /* SKILL 内容（数据目录下已启用技能目录）：读取直接放行，不弹审批；写入仍按越界流程 */
+  if (
+    options.action === 'read' &&
+    (options.readRoots ?? []).some((item) => isWithinRoot(canonicalize(item), abs))
+  ) {
     return { allowed: true, abs }
   }
   /* 会话级白名单命中：不再重复询问 */
