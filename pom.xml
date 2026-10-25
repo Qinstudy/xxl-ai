@@ -35,7 +35,7 @@
 		<spring-boot.version>4.1.1</spring-boot.version>
 		<!-- mybatis & db -->
 		<mybatis-spring-boot-starter.version>4.1.0</mybatis-spring-boot-starter.version>
-		<mysql-connector-j.version>26.7.0</mysql-connector-j.version>
+		<mysql-connector-j.version>26.10.0</mysql-connector-j.version>
 		<!-- xxl-sso -->
 		<xxl-sso.version>2.4.1</xxl-sso.version>
 		<!-- poi (excel) -->
