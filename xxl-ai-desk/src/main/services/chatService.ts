@@ -6,7 +6,6 @@
  */
 
 import { app } from 'electron'
-import { isNewChatTitle } from '@shared/ipc'
 import type {
   ChatMode,
   AppSettings,
@@ -143,31 +142,16 @@ function persistFailureRound(sessionId: string, text: string, tip: string): void
   ])
 }
 
-/*
- * 归一化历史消息：兼容早期失败轮次落库的非数组 content（字符串 / 缺失），
- * 避免 Pi 在请求时因 message.content 不可迭代而整轮失败。
- */
+/* 归一化历史消息：剔除 system 与非数组 content 的非法消息 */
 function normalizeHistoryMessage(raw: unknown): { role?: string; content?: unknown } | null {
   if (!raw || typeof raw !== 'object') {
     return null
   }
-  const message = raw as { role?: string; content?: unknown; errorMessage?: unknown }
-  if (!message.role || message.role === 'system') {
+  const message = raw as { role?: string; content?: unknown }
+  if (!message.role || message.role === 'system' || !Array.isArray(message.content)) {
     return null
   }
-  let content = message.content
-  if (typeof content === 'string') {
-    content = [{ type: 'text', text: content }]
-  }
-  if (!Array.isArray(content)) {
-    /* 失败提示消息可能缺失 content：用 errorMessage 兜底，否则跳过 */
-    if (typeof message.errorMessage === 'string' && message.errorMessage) {
-      content = [{ type: 'text', text: message.errorMessage }]
-    } else {
-      return null
-    }
-  }
-  return { ...(raw as Record<string, unknown>), content } as { role?: string; content?: unknown }
+  return message
 }
 
 /* 模式说明：拼接到系统指令末尾，引导模型按当前模式行事（Plan 只读规划，Build 读写实施） */
@@ -256,7 +240,7 @@ export async function sendChat(
       return
     }
     /* 首次对话立即以提问作为会话标题并落库：不等到生成结束，避免侧栏长时间停留在「新对话」 */
-    if (isNewChatTitle(session.title)) {
+    if (!session.title.trim()) {
       updateSession(sessionId, { title: text.slice(0, 24) })
     }
 

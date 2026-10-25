@@ -18,7 +18,6 @@ export interface ChatUiState {
 
 /* 持久化键前缀与结构版本 */
 const STORAGE_PREFIX = 'desk:chatui:'
-const LEGACY_WORKSPACE_PREFIX = 'desk:workspace:'
 const STORAGE_VERSION = 1
 
 /* 默认状态 */
@@ -42,33 +41,9 @@ const storage = createSessionScopedStorage<ChatUiState>({
   }
 })
 
-/* 读取本地持久化：优先新键，兼容旧版工作区切片中的 chat 字段 */
+/* 读取本地持久化 */
 function readStored(sessionId: string): ChatUiState | null {
-  const current = storage.read(sessionId)
-  if (current) {
-    return current
-  }
-  try {
-    /* 旧版：草稿/滚动曾存放在 desk:workspace:{id}.chat */
-    const legacy = localStorage.getItem(LEGACY_WORKSPACE_PREFIX + sessionId)
-    if (legacy) {
-      const parsed = JSON.parse(legacy) as {
-        version?: number
-        chat?: { draft?: string; scrollTop?: number }
-      }
-      if (parsed.version === 1 && parsed.chat) {
-        return {
-          draft: typeof parsed.chat.draft === 'string' ? parsed.chat.draft : '',
-          scrollTop: Number(parsed.chat.scrollTop) || 0,
-          updateTime: Date.now(),
-          version: STORAGE_VERSION
-        }
-      }
-    }
-    return null
-  } catch {
-    return null
-  }
+  return storage.read(sessionId)
 }
 
 export const useChatUiStore = defineStore('chatUi', () => {

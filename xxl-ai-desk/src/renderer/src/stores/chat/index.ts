@@ -11,7 +11,7 @@ import { DRAFT_SESSION_KEY, useWorkspaceStore } from '../workspace'
 import { clearLastSessionId, readLastSessionId, writeLastSessionId } from './lastSession'
 import { mapStoredMessages, uid } from './messageMapping'
 import { createChatStream } from './stream'
-import { NEW_CHAT_TITLE, isNewChatTitle } from '@shared/ipc'
+import { NEW_CHAT_TITLE } from '@shared/ipc'
 import type { ChatMode, ChatEvent, SessionDTO } from '@shared/ipc'
 import type { ToolCallState, UiMessage } from '@renderer/types'
 
@@ -222,7 +222,7 @@ export const useChatStore = defineStore('chat', () => {
 
     /* 首条消息：本地立即把会话标题更新为提问摘要，侧栏无需等待生成完成（后端亦同步落库） */
     const session = sessions.value.find((item) => item.id === sessionId)
-    if (session && isNewChatTitle(session.title)) {
+    if (session && !session.title.trim()) {
       session.title = content.slice(0, 24)
     }
 

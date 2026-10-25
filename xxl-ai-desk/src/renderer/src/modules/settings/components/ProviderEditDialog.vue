@@ -26,61 +26,33 @@ const remoteModels = ref<string[]>([])
 /* 远程模型查询加载态、请求 Header 文本（JSON） */
 const remoteLoading = ref(false)
 const headersText = ref('{}')
-/* 密钥读取态：编辑已有供应商时按需拉取明文，未就绪前禁止提交，避免误清空密钥 */
-const secretLoading = ref(false)
-const secretReady = ref(true)
-/* 密钥请求序号：快速开关弹窗时只接受最后一次响应 */
-let secretSeq = 0
 /* 请求 Header 示例（含花括号，放模板文本避免 i18n 占位符解析冲突） */
 const headersExample = '{"x-opencode-session":"{session}"}'
 
 /* 弹窗标题：编辑 / 新增 */
-const title = computed(() => (props.provider ? t('settings.editProvider') : t('settings.addProvider')))
+const title = computed(() =>
+  props.provider ? t('settings.editProvider') : t('settings.addProvider')
+)
 
 /* 按传入的供应商回填表单（新增时重置为空表单） */
 function resetForm(): void {
   const row = props.provider
   form.value = row
-    ? { name: row.name, baseUrl: row.baseUrl, apiKey: row.apiKey ?? '', enabled: row.enabled }
+    ? {
+        name: row.name,
+        baseUrl: row.baseUrl,
+        apiKey: row.apiKey,
+        enabled: row.enabled
+      }
     : { name: '', baseUrl: '', apiKey: '', enabled: true }
   modelRows.value = row && row.models.length > 0 ? [...row.models] : ['']
   remoteModels.value = []
   headersText.value = JSON.stringify(row?.headers ?? {}, null, 2)
 }
 
-/* 编辑态按需读取密钥明文；读取失败时保持禁止提交，避免把空值写回清空密钥 */
-async function loadSecret(): Promise<void> {
-  const provider = props.provider
-  if (!provider) {
-    return
-  }
-  const seq = ++secretSeq
-  secretLoading.value = true
-  secretReady.value = false
-  try {
-    const secret = await settings.loadProviderSecret(provider.id)
-    if (seq === secretSeq) {
-      form.value.apiKey = secret
-      secretReady.value = true
-    }
-  } catch {
-    /* 保持 secretReady=false，提交入口会提示重试 */
-  } finally {
-    if (seq === secretSeq) {
-      secretLoading.value = false
-    }
-  }
-}
-
 watch(visible, (open) => {
-  if (!open) {
-    return
-  }
-  resetForm()
-  if (props.provider) {
-    void loadSecret()
-  } else {
-    secretReady.value = true
+  if (open) {
+    resetForm()
   }
 })
 
@@ -154,22 +126,12 @@ async function queryRemoteModels(): Promise<void> {
 /* 提交供应商表单：模型去重、校验请求 Header 后保存 */
 async function submit(): Promise<void> {
   const models = Array.from(
-    new Set(
-      modelRows.value
-        .map((item) => (item ?? '').trim())
-        .filter(Boolean)
-    )
+    new Set(modelRows.value.map((item) => (item ?? '').trim()).filter(Boolean))
   )
   if (!form.value.name || !form.value.baseUrl || models.length === 0) {
     ElMessage.warning(t('settings.providerTip'))
     return
   }
-  /* 编辑态密钥尚未读取完成：拒绝提交，避免以空值覆盖已保存密钥 */
-  if (!secretReady.value) {
-    ElMessage.warning(t('settings.apiKeyLoading'))
-    return
-  }
-
   const headers = parseHeaders()
   if (!headers) {
     ElMessage.error(t('settings.headersInvalid'))

@@ -33,12 +33,8 @@ function parseHeaders(raw: string): Record<string, string> {
   return {}
 }
 
-/*
- * 行记录 → DTO（解析模型列表与请求Header）。
- *   - revealSecret=true 仅用于编辑态/运行时装配，列表接口一律脱敏；
- *   - apiKeySet 用于界面展示「已配置」状态。
- */
-function toDTO(row: ProviderRow, revealSecret = false): ProviderDTO {
+/* 行记录 → DTO（解码密钥、解析模型列表与请求Header） */
+function toDTO(row: ProviderRow): ProviderDTO {
   let models: string[] = []
   try {
     const parsed = JSON.parse(row.models)
@@ -52,8 +48,7 @@ function toDTO(row: ProviderRow, revealSecret = false): ProviderDTO {
     id: row.id,
     name: row.name,
     baseUrl: row.baseUrl,
-    apiKey: revealSecret ? decryptSecret(row.apiKey) : undefined,
-    apiKeySet: Boolean(row.apiKey),
+    apiKey: decryptSecret(row.apiKey),
     headers: parseHeaders(row.headers),
     models,
     enabled: row.enabled === 1,
@@ -63,22 +58,16 @@ function toDTO(row: ProviderRow, revealSecret = false): ProviderDTO {
   }
 }
 
-/* 供应商列表（密钥脱敏） */
+/* 供应商列表 */
 export function listProviders(): ProviderDTO[] {
   const rows = getDb().select().from(providerTable).orderBy(providerTable.sort).all()
-  return rows.map((row) => toDTO(row, false))
+  return rows.map(toDTO)
 }
 
-/* 按主键读取供应商（含解密密钥，供运行时装配与远程模型查询） */
+/* 按主键读取供应商 */
 export function getProvider(id: string): ProviderDTO | null {
   const row = getDb().select().from(providerTable).where(eq(providerTable.id, id)).get()
-  return row ? toDTO(row, true) : null
-}
-
-/* 读取供应商密钥明文（仅编辑态按需调用，列表不返回） */
-export function getProviderSecret(id: string): string {
-  const row = getDb().select().from(providerTable).where(eq(providerTable.id, id)).get()
-  return row ? decryptSecret(row.apiKey) : ''
+  return row ? toDTO(row) : null
 }
 
 /* 新增或更新供应商 */
@@ -89,8 +78,7 @@ export function saveProvider(input: Partial<ProviderDTO>): ProviderDTO {
   const existing = db.select().from(providerTable).where(eq(providerTable.id, id)).get()
 
   /* 未传 apiKey 表示保持原值；显式空串表示清空 */
-  const apiKey =
-    input.apiKey !== undefined ? encryptSecret(input.apiKey) : (existing?.apiKey ?? '')
+  const apiKey = input.apiKey !== undefined ? encryptSecret(input.apiKey) : (existing?.apiKey ?? '')
   const record = {
     id,
     name: input.name ?? existing?.name ?? '未命名供应商',
@@ -109,7 +97,7 @@ export function saveProvider(input: Partial<ProviderDTO>): ProviderDTO {
     .onConflictDoUpdate({ target: providerTable.id, set: record })
     .run()
 
-  return toDTO(record, true)
+  return toDTO(record)
 }
 
 /* 删除供应商 */
@@ -140,7 +128,10 @@ export async function fetchRemoteModels(input: ProviderModelQuery): Promise<stri
   }
 
   /* 统一携带 User-Agent，标识 Desk 客户端（压过自定义同名头） */
-  const requestHeaders: Record<string, string> = { ...headers, 'User-Agent': USER_AGENT }
+  const requestHeaders: Record<string, string> = {
+    ...headers,
+    'User-Agent': USER_AGENT
+  }
   if (apiKey) {
     requestHeaders.Authorization = `Bearer ${apiKey}`
   }

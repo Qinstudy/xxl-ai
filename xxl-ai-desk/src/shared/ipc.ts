@@ -16,7 +16,6 @@ export * from './contracts/mcp'
 export * from './contracts/skill'
 export * from './contracts/browser'
 export * from './defaults'
-export * from './toolManifest'
 
 import type {
   AppSettings,
@@ -104,8 +103,6 @@ export interface DeskApi {
     remove(id: string): Promise<void>
     /* 查询远端可用模型 */
     remoteModels(input: ProviderModelQuery): Promise<string[]>
-    /* 读取密钥明文（仅编辑态按需调用） */
-    secret(id: string): Promise<string>
   }
   /* 项目管理（1:1 绑定本地磁盘目录） */
   project: {
@@ -275,7 +272,6 @@ export const IPC = {
   providerSave: 'desk:provider:save',
   providerRemove: 'desk:provider:remove',
   providerRemoteModels: 'desk:provider:remote-models',
-  providerSecret: 'desk:provider:secret',
   /* 项目 */
   projectList: 'desk:project:list',
   projectCreate: 'desk:project:create',

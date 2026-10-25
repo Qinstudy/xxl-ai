@@ -13,15 +13,6 @@ export const DEFAULT_SYSTEM_PROMPT = '你是 XXL-AI-Desk 智能助手，回答�
 /* 新建会话的占位标题：空串表示「尚未由首条提问命名」 */
 export const NEW_CHAT_TITLE = ''
 
-/* 历史版本占位标题（仅用于读取旧数据时兼容识别，不再写入） */
-const LEGACY_NEW_CHAT_TITLE = '新对话'
-
-/* 是否仍为未命名会话（含历史数据兼容） */
-export function isNewChatTitle(title: string): boolean {
-  const value = (title ?? '').trim()
-  return value.length === 0 || value === LEGACY_NEW_CHAT_TITLE
-}
-
 /* 默认应用设置（主进程与渲染进程共用） */
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   theme: 'light',

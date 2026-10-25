@@ -10,10 +10,8 @@ export interface ProviderDTO {
   name: string
   /* 接口基址（OpenAI 兼容端点） */
   baseUrl: string
-  /* 访问密钥（列表接口不返回明文，仅编辑态按需读取） */
-  apiKey?: string
-  /* 是否已配置密钥（列表脱敏场景用于展示与校验） */
-  apiKeySet?: boolean
+  /* 访问密钥（base64 编码存储，读取时解码） */
+  apiKey: string
   /* 附加请求头（支持 {session} 等占位） */
   headers: Record<string, string>
   /* 可选模型 ID 列表 */

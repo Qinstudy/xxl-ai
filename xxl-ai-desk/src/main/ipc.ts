@@ -29,7 +29,6 @@ import { checkForUpdate, openDownload } from './services/updateService'
 import {
   deleteProvider,
   fetchRemoteModels,
-  getProviderSecret,
   listProviders,
   saveProvider
 } from './services/providerService'
@@ -63,11 +62,7 @@ import { listDir, readFile, writeFile } from './services/fsService'
 import { initFsWatch, unwatchDir, watchDir } from './services/fsWatchService'
 import { listOpenWithApps, openWith } from './services/openWithService'
 import { abortChat, discardSessionRuns, respondApproval, sendChat } from './services/chatService'
-import {
-  deleteMcp,
-  listMcps,
-  saveMcp
-} from './services/mcpService'
+import { deleteMcp, listMcps, saveMcp } from './services/mcpService'
 import { listMcpTools, testMcp } from './services/mcpRuntimeService'
 import { discoverMcp, discoverMcpDetail, listMcpCategories } from './services/mcpDiscoverService'
 import {
@@ -99,7 +94,11 @@ import { resolveBrowserAction, setBrowserActionSender } from './agent/host/brows
 export function registerIpc(getWindow: () => BrowserWindow | null): void {
   /* Agent 工具 open_browser：把 URL 交给渲染层，在对应会话的浏览器面板打开（可指定新建标签页） */
   setBrowserOpener((sessionId, url, newTab) => {
-    getWindow()?.webContents.send(IPC.browserOpenTab, { sessionId, url, newTab })
+    getWindow()?.webContents.send(IPC.browserOpenTab, {
+      sessionId,
+      url,
+      newTab
+    })
   })
   /* Agent 浏览器动作：请求转渲染层执行，结果经 browserActionResult 回传 */
   setBrowserActionSender((request) => {
@@ -197,8 +196,6 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.providerRemoteModels, (_event, input: ProviderModelQuery) =>
     fetchRemoteModels(input)
   )
-  /* 密钥明文仅在编辑态按需读取，列表接口保持脱敏 */
-  ipcMain.handle(IPC.providerSecret, (_event, id: string) => getProviderSecret(id))
 
   /* --- 项目（1:1 绑定本地目录） --- */
   ipcMain.handle(IPC.projectList, () => listProjects())

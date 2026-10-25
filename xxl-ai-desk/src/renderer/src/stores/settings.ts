@@ -81,7 +81,10 @@ export const useSettingsStore = defineStore('settings', () => {
     const saved = await api.provider.save(dto)
     providers.value = await api.provider.list()
     if (!settings.value.providerId) {
-      await saveSettings({ providerId: saved.id, modelId: saved.models[0] ?? '' })
+      await saveSettings({
+        providerId: saved.id,
+        modelId: saved.models[0] ?? ''
+      })
     }
     return saved
   }
@@ -92,18 +95,16 @@ export const useSettingsStore = defineStore('settings', () => {
     providers.value = await api.provider.list()
     if (settings.value.providerId === id) {
       const next = providers.value[0]
-      await saveSettings({ providerId: next?.id ?? '', modelId: next?.models[0] ?? '' })
+      await saveSettings({
+        providerId: next?.id ?? '',
+        modelId: next?.models[0] ?? ''
+      })
     }
   }
 
   /* 远程查询供应商可用模型（不落库，供模型行下拉选择） */
   async function queryRemoteModels(input: ProviderModelQuery): Promise<string[]> {
     return api.provider.remoteModels(input)
-  }
-
-  /* 读取供应商密钥明文（编辑弹窗打开时按需调用，列表不保存密钥） */
-  async function loadProviderSecret(id: string): Promise<string> {
-    return api.provider.secret(id)
   }
 
   /* 选择数据目录（系统对话框，取消返回空串） */
@@ -191,7 +192,6 @@ export const useSettingsStore = defineStore('settings', () => {
     saveProvider,
     removeProvider,
     queryRemoteModels,
-    loadProviderSecret,
     selectDataDir,
     saveDataDir,
     openDataDir,

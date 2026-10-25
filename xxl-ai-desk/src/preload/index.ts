@@ -48,8 +48,7 @@ const api: DeskApi = {
     /* 重启应用使变更生效 */
     relaunch: () => ipcRenderer.invoke(IPC.appRelaunch),
     /* 弹出可执行文件选择框 */
-    selectExecutable: (title?: string) =>
-      ipcRenderer.invoke(IPC.appSelectExecutable, title),
+    selectExecutable: (title?: string) => ipcRenderer.invoke(IPC.appSelectExecutable, title),
     /* 检测运行时可执行文件版本 */
     detectExecutable: (input: RuntimeExecInput): Promise<RuntimeDetectResult> =>
       ipcRenderer.invoke(IPC.appDetectExecutable, input)
@@ -77,10 +76,7 @@ const api: DeskApi = {
     /* 删除供应商 */
     remove: (id: string) => ipcRenderer.invoke(IPC.providerRemove, id),
     /* 查询远端可用模型 */
-    remoteModels: (input: ProviderModelQuery) =>
-      ipcRenderer.invoke(IPC.providerRemoteModels, input),
-    /* 读取密钥明文（仅编辑态按需调用） */
-    secret: (id: string): Promise<string> => ipcRenderer.invoke(IPC.providerSecret, id)
+    remoteModels: (input: ProviderModelQuery) => ipcRenderer.invoke(IPC.providerRemoteModels, input)
   },
   /* 项目管理 */
   project: {
@@ -202,15 +198,13 @@ const api: DeskApi = {
   browser: {
     /* 内嵌浏览器：新窗口 / Agent 打开请求 → 渲染层标签页（返回取消订阅函数） */
     onOpenTab: (callback: (request: BrowserOpenTabRequest) => void) => {
-      const listener = (_event: unknown, request: BrowserOpenTabRequest): void =>
-        callback(request)
+      const listener = (_event: unknown, request: BrowserOpenTabRequest): void => callback(request)
       ipcRenderer.on(IPC.browserOpenTab, listener)
       return () => ipcRenderer.removeListener(IPC.browserOpenTab, listener)
     },
     /* Agent 页面动作请求：渲染层执行脚本并回传结果（返回取消订阅函数） */
     onActionRequest: (callback: (request: BrowserActionRequest) => void) => {
-      const listener = (_event: unknown, request: BrowserActionRequest): void =>
-        callback(request)
+      const listener = (_event: unknown, request: BrowserActionRequest): void => callback(request)
       ipcRenderer.on(IPC.browserActionRequest, listener)
       return () => ipcRenderer.removeListener(IPC.browserActionRequest, listener)
     },

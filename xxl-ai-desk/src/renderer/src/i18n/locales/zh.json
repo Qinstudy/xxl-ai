@@ -270,8 +270,7 @@
     "autoCheckUpdate": "启动时自动检查更新",
     "github": "GitHub 仓库",
     "docs": "官方文档",
-    "headersExample": "示例：",
-    "apiKeyLoading": "密钥读取中，请稍候"
+    "headersExample": "示例："
   },
   "plugin": {
     "title": "插件",

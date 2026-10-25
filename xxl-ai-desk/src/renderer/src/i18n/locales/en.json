@@ -270,8 +270,7 @@
     "autoCheckUpdate": "Check for updates on startup",
     "github": "GitHub Repository",
     "docs": "Documentation",
-    "headersExample": "Example: ",
-    "apiKeyLoading": "Loading the saved key, please wait"
+    "headersExample": "Example: "
   },
   "plugin": {
     "title": "Plugins",
