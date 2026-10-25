@@ -2,6 +2,7 @@ package com.xxl.ai.api.business.supplier.service.impl;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
+import com.xxl.ai.api.business.harness.llm.LlmModelFactory;
 import com.xxl.ai.api.business.harness.supplier.SupplierApiTool;
 import com.xxl.ai.api.business.supplier.mapper.SupplierMapper;
 import com.xxl.ai.api.business.supplier.mapper.SupplierModelMapper;
@@ -47,6 +48,8 @@ public class SupplierServiceImpl implements SupplierService {
     private SupplierModelMapper supplierModelMapper;
     @Resource
     private SupplierApiTool supplierApiTool;
+    @Resource
+    private LlmModelFactory llmModelFactory;
 
     /**
      * 分页查询供应商列表
@@ -103,6 +106,10 @@ public class SupplierServiceImpl implements SupplierService {
             }
         }
         int ret = supplierMapper.deleteByIds(ids);
+        if (ret > 0) {
+            // remove cache
+            ids.forEach(llmModelFactory::evictSupplier);
+        }
         return ret > 0 ? Response.ofSuccess() : Response.ofFail();
     }
 
@@ -119,6 +126,10 @@ public class SupplierServiceImpl implements SupplierService {
             return Response.ofFail("请求Header格式不正确，应为JSON对象：{\"key\":\"value\"}");
         }
         int ret = supplierMapper.update(supplier);
+        if (ret > 0) {
+            // remove cache
+            llmModelFactory.evictSupplier(supplier.getId());
+        }
         return ret > 0 ? Response.ofSuccess() : Response.ofFail();
     }
 

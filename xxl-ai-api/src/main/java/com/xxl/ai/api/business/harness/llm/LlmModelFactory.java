@@ -17,6 +17,7 @@ import java.net.URI;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * LLM 模型工厂（spring-ai）
@@ -39,12 +40,13 @@ public class LlmModelFactory {
     /** 对外请求 User-Agent（覆盖 spring-ai 默认的 spring-ai-openai） */
     private static final String USER_AGENT = "XXL-AI";
 
-    private static final int CACHE_MAX = 128;
+    /** 模型缓存上限：超过上限时逐出最旧项 */
+    private static final int CACHE_MAX = 500;
 
-    /** 对话模型缓存（supplierId:modelId:sessionId → ChatModel） */
-    private final Map<String, OpenAiChatModel> chatModelCache = Collections.synchronizedMap(new LRUCache<>());
-    /** 嵌入模型缓存（supplierId:modelId → EmbeddingModel） */
-    private final Map<String, OpenAiEmbeddingModel> embeddingModelCache = Collections.synchronizedMap(new LRUCache<>());
+    /** 对话模型缓存（supplierId:modelId:sessionId → 配置指纹 + ChatModel） */
+    private final Map<String, ChatModelEntry> chatModelCache = Collections.synchronizedMap(new LRUCache<>());
+    /** 嵌入模型缓存（supplierId:modelId → 配置指纹 + EmbeddingModel） */
+    private final Map<String, EmbeddingModelEntry> embeddingModelCache = Collections.synchronizedMap(new LRUCache<>());
 
     /**
      * 获取（或构建）对话模型，并包装为 ChatClient
@@ -63,15 +65,23 @@ public class LlmModelFactory {
      * 否则同一模型跨会话复用，避免每个对话都构建一个模型实例。
      */
     private OpenAiChatModel chatModel(SupplierRuntime runtime, String sessionId) {
+
+        // store key
         String sessionKey = usesSessionHeader(runtime.getHeaders()) && StringTool.isNotBlank(sessionId) ? sessionId : "";
         String key = runtime.getSupplierId() + ":" + runtime.getModelId() + ":" + sessionKey;
-        OpenAiChatModel cached = chatModelCache.get(key);
-        if (cached != null) {
-            return cached;
+        String baseUrl = normalizeBaseUrl(runtime.getBaseUrl());
+        int signature = configSignature(baseUrl, runtime);
+
+        // load valid data
+        ChatModelEntry entry = chatModelCache.get(key);
+        if (entry != null && entry.signature == signature) {
+            return entry.model;
         }
+
+        // build model and store
         Map<String, String> headers = buildHeaders(runtime.getHeaders(), sessionId);
         OpenAiChatOptions options = OpenAiChatOptions.builder()
-                .baseUrl(normalizeBaseUrl(runtime.getBaseUrl()))
+                .baseUrl(baseUrl)
                 .apiKey(runtime.getApiKey())
                 .model(runtime.getModelName())
                 .customHeaders(headers)
@@ -80,7 +90,8 @@ public class LlmModelFactory {
                 .options(options)
                 .httpClientBuilderCustomizer(userAgentCustomizer())
                 .build();
-        chatModelCache.put(key, model);
+        chatModelCache.put(key, new ChatModelEntry(signature, model));
+
         logger.debug("LLM 对话模型构建完成, supplierId={}, modelId={}", runtime.getSupplierId(), runtime.getModelId());
         return model;
     }
@@ -89,14 +100,22 @@ public class LlmModelFactory {
      * 获取（或构建）嵌入模型：按 供应商+模型 缓存
      */
     public EmbeddingModel embeddingModel(SupplierRuntime runtime) {
+
+        // store key
         String key = runtime.getSupplierId() + ":" + runtime.getModelId();
-        OpenAiEmbeddingModel cached = embeddingModelCache.get(key);
-        if (cached != null) {
-            return cached;
+        String baseUrl = normalizeBaseUrl(runtime.getBaseUrl());
+        int signature = configSignature(baseUrl, runtime);
+
+        // load valid data
+        EmbeddingModelEntry entry = embeddingModelCache.get(key);
+        if (entry != null && entry.signature == signature) {
+            return entry.model;
         }
+
+        // build model and store
         Map<String, String> headers = buildHeaders(runtime.getHeaders(), null);
         OpenAiEmbeddingOptions options = OpenAiEmbeddingOptions.builder()
-                .baseUrl(normalizeBaseUrl(runtime.getBaseUrl()))
+                .baseUrl(baseUrl)
                 .apiKey(runtime.getApiKey())
                 .model(runtime.getModelName())
                 .customHeaders(headers)
@@ -105,9 +124,31 @@ public class LlmModelFactory {
                 .options(options)
                 .httpClientBuilderCustomizer(userAgentCustomizer())
                 .build();
-        embeddingModelCache.put(key, model);
+        embeddingModelCache.put(key, new EmbeddingModelEntry(signature, model));
+
         logger.debug("LLM 嵌入模型构建完成, supplierId={}, modelId={}", runtime.getSupplierId(), runtime.getModelId());
         return model;
+    }
+
+    /**
+     * 配置指纹：BaseURL / API Key / 模型标识 / 自定义 Header 任一变化即重建模型，
+     * 避免供应商配置修改后仍复用旧连接配置（如 API Key 错误修正后旧会话继续失败）。
+     */
+    private int configSignature(String baseUrl, SupplierRuntime runtime) {
+        return Objects.hash(baseUrl, runtime.getApiKey(), runtime.getModelName(), runtime.getHeaders());
+    }
+
+    /**
+     * 清理指定供应商的模型缓存：供应商或模型元数据变更时调用，保证下一轮对话立即生效。
+     */
+    public void evictSupplier(long supplierId) {
+        String prefix = supplierId + ":";
+        synchronized (chatModelCache) {
+            chatModelCache.keySet().removeIf(key -> key.startsWith(prefix));
+        }
+        synchronized (embeddingModelCache) {
+            embeddingModelCache.keySet().removeIf(key -> key.startsWith(prefix));
+        }
     }
 
     /**
@@ -183,6 +224,28 @@ public class LlmModelFactory {
             }
         }
         return result;
+    }
+
+    /** 对话模型缓存条目：记录构建时的配置指纹 */
+    private static class ChatModelEntry {
+        private final int signature;
+        private final OpenAiChatModel model;
+
+        private ChatModelEntry(int signature, OpenAiChatModel model) {
+            this.signature = signature;
+            this.model = model;
+        }
+    }
+
+    /** 嵌入模型缓存条目：记录构建时的配置指纹 */
+    private static class EmbeddingModelEntry {
+        private final int signature;
+        private final OpenAiEmbeddingModel model;
+
+        private EmbeddingModelEntry(int signature, OpenAiEmbeddingModel model) {
+            this.signature = signature;
+            this.model = model;
+        }
     }
 
     /**
