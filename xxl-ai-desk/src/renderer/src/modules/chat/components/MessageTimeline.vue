@@ -3,7 +3,7 @@
  * 助手消息执行过程时间线：按发生顺序渲染 思考 → 工具 → 正文，并展示生成中与耗时状态。
  * @author xuxueli 2026-10-25
  */
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { renderMarkdown } from '@renderer/composables/useMarkdown'
 import { onCodeCopyClick } from '@renderer/composables/useCodeCopy'
 import { toolArgsText, toolView } from '@renderer/composables/useToolView'
@@ -63,6 +63,45 @@ function thinkingExpanded(index: number): boolean {
 function toggleThinking(index: number): void {
   thinkingOpen.value = { ...thinkingOpen.value, [index]: !thinkingExpanded(index) }
 }
+
+/* 思考正文容器：索引 → 元素（生成中吸底用） */
+const thinkingBodies = new Map<number, HTMLElement>()
+/* 思考区是否跟随底部：用户上翻后暂停跟随，回到底部附近恢复 */
+const thinkingSticky = new Map<number, boolean>()
+
+/* 登记思考正文容器（v-for 中 ref 需用函数形式） */
+function bindThinkingBody(index: number, el: Element | { $el?: unknown } | null): void {
+  if (el instanceof HTMLElement) {
+    thinkingBodies.set(index, el)
+  } else {
+    thinkingBodies.delete(index)
+  }
+}
+
+/* 用户滚动思考区：据距底距离决定是否继续跟随 */
+function onThinkingScroll(index: number, event: Event): void {
+  const el = event.target as HTMLElement
+  thinkingSticky.set(index, el.scrollHeight - el.scrollTop - el.clientHeight < 24)
+}
+
+/* 生成中思考区吸底：内容增长时始终展示最新一行（用户上翻查看时不打扰） */
+watch(
+  () => {
+    const part = props.message.parts[lastIndex.value]
+    return props.message.pending && part?.type === 'thinking' ? part.text.length : -1
+  },
+  () => {
+    const index = lastIndex.value
+    if (!thinkingExpanded(index) || thinkingSticky.get(index) === false) {
+      return
+    }
+    const el = thinkingBodies.get(index)
+    if (el) {
+      el.scrollTop = el.scrollHeight
+    }
+  },
+  { flush: 'post' }
+)
 
 /* 工具卡片展开态：默认执行中自动展开以展示进度/参数，完成后收起 */
 function toolExpanded(tool: ToolCallState): boolean {
@@ -125,7 +164,12 @@ function toolDetailsText(tool: ToolCallState): string {
             <ArrowDown />
           </el-icon>
         </button>
-        <div v-show="thinkingExpanded(index)" class="thinking-body">{{ part.text }}</div>
+        <div
+          v-show="thinkingExpanded(index)"
+          :ref="(el) => bindThinkingBody(index, el)"
+          class="thinking-body"
+          @scroll="onThinkingScroll(index, $event)"
+        >{{ part.text }}</div>
       </div>
 
       <!-- 工具调用片段 -->
@@ -309,10 +353,13 @@ function toolDetailsText(tool: ToolCallState): string {
   transform: rotate(180deg);
 }
 
-/* 思考正文：弱化的斜体，展示模型推理过程 */
+/* 思考正文：弱化的斜体，展示模型推理过程；超长时区内滚动，避免整页被撑高 */
 .thinking-body {
   margin: 2px 0 6px;
   padding-left: 2px;
+  max-height: min(480px, 55vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   font-size: 13px;
   line-height: 1.75;
   color: var(--desk-text-tertiary);
