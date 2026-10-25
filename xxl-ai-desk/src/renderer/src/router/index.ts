@@ -18,7 +18,7 @@ const router = createRouter({
       component: () => import('@renderer/modules/settings/pages/index.vue')
     },
     {
-      path: '/plugin/:tool(mcp|skill)',
+      path: '/plugin/:tool(mcp|skill|builtin)',
       name: 'plugin',
       component: () => import('@renderer/modules/plugin/pages/index.vue')
     },

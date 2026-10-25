@@ -43,6 +43,8 @@ export interface AppSettings {
   runtimePythonPath: string
   /* 启动时自动检查客户端更新 */
   updateAutoCheck: boolean
+  /* 浏览器类内置工具是否启用（关闭后模型不再获得 open_browser / read_browser） */
+  builtinToolBrowserEnabled: boolean
 }
 
 /* 运行时可执行文件检测入参 */

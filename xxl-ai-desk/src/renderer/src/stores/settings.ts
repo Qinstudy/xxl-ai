@@ -28,7 +28,8 @@ export const useSettingsStore = defineStore('settings', () => {
     runtimeNodeMode: 'builtin',
     runtimeNodePath: '',
     runtimePythonPath: '',
-    updateAutoCheck: true
+    updateAutoCheck: true,
+    builtinToolBrowserEnabled: true
   })
   /* 供应商列表 */
   const providers = ref<ProviderDTO[]>([])

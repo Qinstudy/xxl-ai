@@ -76,6 +76,8 @@ export interface RunAgentInput {
   mcpServers: McpRuntimeConfig[]
   /* 已启用的技能清单（只下发索引，正文由 read_skill 按需读取） */
   skills: SkillRuntimeConfig[]
+  /* 浏览器类内置工具是否启用（关闭时不装配 open_browser / read_browser） */
+  browserToolsEnabled: boolean
   /* 本轮用户输入 */
   text: string
 }

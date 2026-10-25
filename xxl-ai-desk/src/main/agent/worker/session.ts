@@ -28,6 +28,8 @@ export interface AgentRuntimeOptions {
   mcpServers: McpRuntimeConfig[]
   /* 已启用的技能索引 */
   skills: SkillRuntimeConfig[]
+  /* 浏览器类内置工具是否启用 */
+  browserToolsEnabled: boolean
   /* 会话是否已被终止（Agent 创建阶段用于提前跳出） */
   isAborted?: () => boolean
 }
@@ -60,7 +62,8 @@ async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
     mode: options.mode,
     rootDir: options.rootDir,
     sessionId: options.sessionId,
-    skills: options.skills
+    skills: options.skills,
+    browserToolsEnabled: options.browserToolsEnabled
   })
   const tools = entries.map((entry) => entry.tool)
   /* MCP 工具：随会话装配（未开启的服务不下发，连接失败的服务自动跳过） */

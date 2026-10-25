@@ -31,7 +31,8 @@ export const NAV_SECTIONS: Record<'plugin' | 'settings', NavSection> = {
     entryPath: '/plugin/mcp',
     items: [
       { key: 'mcp', labelKey: 'plugin.mcp', icon: 'Connection', path: '/plugin/mcp' },
-      { key: 'skill', labelKey: 'plugin.skill', icon: 'MagicStick', path: '/plugin/skill' }
+      { key: 'skill', labelKey: 'plugin.skill', icon: 'MagicStick', path: '/plugin/skill' },
+      { key: 'builtin', labelKey: 'plugin.builtin', icon: 'Operation', path: '/plugin/builtin' }
     ]
   },
   settings: {

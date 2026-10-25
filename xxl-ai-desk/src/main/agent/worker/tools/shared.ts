@@ -19,6 +19,8 @@ export interface ToolContext {
   sessionId: string
   /* 已启用的技能索引（正文由 read_skill 按需读取） */
   skills?: SkillRuntimeConfig[]
+  /* 浏览器类内置工具是否启用（关闭时浏览器工具工厂直接返回空集） */
+  browserToolsEnabled: boolean
 }
 
 /* 工具分组：便于按域拆分文件与后续扩展 */

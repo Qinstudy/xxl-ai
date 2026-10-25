@@ -263,6 +263,7 @@
     "title": "插件",
     "mcp": "MCP工具",
     "skill": "SKILL技能",
+    "builtin": "内置工具",
     "wip": "功能建设中，敬请期待！",
     "mcpCenter": {
       "tabManage": "MCP 管理",
@@ -405,6 +406,39 @@
       "openInBrowser": "在浏览器打开",
       "loadMore": "加载更多",
       "loadedCount": "已加载 {0} / {1}"
+    },
+    "builtinTool": {
+      "title": "内置工具",
+      "intro": "以下为当前版本内置的工具能力。文件操作类固定启用；浏览器类可按需关闭，变更在下一轮对话生效。",
+      "fixedEnabled": "固定启用",
+      "enabledOn": "浏览器工具已启用，下一轮对话生效",
+      "enabledOff": "浏览器工具已停用，下一轮对话生效",
+      "tool": "工具",
+      "identifier": "标识",
+      "permission": "权限",
+      "readOnly": "只读",
+      "writable": "可写",
+      "modes": "适用模式",
+      "modeAll": "Plan / Build",
+      "modeBuild": "Build",
+      "category": {
+        "fs": "文件操作",
+        "browser": "浏览器"
+      },
+      "categoryDesc": {
+        "fs": "读取、查找与编辑项目目录内的文件；写操作仅在 Build 模式可用，越界需审批。",
+        "browser": "在右侧浏览器面板打开网页并读取当前页正文；关闭后模型不再获得浏览器工具。"
+      },
+      "desc": {
+        "readFile": "按行范围读取项目目录内的文本文件",
+        "listDir": "列出目录下的文件与子目录",
+        "glob": "按 glob 模式查找匹配的文件路径",
+        "search": "按正则搜索文件内容并返回行号",
+        "writeFile": "创建或覆盖文件，自动创建父目录",
+        "editFile": "将文件中的指定文本替换为新文本",
+        "openBrowser": "在右侧浏览器面板打开网页或搜索关键词",
+        "readBrowser": "读取浏览器当前标签页的标题、地址与正文"
+      }
     }
   }
 }

@@ -33,7 +33,11 @@ export function setBrowserReader(reader: (params: BrowserReadParams) => Promise<
 }
 
 /* 构建浏览器类工具 */
-export async function createBrowserTools(_context: ToolContext): Promise<ToolEntry[]> {
+export async function createBrowserTools(context: ToolContext): Promise<ToolEntry[]> {
+  /* 内置工具开关关闭时不装配任何浏览器工具（保留开关语义在浏览器域内） */
+  if (!context.browserToolsEnabled) {
+    return []
+  }
   const { Type } = await import('@earendil-works/pi-ai')
 
   /* 打开浏览器：默认复用当前标签页，必要时新建 */
