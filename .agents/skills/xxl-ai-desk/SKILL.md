@@ -265,7 +265,7 @@ desk-shell（纵向）
 
 | 需求 | 落位 | 要点 |
 |---|---|---|
-| 内置工具 | `agent/worker/tools.ts` | `createBuiltinTools()` 用 `Type.Object` 定义 `AgentTool`；只读工具常驻，写/命令类仅 build |
+| 内置工具 | `agent/worker/tools/` | `createBuiltinTools()` 用 `Type.Object` 定义 `AgentTool`；只读工具常驻，写/命令类仅 build；是否进入「内置工具」页见 §6.1 |
 | 文件类工具 | `tools.ts` + `sandbox.ts` | 必须先过 `guardPath({ sessionId, rootDir, target, action, tool })`，越界返回拦截错误 |
 | 越界审批 | `sandbox.ts` + `host/runtimeHost.ts` + `host/approval.ts` | worker 经 `parentPort` 发 `approval-request`，主进程弹窗回传 `once/session/deny` |
 | MCP | `agent/worker/mcp/{client,tools}.ts` | 使用 Pi 官方 `@earendil-works/pi-mcp`；工具转换 `toLlmContent` + `Type.Unsafe` + `signal` |
@@ -274,6 +274,21 @@ desk-shell（纵向）
 | 模型 | `agent/worker/models.ts` | `normalizeBaseUrl`、`buildModels`、`{session}` 占位替换 |
 
 工具结果 `content` 为文本块数组；失败用 `isError: true`。新增工具必须自测越界拦截与 Plan 模式不可见。
+
+### 6.1 内置工具目录的产品边界（硬约束）
+
+「插件 → 内置工具」是**产品能力目录**，不是 `agent/worker/tools` 注册表的镜像。收录项须同时满足：
+
+1. 由客户端自身提供，不是外部 MCP / 插件动态接入；
+2. 是独立能力，不是其它功能的内部实现（如 `read_skill` 仅服务 SKILL）；
+3. 用户可理解、可能需要管理（开关 / 权限 / 适用模式）；
+4. 不与已有管理页重复（MCP → MCP 页，SKILL → SKILL 页）。
+
+判定顺序：**先问用户是否应在此页看到并管理，再看代码里有没有。**
+
+- 展示：`fs` / `shell` / `browser` / `system` 等客户端核心能力；
+- 不展示：MCP 工具、`read_skill` 等插件内部工具、仅服务单一业务模块的辅助 Tool；
+- 分类与工具清单按产品白名单维护，不按工具工厂输出自动展开。
 
 ## 7. 校验清单
 
@@ -284,6 +299,7 @@ desk-shell（纵向）
 - [ ] 新增/变更依赖为精确版本（无 `^` / `~` / 区间），`package-lock.json` 已同步。
 - [ ] 通道 `desk:{module}:{action}`；时间 ISO；布尔归一。
 - [ ] 渲染仅经 `api`；路由已登记；文案 `t()` 且 zh/en 成对；无硬编码中文。
+- [ ] 「内置工具」仅收录客户端核心能力，未混入 MCP / SKILL 等插件内部工具。
 - [ ] UI 复用 tokens/外壳/列表规范；弹层 append-to-body 且拖拽区可用；全局样式已验证影响面。
 - [ ] 资源生命周期闭环；超时/取消/失败隔离/进程无残留。
 - [ ] `npm run type-check`、`npm run build` 通过；涉及 IPC/运行时完成端到端验证。
