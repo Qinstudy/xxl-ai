@@ -9,7 +9,7 @@ import { execFileSync, spawn } from 'child_process'
 import { utilityProcess, type UtilityProcess } from 'electron'
 import log from 'electron-log/main'
 import { confirmOutside } from './approval'
-import { requestBrowserRead } from './browserBridge'
+import { requestBrowserAction } from './browserBridge'
 import type {
   HostEvent,
   RunAgentInput,
@@ -94,11 +94,11 @@ async function handleMessage(message: WorkerMessage): Promise<void> {
       /* Agent 工具请求：转交渲染层，在右侧「浏览器」面板打开（newTab 控制是否新建标签页） */
       browserOpener?.(message.url, message.newTab === true)
       break
-    case 'browser-read':
-      /* Agent 工具请求：经渲染层 webview 提取当前页正文，结果回传运行时进程 */
-      void requestBrowserRead(message.params).then((result) => {
+    case 'browser-action':
+      /* Agent 工具请求：经渲染层 webview 执行页面动作，结果回传运行时进程 */
+      void requestBrowserAction(message.action).then((result) => {
         worker?.postMessage({
-          type: 'browser-read-result',
+          type: 'browser-action-result',
           requestId: message.requestId,
           result
         } satisfies WorkerRequest)

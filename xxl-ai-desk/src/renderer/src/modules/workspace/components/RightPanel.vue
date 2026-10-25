@@ -9,7 +9,7 @@ import { useLayoutStore } from '@renderer/stores/layout'
 import { t } from '@renderer/i18n'
 import FilePanel from './FilePanel.vue'
 import BrowserPanel from './BrowserPanel.vue'
-import { readBrowserFromPanel } from '../composables/useBrowserTabs'
+import { runBrowserActionFromPanel } from '../composables/useBrowserTabs'
 
 const props = defineProps<{ root?: string; projectName?: string }>()
 
@@ -23,22 +23,24 @@ const browserOpened = ref(false)
 /* 浏览器新标签页请求：Agent 工具 open_browser 与页面 window.open 统一在此接收。
  * 放在常驻的 RightPanel 上，保证「浏览器面板尚未打开过」时也不会丢请求。 */
 let offOpenTab: (() => void) | null = null
-/* 页面读取请求：同样常驻监听，并在读取前确保浏览器面板已挂载 */
-let offReadRequest: (() => void) | null = null
+/* 页面动作请求：同样常驻监听，并在执行前确保浏览器面板已挂载 */
+let offActionRequest: (() => void) | null = null
 
 onMounted(() => {
   offOpenTab = api.browser.onOpenTab((url, newTab) => layout.openBrowser(url, { newTab }))
-  offReadRequest = api.browser.onReadRequest((requestId, params) => {
+  offActionRequest = api.browser.onActionRequest((requestId, action) => {
     layout.openRightPanelTool('browser')
-    void readBrowserFromPanel(params).then((result) => api.browser.respondRead(requestId, result))
+    void runBrowserActionFromPanel(action).then((result) =>
+      api.browser.respondAction(requestId, result)
+    )
   })
 })
 
 onBeforeUnmount(() => {
   offOpenTab?.()
   offOpenTab = null
-  offReadRequest?.()
-  offReadRequest = null
+  offActionRequest?.()
+  offActionRequest = null
 })
 
 /* 标记已打开过的工具，使其面板首次打开后保持挂载（切换用 v-show） */

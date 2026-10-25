@@ -12,7 +12,7 @@ import { registerLocalFileProtocol } from './services/localFileProtocolService'
 import { disposeAllTerminals } from './services/terminalService'
 import { disposeAllFsWatch } from './services/fsWatchService'
 import { disposeAgentRuntime } from './agent/host/runtimeHost'
-import { disposeBrowserReads } from './agent/host/browserBridge'
+import { disposeBrowserActions } from './agent/host/browserBridge'
 
 /* 主窗口引用（未创建或已关闭时为 null） */
 let mainWindow: BrowserWindow | null = null
@@ -69,7 +69,7 @@ function createWindow(): void {
 
   /* 窗口关闭：解除引用并结算未完成的浏览器读取，避免等待超时 */
   mainWindow.on('closed', () => {
-    disposeBrowserReads()
+    disposeBrowserActions()
     mainWindow = null
   })
 

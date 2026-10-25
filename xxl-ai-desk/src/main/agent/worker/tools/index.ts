@@ -47,6 +47,6 @@ export function buildToolGuide(entries: ToolEntry[]): string {
 
 /* 运行时 PATH 注入（终端与 MCP stdio 共用） */
 export { setRuntimePath } from './shell'
-/* 浏览器打开 / 读取回调注入 */
-export { setBrowserOpener, setBrowserReader } from './browser'
+/* 浏览器打开 / 动作回调注入 */
+export { setBrowserOpener, setBrowserActionInvoker } from './browser'
 export type { ToolContext, ToolEntry, ToolMeta } from './shared'

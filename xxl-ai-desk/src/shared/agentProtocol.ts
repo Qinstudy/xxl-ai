@@ -5,7 +5,7 @@
  */
 
 import type { ChatMode, McpRuntimeConfig, McpTestResult, McpToolMeta, SkillRuntimeConfig } from './ipc'
-import type { BrowserReadParams, BrowserReadResult } from './contracts/browser'
+import type { BrowserAction, BrowserActionResult } from './contracts/browser'
 
 /* 供应商运行时配置（主进程解密后传给运行时，与 Pi Models 构建入参一致） */
 export interface ProviderModelConfig {
@@ -93,13 +93,13 @@ export type WorkerRequest =
   | { type: 'approval-response'; requestId: string; choice: ApprovalChoice } /* 回传越界审批结果 */
   | { type: 'mcp-test'; requestId: string; server: McpRuntimeConfig; runtimePath: string } /* 连通测试（临时连接） */
   | { type: 'mcp-tools'; requestId: string; server: McpRuntimeConfig; runtimePath: string } /* 列举工具（复用连接缓存） */
-  | { type: 'browser-read-result'; requestId: string; result: BrowserReadResult } /* 页面读取结果回传 */
+  | { type: 'browser-action-result'; requestId: string; result: BrowserActionResult } /* 页面动作结果回传 */
 
 /* 运行时进程 → 主进程 */
 export type WorkerMessage =
   | { type: 'event'; sessionId: string; event: HostEvent } /* 流式事件 */
   | { type: 'open-browser'; url: string; newTab?: boolean } /* 在右侧「浏览器」面板打开页面（Agent 工具触发） */
-  | { type: 'browser-read'; requestId: string; params: BrowserReadParams } /* 读取当前页正文（跨进程请求渲染层） */
+  | { type: 'browser-action'; requestId: string; action: BrowserAction } /* 执行页面动作（跨进程请求渲染层） */
   | { type: 'run-done'; sessionId: string; messages: unknown[] } /* 运行完成（返回最新上下文） */
   | { type: 'run-error'; sessionId: string; message: string } /* 运行失败 */
   | ({ type: 'approval-request'; requestId: string } & ApprovalRequest) /* 越界审批请求 */

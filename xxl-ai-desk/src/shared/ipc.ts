@@ -30,7 +30,7 @@ import type { ChatApprovalChoice, ChatApprovalPrompt, ChatEvent } from './contra
 import type { TerminalCreateInput, TerminalDTO, TerminalEvent } from './contracts/terminal'
 import type { FileContent, FsEntry } from './contracts/fs'
 import type { OpenWithApp } from './contracts/shell'
-import type { BrowserReadParams, BrowserReadResult } from './contracts/browser'
+import type { BrowserAction, BrowserActionResult } from './contracts/browser'
 import type {
   McpCategory,
   McpDiscoverDetail,
@@ -183,10 +183,10 @@ export interface DeskApi {
   browser: {
     /* 订阅新标签页请求（返回取消订阅函数）：newTab 为 true 时强制新标签页 */
     onOpenTab(cb: (url: string, newTab: boolean) => void): () => void
-    /* 订阅 Agent 页面读取请求（返回取消订阅函数），处理完需调用 respondRead 回传 */
-    onReadRequest(cb: (requestId: string, params: BrowserReadParams) => void): () => void
-    /* 回传页面读取结果 */
-    respondRead(requestId: string, result: BrowserReadResult): Promise<void>
+    /* 订阅 Agent 页面动作请求（返回取消订阅函数），处理完需调用 respondAction 回传 */
+    onActionRequest(cb: (requestId: string, action: BrowserAction) => void): () => void
+    /* 回传页面动作结果 */
+    respondAction(requestId: string, result: BrowserActionResult): Promise<void>
   }
   /* MCP 插件中心（在线管理 + 发现 MCP） */
   mcp: {
@@ -297,9 +297,9 @@ export const IPC = {
   shellOpenWith: 'desk:shell:open-with',
   /* 内嵌浏览器新窗口请求 → 渲染层新标签页 */
   browserOpenTab: 'desk:browser:open-tab',
-  /* 内嵌浏览器页面读取：主进程 → 渲染层请求 / 渲染层 → 主进程结果 */
-  browserReadRequest: 'desk:browser:read-request',
-  browserReadResult: 'desk:browser:read-result',
+  /* 内嵌浏览器页面动作：主进程 → 渲染层请求 / 渲染层 → 主进程结果 */
+  browserActionRequest: 'desk:browser:action-request',
+  browserActionResult: 'desk:browser:action-result',
   /* MCP 插件中心 */
   mcpList: 'desk:mcp:list',
   mcpSave: 'desk:mcp:save',

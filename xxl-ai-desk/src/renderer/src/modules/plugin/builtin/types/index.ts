@@ -3,6 +3,8 @@
  *   - 描述内置工具的名称、分类、权限与适用模式，供「插件 → 内置工具」页面只读展示；
  *   - 工具名必须与 agent/worker/tools 下的内置工具保持一致；
  *   - 开关类分类的启用状态来自应用设置，不在本文件落库。
+ *
+ * @author xuxueli 2026-10-25
  */
 
 import type { ChatMode } from '@shared/ipc'
@@ -117,6 +119,62 @@ export const BUILTIN_TOOL_CATALOG: BuiltinToolCatalogItem[] = [
     category: 'browser',
     titleKey: 'chat.tool.readBrowser',
     descriptionKey: 'plugin.builtinTool.desc.readBrowser',
+    readOnly: true,
+    modes: ['plan', 'build']
+  },
+  {
+    name: 'snapshot_browser',
+    category: 'browser',
+    titleKey: 'chat.tool.snapshotBrowser',
+    descriptionKey: 'plugin.builtinTool.desc.snapshotBrowser',
+    readOnly: true,
+    modes: ['plan', 'build']
+  },
+  {
+    name: 'click_browser',
+    category: 'browser',
+    titleKey: 'chat.tool.clickBrowser',
+    descriptionKey: 'plugin.builtinTool.desc.clickBrowser',
+    readOnly: false,
+    modes: ['build']
+  },
+  {
+    name: 'fill_browser',
+    category: 'browser',
+    titleKey: 'chat.tool.fillBrowser',
+    descriptionKey: 'plugin.builtinTool.desc.fillBrowser',
+    readOnly: false,
+    modes: ['build']
+  },
+  {
+    name: 'wait_browser',
+    category: 'browser',
+    titleKey: 'chat.tool.waitBrowser',
+    descriptionKey: 'plugin.builtinTool.desc.waitBrowser',
+    readOnly: true,
+    modes: ['plan', 'build']
+  },
+  {
+    name: 'screenshot_browser',
+    category: 'browser',
+    titleKey: 'chat.tool.screenshotBrowser',
+    descriptionKey: 'plugin.builtinTool.desc.screenshotBrowser',
+    readOnly: true,
+    modes: ['plan', 'build']
+  },
+  {
+    name: 'inspect_browser',
+    category: 'browser',
+    titleKey: 'chat.tool.inspectBrowser',
+    descriptionKey: 'plugin.builtinTool.desc.inspectBrowser',
+    readOnly: true,
+    modes: ['plan', 'build']
+  },
+  {
+    name: 'browser_tabs',
+    category: 'browser',
+    titleKey: 'chat.tool.browserTabs',
+    descriptionKey: 'plugin.builtinTool.desc.browserTabs',
     readOnly: true,
     modes: ['plan', 'build']
   }

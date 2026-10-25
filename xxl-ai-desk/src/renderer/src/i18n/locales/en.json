@@ -67,6 +67,13 @@
       "time": "Get time",
       "openBrowser": "Open page",
       "readBrowser": "Read page",
+      "snapshotBrowser": "Inspect page structure",
+      "clickBrowser": "Click page element",
+      "fillBrowser": "Fill page form",
+      "waitBrowser": "Wait for page state",
+      "screenshotBrowser": "Page screenshot",
+      "inspectBrowser": "Page diagnostics",
+      "browserTabs": "Manage browser tabs",
       "mcp": "MCP tool",
       "generic": "Tool"
     },
@@ -427,7 +434,7 @@
       },
       "categoryDesc": {
         "fs": "Read, search and edit files inside the project directory. Writes require Build mode; out-of-scope access needs approval.",
-        "browser": "Open pages in the right-side Browser panel and read the current page. When disabled, the model no longer receives browser tools."
+        "browser": "Open pages, read content and structure, click and fill forms, take screenshots and run diagnostics. When disabled, the model no longer receives browser tools."
       },
       "desc": {
         "readFile": "Read a text file by line range inside the project directory",
@@ -437,7 +444,14 @@
         "writeFile": "Create or overwrite a file, creating parent directories",
         "editFile": "Replace specified text in a file with new text",
         "openBrowser": "Open a page or search keywords in the Browser panel",
-        "readBrowser": "Read the title, URL and content of the current browser tab"
+        "readBrowser": "Read the title, URL and content of the current browser tab",
+        "snapshotBrowser": "List interactive elements with stable refs for click and fill",
+        "clickBrowser": "Click a page element, including right-click and repeated clicks (Build mode only)",
+        "fillBrowser": "Fill inputs, selects and checkboxes, optionally submitting the form (Build mode only)",
+        "waitBrowser": "Wait for a selector, page text or URL condition",
+        "screenshotBrowser": "Capture the visible page for layout and visual verification",
+        "inspectBrowser": "Read console warnings/errors and failed page loads",
+        "browserTabs": "List, switch or close browser tabs"
       }
     }
   }

@@ -27,7 +27,14 @@ const TOOL_TITLE_KEYS: Record<string, string> = {
   run_command: 'command',
   get_current_time: 'time',
   open_browser: 'openBrowser',
-  read_browser: 'readBrowser'
+  read_browser: 'readBrowser',
+  snapshot_browser: 'snapshotBrowser',
+  click_browser: 'clickBrowser',
+  fill_browser: 'fillBrowser',
+  wait_browser: 'waitBrowser',
+  screenshot_browser: 'screenshotBrowser',
+  inspect_browser: 'inspectBrowser',
+  browser_tabs: 'browserTabs'
 }
 
 /* 工具名 → 图标组件名 */
@@ -41,7 +48,14 @@ const TOOL_ICONS: Record<string, string> = {
   run_command: 'Monitor',
   get_current_time: 'Clock',
   open_browser: 'Link',
-  read_browser: 'View'
+  read_browser: 'View',
+  snapshot_browser: 'Document',
+  click_browser: 'SetUp',
+  fill_browser: 'EditPen',
+  wait_browser: 'Clock',
+  screenshot_browser: 'Monitor',
+  inspect_browser: 'WarningFilled',
+  browser_tabs: 'FolderOpened'
 }
 
 /* 参数摘要过长时截断，避免撑破单行 */
@@ -75,9 +89,25 @@ function detailOf(name: string, args: unknown): string {
     case 'get_current_time':
       return clip(pick('timezone'))
     case 'open_browser':
-      return clip(pick('url'))
+      return clip(pick('url') || pick('action'))
     case 'read_browser':
       return clip(pick('selector'))
+    case 'snapshot_browser':
+      return ''
+    case 'click_browser':
+      return clip(pick('ref') || pick('selector'))
+    case 'fill_browser': {
+      const fields = Array.isArray(record.fields) ? record.fields.length : 0
+      return fields > 0 ? `${fields} 个字段` : ''
+    }
+    case 'wait_browser':
+      return clip(pick('selector') || pick('text') || pick('url'))
+    case 'screenshot_browser':
+      return ''
+    case 'inspect_browser':
+      return ''
+    case 'browser_tabs':
+      return clip(pick('operation') === 'list' ? 'list' : `${pick('operation')} ${pick('tab_id')}`)
     default:
       return ''
   }

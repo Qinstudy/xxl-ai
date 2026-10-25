@@ -1055,6 +1055,8 @@ content 的固定维度（无内容的维度整节省略）：
 | `desk_message` | 消息（`id / session_id / seq / role / content / data / add_time`，`data` 为 Agent 原始消息 JSON） |
 | `desk_provider` | 供应商（`name / base_url / api_key / headers / models / enabled / sort`） |
 | `desk_setting` | 设置（`key / value`） |
+| `desk_skill` | 技能状态（`id` 目录名 / `name / description / version / source / source_id / enabled`，目录内容为权威） |
+| `desk_mcp` | MCP 服务（`name / type / transport / url / headers / command / args / env / cwd / config / remark / enabled / health`） |
 
 - 旧库兼容：`PRAGMA table_info` 检测缺列后 `ALTER TABLE` 补齐（SQLite 无 `ADD COLUMN IF NOT EXISTS`）；
 - 运行时数据目录默认 `app.getPath('userData')/xxl-ai-desk.sqlite`，可自定义（`userData/desk-config.json`），修改后重启生效。

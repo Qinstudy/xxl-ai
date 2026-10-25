@@ -8,6 +8,7 @@ import { app, dialog, ipcMain, shell, type BrowserWindow } from 'electron'
 import { IPC } from '@shared/ipc'
 import type {
   AppSettings,
+  BrowserAction,
   ChatApprovalChoice,
   McpDTO,
   McpDiscoverQuery,
@@ -88,7 +89,7 @@ import {
   resetAgents,
   setBrowserOpener
 } from './agent/host/runtimeHost'
-import { resolveBrowserRead, setBrowserActionSender } from './agent/host/browserBridge'
+import { resolveBrowserAction, setBrowserActionSender } from './agent/host/browserBridge'
 
 /* 注册全部 IPC 处理器 */
 export function registerIpc(getWindow: () => BrowserWindow | null): void {
@@ -96,12 +97,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   setBrowserOpener((url, newTab) => {
     getWindow()?.webContents.send(IPC.browserOpenTab, url, newTab)
   })
-  /* Agent 工具 read_browser：读取请求转渲染层，结果经 browserReadResult 回传 */
-  setBrowserActionSender((requestId, params) => {
-    getWindow()?.webContents.send(IPC.browserReadRequest, requestId, params)
+  /* Agent 浏览器动作：请求转渲染层执行，结果经 browserActionResult 回传 */
+  setBrowserActionSender((requestId, action: BrowserAction) => {
+    getWindow()?.webContents.send(IPC.browserActionRequest, requestId, action)
   })
-  ipcMain.handle(IPC.browserReadResult, (_event, requestId: string, result) =>
-    resolveBrowserRead(requestId, result)
+  ipcMain.handle(IPC.browserActionResult, (_event, requestId: string, result) =>
+    resolveBrowserAction(requestId, result)
   )
 
   ipcMain.handle(

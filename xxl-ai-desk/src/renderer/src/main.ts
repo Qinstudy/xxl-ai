@@ -34,6 +34,7 @@ import {
   FullScreen,
   HomeFilled,
   InfoFilled,
+  Link,
   Loading,
   MagicStick,
   Monitor,
@@ -52,6 +53,7 @@ import {
   UploadFilled,
   User,
   VideoPause,
+  View,
   WarningFilled
 } from '@element-plus/icons-vue'
 import 'element-plus/dist/index.css'
@@ -95,6 +97,7 @@ const icons = {
   FullScreen,
   HomeFilled,
   InfoFilled,
+  Link,
   Loading,
   MagicStick,
   Monitor,
@@ -113,6 +116,7 @@ const icons = {
   UploadFilled,
   User,
   VideoPause,
+  View,
   WarningFilled
 }
 for (const [name, component] of Object.entries(icons)) {

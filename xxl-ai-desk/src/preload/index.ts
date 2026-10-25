@@ -4,8 +4,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/ipc'
 import type {
   AppSettings,
-  BrowserReadParams,
-  BrowserReadResult,
+  BrowserAction,
+  BrowserActionResult,
   ChatApprovalChoice,
   ChatApprovalPrompt,
   ChatEvent,
@@ -198,16 +198,16 @@ const api: DeskApi = {
       ipcRenderer.on(IPC.browserOpenTab, listener)
       return () => ipcRenderer.removeListener(IPC.browserOpenTab, listener)
     },
-    /* Agent 页面读取请求：渲染层执行脚本提取正文（返回取消订阅函数） */
-    onReadRequest: (callback: (requestId: string, params: BrowserReadParams) => void) => {
-      const listener = (_event: unknown, requestId: string, params: BrowserReadParams): void =>
-        callback(requestId, params)
-      ipcRenderer.on(IPC.browserReadRequest, listener)
-      return () => ipcRenderer.removeListener(IPC.browserReadRequest, listener)
+    /* Agent 页面动作请求：渲染层执行脚本并回传结果（返回取消订阅函数） */
+    onActionRequest: (callback: (requestId: string, action: BrowserAction) => void) => {
+      const listener = (_event: unknown, requestId: string, action: BrowserAction): void =>
+        callback(requestId, action)
+      ipcRenderer.on(IPC.browserActionRequest, listener)
+      return () => ipcRenderer.removeListener(IPC.browserActionRequest, listener)
     },
-    /* 回传页面读取结果 */
-    respondRead: (requestId: string, result: BrowserReadResult) =>
-      ipcRenderer.invoke(IPC.browserReadResult, requestId, result)
+    /* 回传页面动作结果 */
+    respondAction: (requestId: string, result: BrowserActionResult) =>
+      ipcRenderer.invoke(IPC.browserActionResult, requestId, result)
   },
   /* MCP 插件中心 */
   mcp: {
