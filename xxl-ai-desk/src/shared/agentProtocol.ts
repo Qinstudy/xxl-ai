@@ -31,8 +31,9 @@ export type HostEvent =
   | { type: 'thinking'; text: string } /* 思考文本 */
   | { type: 'tool_start'; toolCallId: string; toolName: string; args: unknown } /* 工具开始 */
   | { type: 'tool_end'; toolCallId: string; toolName: string; isError: boolean; result?: string; details?: unknown; durationMs?: number } /* 工具结束 */
+  | { type: 'notice'; message: string } /* 非致命异常提示（继续执行） */
   | { type: 'done' } /* 本轮完成 */
-  | { type: 'error'; message: string } /* 出错 */
+  | { type: 'error'; message: string } /* 出错（结束） */
 
 /* 越界访问动作类型（文案区分用） */
 export type PathAction = 'read' | 'write'
@@ -64,7 +65,7 @@ export interface RunAgentInput {
   modelId: string
   /* 系统提示词 */
   systemPrompt: string
-  /* 历史消息（Pi AgentMessage[]） */
+  /* 模型上下文（最近窗口，不含 thinking） */
   messages: unknown[]
   /* 对话模式 */
   mode: ChatMode
@@ -102,7 +103,7 @@ export type WorkerMessage =
   | { type: 'event'; sessionId: string; event: HostEvent } /* 流式事件 */
   | { type: 'open-browser'; sessionId: string; url: string; newTab?: boolean } /* 在右侧「浏览器」面板打开页面（Agent 工具触发） */
   | { type: 'browser-action'; requestId: string; sessionId: string; action: BrowserAction } /* 执行页面动作（跨进程请求渲染层） */
-  | { type: 'run-done'; sessionId: string; messages: unknown[] } /* 运行完成（返回最新上下文） */
+  | { type: 'run-done'; sessionId: string; messages: unknown[] } /* 运行完成（只返回本轮新增消息） */
   | { type: 'run-error'; sessionId: string; message: string } /* 运行失败 */
   | ({ type: 'approval-request'; requestId: string } & ApprovalRequest) /* 越界审批请求 */
   | { type: 'mcp-test-result'; requestId: string; result: McpTestResult } /* 连通测试结果 */

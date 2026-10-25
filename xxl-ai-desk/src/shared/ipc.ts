@@ -16,6 +16,7 @@ export * from './contracts/mcp'
 export * from './contracts/skill'
 export * from './contracts/browser'
 export * from './defaults'
+export * from './history'
 
 import type {
   AppSettings,

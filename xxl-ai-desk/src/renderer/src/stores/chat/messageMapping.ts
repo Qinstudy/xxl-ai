@@ -6,6 +6,7 @@
  */
 
 import type { MessagePart, ToolCallState, UiMessage } from '@renderer/types'
+import { AUTO_CONTINUE_PROMPT, THINKING_ONLY_NOTE } from '@shared/ipc'
 import type { StoredMessage } from '@shared/ipc'
 
 /* 持久化的 Pi 原始消息结构（仅取渲染所需字段） */
@@ -17,6 +18,8 @@ export interface RawPart {
   id?: string
   name?: string
   arguments?: unknown
+  /* 异常备注片段（本地渲染用，Pi 忽略该字段） */
+  error?: boolean
 }
 
 export interface RawMessage {
@@ -45,13 +48,32 @@ export function parseData(data: string): RawMessage | null {
   }
 }
 
+/* 标记失败消息的最后一段正文；没有正文时补一条异常说明 */
+function markFailedPart(message: UiMessage, startIndex: number): void {
+  for (let index = message.parts.length - 1; index >= startIndex; index -= 1) {
+    const part = message.parts[index]
+    if (part.type === 'text') {
+      part.error = true
+      return
+    }
+  }
+  appendPart(message, { type: 'text', text: THINKING_ONLY_NOTE, error: true })
+}
+
 /* 向助手消息追加片段：同类相邻文本合并，保持片段发生顺序（思考 → 工具 → 正文 交错） */
 export function appendPart(message: UiMessage, part: MessagePart): void {
   if (part.type === 'thinking' || part.type === 'text') {
     const last = message.parts[message.parts.length - 1]
+    /* 文本片段按 error 边界分段，避免异常备注与正常正文合并 */
     if (last && last.type === part.type) {
-      last.text += part.text
-      return
+      const sameError =
+        last.type !== 'text' ||
+        part.type !== 'text' ||
+        Boolean(last.error) === Boolean(part.error)
+      if (sameError) {
+        last.text += part.text
+        return
+      }
     }
   }
   message.parts.push(part)
@@ -90,6 +112,10 @@ export function mapStoredMessages(stored: StoredMessage[]): UiMessage[] {
 
   for (const record of stored) {
     if (record.role === 'user') {
+      /* 自动续写消息仅驱动模型，不进入界面 */
+      if (record.content === AUTO_CONTINUE_PROMPT) {
+        continue
+      }
       result.push({
         id: record.id,
         role: 'user',
@@ -115,7 +141,12 @@ export function mapStoredMessages(stored: StoredMessage[]): UiMessage[] {
 
     const raw = parseData(record.data)
     const parts = Array.isArray(raw?.content) ? raw.content : []
-    const failed = raw?.stopReason === 'error'
+    const hasVisiblePart = parts.some((part) => part.type === 'text' || part.type === 'toolCall')
+    /* 失败、截断、只有 thinking / 空内容：统一按 error 展示 */
+    const failed =
+      raw?.stopReason === 'error' ||
+      raw?.stopReason === 'length' ||
+      !hasVisiblePart
 
     /* 合并到本轮已存在的助手消息 */
     let last = result[result.length - 1]
@@ -125,13 +156,13 @@ export function mapStoredMessages(stored: StoredMessage[]): UiMessage[] {
         role: 'assistant',
         content: '',
         parts: [],
-        addTime: record.addTime,
-        error: failed
+        addTime: record.addTime
       }
       result.push(last)
-    } else if (failed) {
-      last.error = true
     }
+
+    /* 本片段起始下标：用于失败时标记对应的正文段 */
+    const partStart = last.parts.length
 
     /* 按原始顺序还原片段，并累计本片段的结构化正文 */
     let localText = ''
@@ -139,7 +170,7 @@ export function mapStoredMessages(stored: StoredMessage[]): UiMessage[] {
       if (part.type === 'thinking' && !part.redacted && part.thinking) {
         appendPart(last, { type: 'thinking', text: part.thinking })
       } else if (part.type === 'text' && part.text) {
-        appendPart(last, { type: 'text', text: part.text })
+        appendPart(last, { type: 'text', text: part.text, error: part.error === true })
         localText += part.text
       } else if (part.type === 'toolCall') {
         const tool: ToolCallState = {
@@ -159,14 +190,19 @@ export function mapStoredMessages(stored: StoredMessage[]): UiMessage[] {
       if (record.content.startsWith(localText)) {
         const rest = record.content.slice(localText.length)
         if (rest) {
-          appendPart(last, { type: 'text', text: rest })
+          appendPart(last, { type: 'text', text: rest, error: failed })
         }
       } else if (!localText) {
-        appendPart(last, { type: 'text', text: record.content })
+        appendPart(last, { type: 'text', text: record.content, error: failed })
       }
+    }
+
+    /* 失败/截断消息：至少给出一段可读的异常说明 */
+    if (failed) {
+      markFailedPart(last, partStart)
     }
   }
 
-  /* 剔除无任何内容的空助手消息（避免空白气泡） */
+  /* 剔除空助手消息（理论上已在上面补齐异常说明） */
   return result.filter((message) => message.role !== 'assistant' || message.parts.length > 0)
 }

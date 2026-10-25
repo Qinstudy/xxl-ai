@@ -28,7 +28,7 @@ export interface ToolCallState {
  */
 export type MessagePart =
   | { type: 'thinking'; text: string }
-  | { type: 'text'; text: string }
+  | { type: 'text'; text: string; error?: boolean }
   | { type: 'tool'; tool: ToolCallState }
 
 /* 对话消息（UI 渲染用） */

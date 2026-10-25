@@ -18,7 +18,12 @@ const visible = defineModel<boolean>('visible', { required: true })
 const settings = useSettingsStore()
 
 /* 表单数据 */
-const form = ref({ name: '', baseUrl: '', apiKey: '', enabled: true })
+const form = ref({
+  name: '',
+  baseUrl: '',
+  apiKey: '',
+  enabled: true
+})
 /* 模型行（动态多行管理，支持手输与远程下拉选择） */
 const modelRows = ref<string[]>([''])
 /* 远程查询得到的可选模型 */
@@ -44,7 +49,12 @@ function resetForm(): void {
         apiKey: row.apiKey,
         enabled: row.enabled
       }
-    : { name: '', baseUrl: '', apiKey: '', enabled: true }
+    : {
+        name: '',
+        baseUrl: '',
+        apiKey: '',
+              enabled: true
+      }
   modelRows.value = row && row.models.length > 0 ? [...row.models] : ['']
   remoteModels.value = []
   headersText.value = JSON.stringify(row?.headers ?? {}, null, 2)

@@ -1354,6 +1354,7 @@ docker compose down
 - 5、【TODO】
   - SKILL支持从Github安装；
   - SKILL按需启用：选择后才启用；
+- 5、【TODO】进行中任务补充会话，进行会话中队列；
 
 
 ### TODO LIST

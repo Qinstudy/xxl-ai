@@ -222,7 +222,7 @@ function toolDetailsText(tool: ToolCallState): string {
       <div
         v-else-if="part.type === 'text'"
         class="step step-text markdown-body"
-        :class="{ 'is-error': message.error && isLastPart(index) }"
+        :class="{ 'is-error': part.error || (message.error && isLastPart(index)) }"
         @click="onContentClick"
         v-html="renderMarkdown(part.text, baseDir)"
       ></div>

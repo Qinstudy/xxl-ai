@@ -166,7 +166,7 @@ async function handleRun(input: RunAgentInput): Promise<void> {
           ? ({ type: 'done' } as HostEvent)
           : event
       emitEvent(input.sessionId, normalized)
-    })
+    }, input.sessionId)
     /* 结束前冲刷残余增量，保证文本完整落库/展示 */
     flushDelta(input.sessionId)
     const messages = agent.state.messages.filter(

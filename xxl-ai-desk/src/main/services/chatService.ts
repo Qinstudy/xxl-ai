@@ -6,6 +6,7 @@
  */
 
 import { app } from 'electron'
+import { trimHistory } from '@shared/ipc'
 import type {
   ChatMode,
   AppSettings,
@@ -23,7 +24,7 @@ import { getSettings } from './settingsService'
 import { getProvider } from './providerService'
 import { listEnabledMcpServers } from './mcpService'
 import { listEnabledSkillsForRuntime } from './skillService'
-import { getSession, listMessages, replaceMessages, updateSession } from './sessionService'
+import { appendMessages, getSession, listMessages, updateSession } from './sessionService'
 import { getProject } from './projectService'
 import { buildRuntimePath } from './envService'
 import { abortAgent, evictAgent, isAgentRunning, runAgent } from '../agent/host/runtimeHost'
@@ -102,22 +103,13 @@ function resolveRuntimeTarget(
   return { provider, model: fallback }
 }
 
-/*
- * 失败轮次落库：保留历史消息并追加「用户提问 + 错误提示助手消息」，
- * 使发送失败在重载页面/切换会话后仍可见（避免前端回读消息时把错误提示覆盖丢失）。
- */
+/* 失败轮次落库：追加「用户提问 + 错误提示助手消息」，完整历史不重写 */
 function persistFailureRound(sessionId: string, text: string, tip: string): void {
   /* 会话已删除或结果已丢弃：不再写入 */
   if (discardedSessions.has(sessionId) || !getSession(sessionId)) {
     return
   }
-  const existing = listMessages(sessionId).map((message) => ({
-    role: message.role,
-    content: message.content,
-    data: message.data
-  }))
-  replaceMessages(sessionId, [
-    ...existing,
+  appendMessages(sessionId, [
     {
       role: 'user',
       content: text,
@@ -142,7 +134,7 @@ function persistFailureRound(sessionId: string, text: string, tip: string): void
   ])
 }
 
-/* 归一化历史消息：剔除 system 与非数组 content 的非法消息 */
+/* 归一化历史消息：剔除 system 与非数组 content（thinking 由 history 窗口统一处理） */
 function normalizeHistoryMessage(raw: unknown): { role?: string; content?: unknown } | null {
   if (!raw || typeof raw !== 'object') {
     return null
@@ -267,17 +259,20 @@ export async function sendChat(
     /* 自定义指令全局生效：统一取当前设置，并附技能索引与模式说明（个性化变更对旧对话同样生效） */
     const systemPrompt = `${settings.systemPrompt || ''}${buildSkillPrompt(skills)}${modeSystemHint(mode)}`
     /* 历史消息不携带 system 提示：系统指令始终取当前设置，保证旧对话也随设置变更生效 */
-    const history = listMessages(sessionId)
-      .map((message) => {
-        try {
-          return normalizeHistoryMessage(JSON.parse(message.data))
-        } catch {
-          return null
-        }
-      })
-      .filter((item) => item !== null)
+    /* 模型上下文与完整历史分离：这里只构造最近窗口，数据库仍保留完整历史 */
+    const history = trimHistory(
+      listMessages(sessionId)
+        .map((message) => {
+          try {
+            return normalizeHistoryMessage(JSON.parse(message.data))
+          } catch {
+            return null
+          }
+        })
+        .filter((item) => item !== null)
+    )
 
-    /* 交运行时进程执行：流式事件回传渲染层，结束后回传完整上下文供落库 */
+    /* 交运行时进程执行：只下发模型上下文，结束后回传本轮新增消息供追加落库 */
     const runInput: RunAgentInput = {
       sessionId,
       provider: { ...toRuntimeConfig(provider), sessionId },
@@ -307,22 +302,15 @@ export async function sendChat(
     if (discardedSessions.has(sessionId) || !getSession(sessionId)) {
       return
     }
-    /* 落库：以运行时完整上下文覆盖会话消息，保证下次续聊一致（剔除 system，避免固化旧指令） */
+    /* 落库：只追加本轮新增消息，完整历史始终由数据库持有 */
     const serialized = result.messages
       .filter((message) => (message as { role?: string }).role !== 'system')
-      .map((message) => {
-        const role = (message as { role?: string }).role ?? ''
-        const stopReason = (message as { stopReason?: string }).stopReason
-        const errorMessage = (message as { errorMessage?: string }).errorMessage
-        let content = contentToText(message)
-        /* 失败消息追加可读提示落库，避免切换会话后丢失错误信息（保留已生成的部分内容） */
-        if (role === 'assistant' && stopReason === 'error' && !abortRequested.has(sessionId)) {
-          const tip = describeError(errorMessage ?? '', providerName, modelId)
-          content = content ? `${content}\n\n${tip}` : tip
-        }
-        return { role, content, data: JSON.stringify(message) }
-      })
-    replaceMessages(sessionId, serialized)
+      .map((message) => ({
+        role: (message as { role?: string }).role ?? '',
+        content: contentToText(message),
+        data: JSON.stringify(message)
+      }))
+    appendMessages(sessionId, serialized)
     committed = true
   } catch (error) {
     /* 主进程侧异常（读库/落库等）：清理运行时缓存并落库错误提示 */

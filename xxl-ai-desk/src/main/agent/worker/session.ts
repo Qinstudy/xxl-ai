@@ -10,6 +10,7 @@ import { createMcpTools } from './mcp/tools'
 import { setMcpRuntimePath } from './mcp/client'
 import type { ChatMode } from '@shared/ipc'
 import type { HostEvent } from '@shared/agentProtocol'
+import { AUTO_CONTINUE_PROMPT, contentBlocks } from '@shared/ipc'
 import type { McpRuntimeConfig, SkillRuntimeConfig } from '@shared/ipc'
 
 /* 创建/获取会话 Agent 所需的运行时配置 */
@@ -71,6 +72,74 @@ export function isSessionAborted(sessionId: string): boolean {
   return abortedSessions.has(sessionId)
 }
 
+/* 单次请求超时、重试间隔与次数 */
+const REQUEST_TIMEOUT_MS = 30_000
+const RETRY_DELAY_MS = 3_000
+const MAX_REQUEST_RETRIES = 5
+
+/* 仅 401 / 402 / 403 / 404 不重试，其余异常一律重试 */
+const NON_RETRYABLE_STATUS = new Set([401, 402, 403, 404])
+
+/* 运行期消息的最小结构 */
+interface RuntimeMessage {
+  role?: string
+  content?: unknown
+  stopReason?: string
+  errorMessage?: string
+  timestamp?: number
+}
+
+/* 原始用户提问是否已进入上下文（请求失败后判断是否需要重发） */
+function hasUserText(agent: Agent, text: string): boolean {
+  return (agent.state.messages as RuntimeMessage[]).some(
+    (message) =>
+      message.role === 'user' &&
+      contentBlocks(message).some(
+        (block) => (block as { type?: string; text?: string }).type === 'text' &&
+          (block as { text?: string }).text === text
+      )
+  )
+}
+
+/* 最后一轮助手消息 */
+function lastAssistant(agent: Agent): RuntimeMessage | undefined {
+  const messages = agent.state.messages as RuntimeMessage[]
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].role === 'assistant') {
+      return messages[index]
+    }
+  }
+  return undefined
+}
+
+/* 在正文追加一条系统备注；appendToLast=true 时并入最后一条助手消息 */
+function appendAssistantNote(agent: Agent, note: string, appendToLast: boolean): void {
+  const messages = agent.state.messages as RuntimeMessage[]
+  if (appendToLast) {
+    const last = lastAssistant(agent)
+    if (last && Array.isArray(last.content)) {
+      last.content.push({ type: 'text', text: note, error: true })
+      return
+    }
+  }
+  messages.push({
+    role: 'assistant',
+    content: [{ type: 'text', text: note, error: true }],
+    stopReason: 'stop',
+    timestamp: Date.now()
+  })
+}
+
+/* 重试退避 */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/* 是否用户主动终止 */
+function isAbortError(error: unknown): boolean {
+  return /aborted|cancell?ed/i.test((error as Error)?.message ?? '')
+}
+
 /* 按配置动态加载 Pi Agent，装配模型与内置工具，注入系统提示与历史消息 */
 async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
   const { Agent: AgentClass } = await import('@earendil-works/pi-agent-core')
@@ -104,7 +173,8 @@ async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
       tools: [...tools, ...(readyMcpTools ?? [])],
       messages: (options.messages ?? []) as never[]
     },
-    streamFn: models.streamSimple.bind(models)
+    streamFn: (model, context, options) =>
+      models.streamSimple(model, context, { ...options, timeoutMs: REQUEST_TIMEOUT_MS })
   })
   /*
    * 后台装配完成：直接替换运行中 Agent 的工具集（Pi 官方支持，下一次请求生效并自动告知模型），
@@ -154,12 +224,56 @@ export function resetAgents(): void {
   runtimes.clear()
 }
 
-/* 执行一轮对话，流式回调事件 */
+/* 从异常对象中提取 HTTP 状态码 */
+function statusOf(error: unknown): number | undefined {
+  const value = error as {
+    status?: unknown
+    statusCode?: unknown
+    code?: unknown
+    response?: { status?: unknown }
+    error?: { status?: unknown }
+  }
+  const candidates = [
+    value?.status,
+    value?.statusCode,
+    value?.code,
+    value?.response?.status,
+    value?.error?.status
+  ]
+  for (const candidate of candidates) {
+    const status = Number(candidate)
+    if (Number.isInteger(status)) {
+      return status
+    }
+  }
+  return undefined
+}
+
+/* 是否为白名单内的不可重试错误（401 / 402 / 403 / 404） */
+function isNonRetryable(error: unknown): boolean {
+  const status = statusOf(error)
+  if (status !== undefined) {
+    return NON_RETRYABLE_STATUS.has(status)
+  }
+  const message = typeof error === 'string' ? error : (error as Error)?.message ?? ''
+  if (/\b(?:HTTP|status(?:\s*code)?|API error)\s*[:=(]?\s*(401|402|403|404)\b/i.test(message)) {
+    return true
+  }
+  if (/^\s*(?:Error:\s*)?(401|402|403|404)\b/i.test(message)) {
+    return true
+  }
+  return /\b(401|402|403|404)\s+(Unauthorized|Payment Required|Forbidden|Not Found)\b/i.test(
+    message
+  )
+}
+
+/* 执行一轮对话：请求失败重试、长度截断/未知状态统一按 error 处理 */
 export async function runPrompt(
   agent: Agent,
   text: string,
-  sink: (event: HostEvent) => void
-): Promise<void> {
+  sink: (event: HostEvent) => void,
+  sessionId = ''
+): Promise<RuntimeMessage[]> {
   const unsubscribe = agent.subscribe((event) => {
     switch (event.type) {
       case 'message_update': {
@@ -195,24 +309,89 @@ export async function runPrompt(
     }
   })
 
+  let failures = 0
+  let first = true
+  const start = (agent.state.messages as RuntimeMessage[]).length
+  const takeNew = (): RuntimeMessage[] =>
+    (agent.state.messages as RuntimeMessage[]).slice(start)
   try {
-    await agent.prompt(text)
-    const failed = findLastError(agent)
-    if (failed !== undefined) {
-      sink({ type: 'error', message: failed })
-    } else {
-      sink({ type: 'done' })
-    }
-  } catch (error) {
-    /* 用户终止导致的异常按正常结束处理，避免 UI 误报调用失败 */
-    if (/aborted|cancell?ed/i.test((error as Error).message)) {
-      sink({ type: 'done' })
-    } else {
-      sink({ type: 'error', message: (error as Error).message })
+    while (true) {
+      if (sessionId && isSessionAborted(sessionId)) {
+        sink({ type: 'done' })
+        return takeNew()
+      }
+
+      let thrown: unknown = null
+      const promptText = first ? text : AUTO_CONTINUE_PROMPT
+      first = false
+      try {
+        await agent.prompt(promptText)
+      } catch (error) {
+        thrown = error
+      }
+
+      /* 用户终止：直接结束 */
+      if (thrown && (isAbortError(thrown) || (sessionId && isSessionAborted(sessionId)))) {
+        sink({ type: 'done' })
+        return takeNew()
+      }
+
+      const last = lastAssistant(agent)
+      const reason = thrown ? 'exception' : last?.stopReason
+
+      /* 模型明确结束 */
+      if (reason === 'stop' || reason === 'aborted') {
+        sink({ type: 'done' })
+        return takeNew()
+      }
+
+      /* 所有异常统一按 error 处理：正文备注原因 + 重试 5 次 */
+      const detail = thrown
+        ? (thrown as Error)?.message || String(thrown)
+        : reason === 'length'
+          ? '输出内容超过限制，内容已被截断'
+          : reason === 'error'
+            ? last?.errorMessage || '模型返回错误'
+            : `模型返回未知结束状态（${reason || '未知'}）`
+
+      /* 当前助手消息标记为 error，并写入可读原因 */
+      if (!thrown && last) {
+        last.stopReason = 'error'
+        last.errorMessage = detail
+      }
+
+      /* 不可重试错误（401/402/403/404）：直接结束 */
+      if (!thrown && isNonRetryable(detail)) {
+        const note = `\n\n[系统] 不可重试的请求错误：${detail}`
+        appendAssistantNote(agent, note, !thrown)
+        sink({ type: 'error', message: note })
+        return takeNew()
+      }
+
+      failures += 1
+      const appendToLast = !thrown
+      const final = failures > MAX_REQUEST_RETRIES
+      const note = final
+        ? `\n\n[系统] 连续异常 ${MAX_REQUEST_RETRIES + 1} 次，已结束：${detail}`
+        : `\n\n[系统] 第 ${failures} 次异常：${detail}。已记录，继续重试。`
+      appendAssistantNote(agent, note, appendToLast)
+
+      if (final) {
+        sink({ type: 'error', message: note })
+        return takeNew()
+      }
+
+      /* 非致命异常：界面标记错误备注，本轮继续 */
+      sink({ type: 'notice', message: note })
+      if (thrown && !hasUserText(agent, text)) {
+        first = true
+      }
+      await sleep(RETRY_DELAY_MS)
     }
   } finally {
     unsubscribe()
   }
+  return takeNew()
 }
 
 /* 汇总工具结果为纯文本（仅取文本内容块，供 UI 展开查看） */
@@ -235,19 +414,4 @@ function toolResultText(result: unknown): string {
       .join('\n')
   }
   return ''
-}
-
-/* 检查最后一轮是否以错误结束，返回错误信息（无错误返回 undefined） */
-function findLastError(agent: Agent): string | undefined {
-  const messages = agent.state.messages
-  for (let i = messages.length - 1; i >= 0; i -= 1) {
-    const message = messages[i] as { role?: string; stopReason?: string; errorMessage?: string }
-    if (message.role === 'assistant') {
-      if (message.stopReason === 'error') {
-        return message.errorMessage || ''
-      }
-      return undefined
-    }
-  }
-  return undefined
 }

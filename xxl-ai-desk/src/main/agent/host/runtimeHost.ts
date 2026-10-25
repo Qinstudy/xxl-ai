@@ -157,7 +157,7 @@ export function isAgentRunning(sessionId: string): boolean {
   return pendingRuns.has(sessionId)
 }
 
-/* 执行一轮对话，流式回调事件；返回成功时的完整上下文或失败信息 */
+/* 执行一轮对话，流式回调事件；返回成功时本轮新增消息或失败信息 */
 export async function runAgent(
   input: RunAgentInput,
   onEvent: (event: HostEvent) => void

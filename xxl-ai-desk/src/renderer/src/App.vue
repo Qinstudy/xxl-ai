@@ -2,7 +2,7 @@
 /* 应用外壳：三段式布局 + 全局快捷键 + 壳级宿主（终端/浏览器/审批/更新提示） */
 import { onBeforeUnmount, onMounted } from 'vue'
 import { BrowserHost, ShellTerminalHost } from '@renderer/modules/workspace'
-import UpdateDialog from '@renderer/modules/settings/components/UpdateDialog.vue'
+import { UpdateDialog } from '@renderer/modules/settings'
 import ApprovalDialog from '@renderer/components/ApprovalDialog.vue'
 import AppSidebar from '@renderer/components/shell/AppSidebar.vue'
 import AppTopbar from '@renderer/components/shell/AppTopbar.vue'

@@ -98,7 +98,8 @@ export async function buildModels(configs: ProviderModelConfig[]): Promise<Mutab
       input: ['text'],
       cost: { ...DEFAULT_COST },
       contextWindow: 128000,
-      maxTokens: 8192,
+      /* Pi 类型必填；0 表示不发送 max_tokens，由供应商使用默认值 */
+      maxTokens: 0,
       ...(hasHeaders ? { headers: requestHeaders } : {})
     }))
 

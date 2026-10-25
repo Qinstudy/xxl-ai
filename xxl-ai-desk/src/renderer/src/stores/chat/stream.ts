@@ -198,6 +198,21 @@ export function createChatStream(context: ChatStreamContext) {
         }
         break
       }
+      case 'notice': {
+        /* 非致命异常：写入异常备注并标记该段为 error，本轮继续执行 */
+        flushBuffers(sessionId)
+        const assistant = streamAssistant(sessionId)
+        const note = event.message ?? ''
+        if (assistant && note) {
+          appendPart(assistant, {
+            type: 'text',
+            text: note,
+            error: true
+          })
+          refreshContent(assistant)
+        }
+        break
+      }
       case 'error': {
         flushBuffers(sessionId)
         const assistant = streamAssistant(sessionId)

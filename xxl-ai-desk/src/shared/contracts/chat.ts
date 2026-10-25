@@ -6,8 +6,16 @@
 export interface ChatEvent {
   /* 所属会话主键 */
   sessionId: string
-  /* 事件类型：delta 增量文本 / thinking 思考 / tool_start 工具开始 / tool_end 工具结束 / error 错误 / done 完成 / aborted 中止 */
-  type: 'delta' | 'thinking' | 'tool_start' | 'tool_end' | 'error' | 'done' | 'aborted'
+  /* 事件类型：delta 增量文本 / thinking 思考 / tool_start / tool_end / notice 非致命提示 / error 致命错误 / done / aborted */
+  type:
+    | 'delta'
+    | 'thinking'
+    | 'tool_start'
+    | 'tool_end'
+    | 'notice'
+    | 'error'
+    | 'done'
+    | 'aborted'
   /* 增量文本（delta / thinking） */
   text?: string
   /* 工具名（tool_start / tool_end） */
@@ -24,7 +32,7 @@ export interface ChatEvent {
   durationMs?: number
   /* 工具是否失败（tool_end） */
   isError?: boolean
-  /* 错误信息（error） */
+  /* 错误 / 提示信息（notice / error） */
   message?: string
 }
 
