@@ -28,6 +28,7 @@ const TOOL_TITLE_KEYS: Record<string, string> = {
   get_current_time: 'time',
   open_browser: 'openBrowser',
   read_browser: 'readBrowser',
+  read_skill: 'readSkill',
   snapshot_browser: 'snapshotBrowser',
   click_browser: 'clickBrowser',
   fill_browser: 'fillBrowser',
@@ -47,6 +48,7 @@ const TOOL_ICONS: Record<string, string> = {
   search_files: 'Search',
   run_command: 'Monitor',
   get_current_time: 'Clock',
+  read_skill: 'Reading',
   open_browser: 'Link',
   read_browser: 'View',
   snapshot_browser: 'Document',
@@ -84,10 +86,12 @@ function detailOf(name: string, args: unknown): string {
       const include = pick('include')
       return clip(include ? `${pattern}  (${include})` : pattern)
     }
-    case 'run_command':
-      return clip(pick('command'))
     case 'get_current_time':
       return clip(pick('timezone'))
+    case 'read_skill':
+      return clip(pick('name') + (pick('path') ? ` / ${pick('path')}` : ''))
+    case 'run_command':
+      return clip(pick('command'))
     case 'open_browser':
       return clip(pick('url') || pick('action'))
     case 'read_browser':

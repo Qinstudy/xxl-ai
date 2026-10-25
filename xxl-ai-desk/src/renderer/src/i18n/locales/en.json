@@ -65,6 +65,7 @@
       "search": "Search",
       "command": "Run command",
       "time": "Get time",
+      "readSkill": "Read skill",
       "openBrowser": "Open page",
       "readBrowser": "Read page",
       "snapshotBrowser": "Inspect page structure",
@@ -415,8 +416,7 @@
       "loadedCount": "Loaded {0} / {1}"
     },
     "builtinTool": {
-      "title": "Built-in Tools",
-      "intro": "Built-in tools available in this version. File tools are always enabled; browser tools can be turned off and take effect on the next chat turn.",
+      "intro": "This page displays the built-in tools currently available and their capabilities. Always-on tools cannot be disabled; switchable tools can be enabled or disabled as needed, with changes taking effect on the next chat turn.",
       "fixedEnabled": "Always on",
       "enabledOn": "Browser tools enabled for subsequent turns",
       "enabledOff": "Browser tools disabled for subsequent turns",
@@ -428,13 +428,18 @@
       "modes": "Modes",
       "modeAll": "Plan / Build",
       "modeBuild": "Build",
+      "count": "{0} tools",
       "category": {
         "fs": "File Operations",
-        "browser": "Browser"
+        "shell": "Terminal",
+        "browser": "Browser",
+        "system": "System"
       },
       "categoryDesc": {
         "fs": "Read, search and edit files inside the project directory. Writes require Build mode; out-of-scope access needs approval.",
-        "browser": "Open pages, read content and structure, click and fill forms, take screenshots and run diagnostics. When disabled, the model no longer receives browser tools."
+        "shell": "Run shell commands inside the project directory. Dangerous commands are blocked; Build mode only.",
+        "browser": "Open pages, read content and structure, click and fill forms, take screenshots and run diagnostics. When disabled, the model no longer receives browser tools.",
+        "system": "Side-effect-free system capabilities such as current time."
       },
       "desc": {
         "readFile": "Read a text file by line range inside the project directory",
@@ -443,6 +448,7 @@
         "search": "Search file contents by regex and return line numbers",
         "writeFile": "Create or overwrite a file, creating parent directories",
         "editFile": "Replace specified text in a file with new text",
+        "command": "Run a shell command inside the project directory and return output (Build mode only)",
         "openBrowser": "Open a page or search keywords in the Browser panel",
         "readBrowser": "Read the title, URL and content of the current browser tab",
         "snapshotBrowser": "List interactive elements with stable refs for click and fill",
@@ -451,7 +457,8 @@
         "waitBrowser": "Wait for a selector, page text or URL condition",
         "screenshotBrowser": "Capture the visible page for layout and visual verification",
         "inspectBrowser": "Read console warnings/errors and failed page loads",
-        "browserTabs": "List, switch or close browser tabs"
+        "browserTabs": "List, switch or close browser tabs",
+        "time": "Get the current local date and time"
       }
     }
   }

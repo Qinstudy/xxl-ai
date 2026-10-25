@@ -9,8 +9,8 @@
 
 import type { ChatMode } from '@shared/ipc'
 
-/* 内置工具分类：fs 文件操作（固定启用）/ browser 浏览器（可开关） */
-export type BuiltinToolCategoryKey = 'fs' | 'browser'
+/* 内置工具分类：fs 文件 / shell 终端 / browser 浏览器（可开关）/ system 系统 */
+export type BuiltinToolCategoryKey = 'fs' | 'shell' | 'browser' | 'system'
 
 /* 工具目录项 */
 export interface BuiltinToolCatalogItem {
@@ -49,10 +49,22 @@ export const BUILTIN_TOOL_CATEGORIES: BuiltinToolCategory[] = [
     switchable: false
   },
   {
+    key: 'shell',
+    titleKey: 'plugin.builtinTool.category.shell',
+    descriptionKey: 'plugin.builtinTool.categoryDesc.shell',
+    switchable: false
+  },
+  {
     key: 'browser',
     titleKey: 'plugin.builtinTool.category.browser',
     descriptionKey: 'plugin.builtinTool.categoryDesc.browser',
     switchable: true
+  },
+  {
+    key: 'system',
+    titleKey: 'plugin.builtinTool.category.system',
+    descriptionKey: 'plugin.builtinTool.categoryDesc.system',
+    switchable: false
   }
 ]
 
@@ -103,6 +115,14 @@ export const BUILTIN_TOOL_CATALOG: BuiltinToolCatalogItem[] = [
     category: 'fs',
     titleKey: 'chat.tool.editFile',
     descriptionKey: 'plugin.builtinTool.desc.editFile',
+    readOnly: false,
+    modes: ['build']
+  },
+  {
+    name: 'run_command',
+    category: 'shell',
+    titleKey: 'chat.tool.command',
+    descriptionKey: 'plugin.builtinTool.desc.command',
     readOnly: false,
     modes: ['build']
   },
@@ -175,6 +195,14 @@ export const BUILTIN_TOOL_CATALOG: BuiltinToolCatalogItem[] = [
     category: 'browser',
     titleKey: 'chat.tool.browserTabs',
     descriptionKey: 'plugin.builtinTool.desc.browserTabs',
+    readOnly: true,
+    modes: ['plan', 'build']
+  },
+  {
+    name: 'get_current_time',
+    category: 'system',
+    titleKey: 'chat.tool.time',
+    descriptionKey: 'plugin.builtinTool.desc.time',
     readOnly: true,
     modes: ['plan', 'build']
   }
