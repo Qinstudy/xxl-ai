@@ -18,6 +18,8 @@ const props = defineProps<{
   sessions: SessionDTO[]
   /* 是否展开 */
   expanded: boolean
+  /* 当前选中会话（用于会话行高亮） */
+  activeSessionId: string
 }>()
 const emit = defineEmits<{ toggle: []; select: [sessionId: string] }>()
 
@@ -157,6 +159,7 @@ async function onDeleteSession(id: string): Promise<void> {
         :key="session.id"
         dense
         :indent="16"
+        :active="session.id === activeSessionId"
         @click="emit('select', session.id)"
       >
         {{ session.title || t('chat.newChat') }}

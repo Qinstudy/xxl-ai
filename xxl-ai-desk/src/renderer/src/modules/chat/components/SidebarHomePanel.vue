@@ -151,6 +151,7 @@ async function onSelect(id: string): Promise<void> {
       :project="group.project"
       :sessions="group.sessions"
       :expanded="isExpanded(group.project.id)"
+      :active-session-id="chat.currentId"
       @toggle="toggleProject(group.project.id)"
       @select="onSelect"
     />
