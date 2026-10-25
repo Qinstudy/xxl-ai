@@ -121,7 +121,9 @@
     "approvalQuestion": "是否允许本次操作？",
     "approvalOnce": "允许本次",
     "approvalSession": "本会话允许",
-    "approvalDeny": "拒绝"
+    "approvalDeny": "拒绝",
+    "requestFailed": "请求失败",
+    "toolFields": "{0} 个字段"
   },
   "panel": {
     "files": "文件",
@@ -267,7 +269,9 @@
     "checkUpdate": "检查更新",
     "autoCheckUpdate": "启动时自动检查更新",
     "github": "GitHub 仓库",
-    "docs": "官方文档"
+    "docs": "官方文档",
+    "headersExample": "示例：",
+    "apiKeyLoading": "密钥读取中，请稍候"
   },
   "plugin": {
     "title": "插件",

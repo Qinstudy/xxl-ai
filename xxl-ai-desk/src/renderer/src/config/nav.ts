@@ -6,14 +6,18 @@
 /* 一级板块标识 */
 export type SectionKey = 'home' | 'plugin' | 'settings'
 
-/* 子菜单项：icon 为已全局注册的图标组件名；path 用于路由跳转；tab 用于设置分类切换 */
-export interface NavItem {
+/* 子菜单项公共字段 */
+interface NavItemBase {
   key: string
   labelKey: string
+  /* 已全局注册的图标组件名 */
   icon?: string
-  path?: string
-  tab?: string
 }
+
+/* 子菜单项：路由项跳 path，设置项切 tab（二者互斥，避免运行时靠真值猜测） */
+export type NavItem =
+  | (NavItemBase & { path: string; tab?: never })
+  | (NavItemBase & { tab: string; path?: never })
 
 /* 板块子菜单定义（首页为自定义面板，不在此列） */
 export interface NavSection {

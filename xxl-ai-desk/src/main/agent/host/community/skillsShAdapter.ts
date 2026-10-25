@@ -6,6 +6,7 @@
  */
 
 import { load } from 'cheerio'
+import { isTimeoutError, requestWithTimeout } from '../../../utils/http'
 
 /* 站点根地址 */
 const BASE_URL = 'https://www.skills.sh'
@@ -13,9 +14,6 @@ const BASE_URL = 'https://www.skills.sh'
 /* 与普通浏览器一致的 UA，避免被站点拦截 */
 const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
-
-/* 请求超时（毫秒） */
-const TIMEOUT = 15000
 
 /* 榜单类型 */
 export type LeaderboardView = 'all-time' | 'trending'
@@ -48,16 +46,9 @@ export interface RemoteSkillPage {
 
 /* 带超时的文本请求 */
 async function fetchText(url: string): Promise<string> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT)
   try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': USER_AGENT,
-        Accept: 'application/json,text/html;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'zh-CN,zh;q=0.9'
-      }
+    const response = await requestWithTimeout(url, {
+      headers: { 'User-Agent': USER_AGENT }
     })
     if (!response.ok) {
       let detail = ''
@@ -77,12 +68,10 @@ async function fetchText(url: string): Promise<string> {
     }
     return await response.text()
   } catch (error) {
-    if ((error as Error).name === 'AbortError') {
+    if (isTimeoutError(error)) {
       throw new Error('skills.sh 访问超时，请检查网络后重试')
     }
     throw error as Error
-  } finally {
-    clearTimeout(timer)
   }
 }
 

@@ -11,6 +11,7 @@ import { api } from '@renderer/api'
 import { t } from '@renderer/i18n'
 import { useWorkspaceStore } from '@renderer/stores/workspace'
 import { normalizePath, parentDir } from '../../utils/path'
+import FileToolbar from './FileToolbar.vue'
 import FileViewer from './FileViewer.vue'
 import FileTreePanel from './FileTreePanel.vue'
 import type { FileContent, FsEntry, OpenWithApp } from '@shared/ipc'
@@ -256,83 +257,22 @@ function onOpenCommand(command: string): void {
 
 <template>
   <div class="file-panel">
-    <!-- 工具栏：面包屑 + 预览/打开操作 -->
-    <div class="file-toolbar">
-      <div class="file-breadcrumb">
-        <template v-for="(seg, index) in breadcrumb" :key="index">
-          <span v-if="index > 0" class="crumb-sep">›</span>
-          <span class="crumb" :class="{ current: index === breadcrumb.length - 1 }">{{ seg }}</span>
-        </template>
-      </div>
-      <div class="file-actions">
-        <button
-          v-if="editable"
-          class="panel-btn"
-          :class="{ active: dirty }"
-          :disabled="!dirty || saving"
-          :title="t('panel.saveHint')"
-          @click="save"
-        >
-          <el-icon><Finished /></el-icon>
-          <span>{{ t('panel.save') }}</span>
-        </button>
-        <button
-          v-if="canPreview"
-          class="panel-btn"
-          :class="{ active: showPreview }"
-          :title="showPreview ? t('panel.code') : t('panel.preview')"
-          @click="preview = !preview"
-        >
-          <el-icon><Document /></el-icon>
-          <span>{{ showPreview ? t('panel.code') : t('panel.preview') }}</span>
-        </button>
-        <button
-          class="panel-btn"
-          :disabled="!file && !root"
-          :title="file ? t('panel.openFolder') : t('panel.openProjectFolder')"
-          @click="revealFolder"
-        >
-          <el-icon><FolderOpened /></el-icon>
-        </button>
-        <!-- 打开：左半默认应用直接打开，右半下拉选择打开方式 -->
-        <div class="panel-btn open-split" :class="{ disabled: !file }">
-          <button
-            class="open-split-main"
-            :disabled="!file"
-            :title="t('panel.openDefault')"
-            @click="openDefault"
-          >
-            <el-icon><DocumentAdd /></el-icon>
-            <span>{{ t('panel.open') }}</span>
-          </button>
-          <el-dropdown trigger="click" :disabled="!file" @command="onOpenCommand">
-            <button class="open-split-toggle" :disabled="!file" :title="t('panel.open')">
-              <el-icon class="chevron"><ArrowDown /></el-icon>
-            </button>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="default">
-                  <el-icon><Document /></el-icon>{{ t('panel.openDefault') }}
-                </el-dropdown-item>
-                <el-dropdown-item
-                  v-for="app in openApps"
-                  :key="app.path"
-                  :command="`app:${app.path}`"
-                >
-                  <el-icon><Monitor /></el-icon>{{ app.name }}
-                </el-dropdown-item>
-                <el-dropdown-item command="folder" divided>
-                  <el-icon><FolderOpened /></el-icon>{{ t('panel.openFolder') }}
-                </el-dropdown-item>
-                <el-dropdown-item command="copy" divided>
-                  <el-icon><CopyDocument /></el-icon>{{ t('panel.copyPath') }}
-                </el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
-      </div>
-    </div>
+    <FileToolbar
+      :breadcrumb="breadcrumb"
+      :editable="editable"
+      :dirty="dirty"
+      :saving="saving"
+      :can-preview="canPreview"
+      :show-preview="showPreview"
+      :has-file="Boolean(file)"
+      :has-root="Boolean(root)"
+      :open-apps="openApps"
+      @save="save"
+      @toggle-preview="preview = !preview"
+      @reveal="revealFolder"
+      @open-default="openDefault"
+      @open-command="onOpenCommand"
+    />
 
     <div class="file-main">
       <!-- 左：项目目录树 -->
@@ -367,144 +307,6 @@ function onOpenCommand(command: string): void {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-}
-
-/* 工具栏：面包屑居左，操作居右 */
-.file-toolbar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 8px 12px 8px 16px;
-  border-bottom: 1px solid var(--desk-border);
-}
-
-.file-breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 13px;
-  color: var(--desk-text-tertiary);
-}
-
-.crumb {
-  flex-shrink: 0;
-  max-width: 140px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.crumb.current {
-  color: var(--desk-text);
-  flex-shrink: 1;
-}
-
-.crumb-sep {
-  flex-shrink: 0;
-  color: var(--desk-text-tertiary);
-}
-
-.file-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-/* 通用面板按钮 */
-.panel-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--desk-border);
-  border-radius: 8px;
-  background: var(--desk-bg);
-  color: var(--desk-text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.panel-btn:hover:not(:disabled) {
-  background: var(--desk-primary-soft);
-  color: var(--desk-text);
-}
-
-.panel-btn.active {
-  background: var(--desk-segment-bg);
-  color: var(--desk-text);
-  border-color: var(--desk-segment-border);
-}
-
-.panel-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.panel-btn .chevron {
-  font-size: 12px;
-}
-
-/* 打开按钮：左半默认打开 + 右半打开方式下拉，整体保持一个按钮外观 */
-.open-split {
-  gap: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
-.open-split.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* 无文件时保持按钮静止，不响应悬浮高亮 */
-.open-split.disabled:hover {
-  background: var(--desk-bg);
-  color: var(--desk-text-secondary);
-}
-
-.open-split-main,
-.open-split-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  border: none;
-  background: transparent;
-  color: inherit;
-  font-size: inherit;
-  cursor: pointer;
-}
-
-.open-split-main {
-  gap: 5px;
-  padding: 0 10px;
-}
-
-/* 右半下拉触发器：与左半用细线分隔，仅展示箭头 */
-.open-split-toggle {
-  padding: 0 6px;
-  border-left: 1px solid var(--desk-border);
-}
-
-.open-split-main:disabled,
-.open-split-toggle:disabled {
-  cursor: not-allowed;
-}
-
-/* 下拉包裹层撑满按钮高度，保证左右两半等高 */
-.open-split :deep(.el-dropdown) {
-  display: inline-flex;
-  height: 100%;
 }
 
 /* 主体：左文件树 + 右内容 */

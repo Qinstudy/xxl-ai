@@ -10,6 +10,7 @@ import { getDb } from '../db'
 import { providerTable } from '../db/schema'
 import { decryptSecret, encryptSecret } from './securityService'
 import { normalizeBaseUrl, USER_AGENT } from '@shared/providerUrl'
+import { isTimeoutError, requestWithTimeout } from '../utils/http'
 import { getSettings, saveSettings } from './settingsService'
 import type { ProviderDTO, ProviderModelQuery } from '@shared/ipc'
 
@@ -32,8 +33,12 @@ function parseHeaders(raw: string): Record<string, string> {
   return {}
 }
 
-/* 行记录 → DTO（解密密钥、解析模型列表与请求Header） */
-function toDTO(row: ProviderRow): ProviderDTO {
+/*
+ * 行记录 → DTO（解析模型列表与请求Header）。
+ *   - revealSecret=true 仅用于编辑态/运行时装配，列表接口一律脱敏；
+ *   - apiKeySet 用于界面展示「已配置」状态。
+ */
+function toDTO(row: ProviderRow, revealSecret = false): ProviderDTO {
   let models: string[] = []
   try {
     const parsed = JSON.parse(row.models)
@@ -47,7 +52,8 @@ function toDTO(row: ProviderRow): ProviderDTO {
     id: row.id,
     name: row.name,
     baseUrl: row.baseUrl,
-    apiKey: decryptSecret(row.apiKey),
+    apiKey: revealSecret ? decryptSecret(row.apiKey) : undefined,
+    apiKeySet: Boolean(row.apiKey),
     headers: parseHeaders(row.headers),
     models,
     enabled: row.enabled === 1,
@@ -57,16 +63,22 @@ function toDTO(row: ProviderRow): ProviderDTO {
   }
 }
 
-/* 供应商列表 */
+/* 供应商列表（密钥脱敏） */
 export function listProviders(): ProviderDTO[] {
   const rows = getDb().select().from(providerTable).orderBy(providerTable.sort).all()
-  return rows.map(toDTO)
+  return rows.map((row) => toDTO(row, false))
 }
 
-/* 按主键读取供应商 */
+/* 按主键读取供应商（含解密密钥，供运行时装配与远程模型查询） */
 export function getProvider(id: string): ProviderDTO | null {
   const row = getDb().select().from(providerTable).where(eq(providerTable.id, id)).get()
-  return row ? toDTO(row) : null
+  return row ? toDTO(row, true) : null
+}
+
+/* 读取供应商密钥明文（仅编辑态按需调用，列表不返回） */
+export function getProviderSecret(id: string): string {
+  const row = getDb().select().from(providerTable).where(eq(providerTable.id, id)).get()
+  return row ? decryptSecret(row.apiKey) : ''
 }
 
 /* 新增或更新供应商 */
@@ -76,6 +88,7 @@ export function saveProvider(input: Partial<ProviderDTO>): ProviderDTO {
   const id = input.id || randomUUID()
   const existing = db.select().from(providerTable).where(eq(providerTable.id, id)).get()
 
+  /* 未传 apiKey 表示保持原值；显式空串表示清空 */
   const apiKey =
     input.apiKey !== undefined ? encryptSecret(input.apiKey) : (existing?.apiKey ?? '')
   const record = {
@@ -96,7 +109,7 @@ export function saveProvider(input: Partial<ProviderDTO>): ProviderDTO {
     .onConflictDoUpdate({ target: providerTable.id, set: record })
     .run()
 
-  return toDTO(record)
+  return toDTO(record, true)
 }
 
 /* 删除供应商 */
@@ -117,7 +130,7 @@ export async function fetchRemoteModels(input: ProviderModelQuery): Promise<stri
     const existing = getProvider(input.id)
     if (existing) {
       baseUrl = baseUrl || existing.baseUrl
-      apiKey = apiKey || existing.apiKey
+      apiKey = apiKey || existing.apiKey || ''
       headers = Object.keys(headers).length > 0 ? headers : existing.headers
     }
   }
@@ -132,12 +145,9 @@ export async function fetchRemoteModels(input: ProviderModelQuery): Promise<stri
     requestHeaders.Authorization = `Bearer ${apiKey}`
   }
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 15000)
   try {
-    const response = await fetch(`${normalizeBaseUrl(baseUrl)}/models`, {
-      headers: requestHeaders,
-      signal: controller.signal
+    const response = await requestWithTimeout(`${normalizeBaseUrl(baseUrl)}/models`, {
+      headers: requestHeaders
     })
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`)
@@ -152,8 +162,11 @@ export async function fetchRemoteModels(input: ProviderModelQuery): Promise<stri
         ? data.models.map((item) => item.name ?? item.model)
         : []
     return Array.from(new Set(ids.filter((id): id is string => Boolean(id))))
-  } finally {
-    clearTimeout(timer)
+  } catch (error) {
+    if (isTimeoutError(error)) {
+      throw new Error('请求供应商模型列表超时，请检查网络或接口地址')
+    }
+    throw error as Error
   }
 }
 

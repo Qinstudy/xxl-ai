@@ -6,8 +6,6 @@
 export { default as WorkspaceToolPanel } from './components/ToolPanel.vue'
 export { default as BrowserHost } from './components/browser/BrowserHost.vue'
 export { default as WorkspacePanelActions } from './components/WorkspacePanelActions.vue'
+export { default as ShellTerminalHost } from './components/ShellTerminalHost.vue'
 export { useTerminalTarget } from './composables/useTerminalTarget'
-export {
-  disposeBrowserSession,
-  cleanupBrowserSessions
-} from './composables/browserRuntime'
+export { cleanupBrowserSessions } from './composables/browserRuntime'

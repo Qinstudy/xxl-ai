@@ -211,7 +211,8 @@ async function handleMcpTools(
 }
 
 /* 处理来自主进程的请求 */
-function handleRequest(message: WorkerRequest): void {  switch (message.type) {
+function handleRequest(message: WorkerRequest): void {
+  switch (message.type) {
     case 'run':
       void handleRun(message.input)
       break

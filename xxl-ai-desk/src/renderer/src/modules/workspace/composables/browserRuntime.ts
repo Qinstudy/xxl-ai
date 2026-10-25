@@ -10,7 +10,7 @@ import { computed, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@renderer/api'
 import { t } from '@renderer/i18n'
-import { createBrowserTab, useBrowserSessionStore, type BrowserTab } from '@renderer/stores/browserSession'
+import { createBrowserTab } from '@renderer/stores/browserSession'
 import { normalizeBrowserUrl } from '@shared/browserUrl'
 import { enqueueSessionTask } from './browserActionQueue'
 import {
@@ -21,36 +21,29 @@ import {
   removeWarmSession
 } from './browserSessionHost'
 import {
-  buildClickScript,
-  buildFillScript,
-  buildProbeScript,
-  buildReadScript,
-  buildSnapshotScript
-} from '../utils/browserScripts'
-import type {
-  BrowserAction,
-  BrowserActionResult,
-  BrowserConsoleEntry,
-  BrowserFillField,
-  BrowserSnapshotNode,
-  BrowserTabInfo
-} from '@shared/ipc'
-
-/* Electron <webview> 的最小能力声明（渲染进程无官方类型） */
-export interface WebviewElement extends HTMLElement {
-  loadURL(url: string): Promise<void>
-  getURL(): string
-  canGoBack(): boolean
-  canGoForward(): boolean
-  goBack(): void
-  goForward(): void
-  reload(): void
-  stop(): void
-  focus(): void
-  remove(): void
-  capturePage(): Promise<{ getSize(): { width: number; height: number }; toDataURL(): string }>
-  executeJavaScript(code: string): Promise<unknown>
-}
+  activeTabOf,
+  browserStore,
+  consoleLogs,
+  failedLoads,
+  findTab,
+  pendingNav,
+  readyTabs,
+  stateOf,
+  webviews,
+  type WebviewElement
+} from './browserState'
+import {
+  clickActiveTab,
+  diagnosticsActiveTab,
+  fillActiveTab,
+  historyActiveTab,
+  readActiveTab,
+  screenshotActiveTab,
+  snapshotActiveTab,
+  tabLabel,
+  waitActiveTab
+} from './browserActions'
+import type { BrowserAction, BrowserActionResult, BrowserTabInfo } from '@shared/ipc'
 
 /* 事件负载 */
 interface FailLoadEvent extends Event {
@@ -74,44 +67,8 @@ const MAX_TABS = 8
 /* 单标签页诊断上限，避免长期运行无限增长 */
 const MAX_DIAGNOSTICS = 100
 
-/* ============ 运行时资源（模块级单例） ============ */
-
-/* 标签页 ID → webview 元素 */
-const webviews = new Map<string, WebviewElement>()
-/* guest 是否已就绪 */
-const readyTabs = new Set<string>()
-/* guest 未就绪时暂存的待导航地址（dom-ready 后再 loadURL） */
-const pendingNav = new Map<string, string>()
-/* 控制台告警/错误与加载失败（供 Agent 诊断，按标签页维护） */
-const consoleLogs = new Map<string, BrowserConsoleEntry[]>()
-const failedLoads = new Map<string, string[]>()
 /* 地址栏聚焦时不覆盖用户正在编辑的输入 */
 let inputFocused = false
-
-/* 浏览器状态 store */
-function browserStore() {
-  return useBrowserSessionStore()
-}
-
-/* 取某会话的标签状态 */
-function stateOf(sessionId: string) {
-  return browserStore().sliceOf(sessionId)
-}
-
-/* 当前激活标签页（兜底取首个） */
-function activeTabOf(state: ReturnType<typeof stateOf>): BrowserTab | undefined {
-  return state.tabs.find((tab) => tab.id === state.activeId) ?? state.tabs[0]
-}
-
-/* 按 id 查找标签页 */
-function findTab(sessionId: string, id: string): BrowserTab | undefined {
-  return stateOf(sessionId).tabs.find((tab) => tab.id === id)
-}
-
-/* 简单延时 */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
 
 /* ============ 宿主与生命周期 ============ */
 
@@ -237,6 +194,7 @@ async function loadUrl(id: string, url: string): Promise<void> {
 
 /* 导航到指定 URL：guest 未就绪时先排队，dom-ready 后再 loadURL */
 async function navigate(sessionId: string, id: string, url: string): Promise<void> {
+  browserStore().touch(sessionId)
   const view = ensureWebview(id, sessionId)
   const tab = findTab(sessionId, id)
   if (tab) {
@@ -352,301 +310,6 @@ function ensureWebview(id: string, sessionId: string): WebviewElement | null {
 
 /* ============ 页面动作执行 ============ */
 
-/* 读取 webview 当前地址（未就绪时返回空串，避免抛错中断等待） */
-function currentUrlOf(view: WebviewElement): string {
-  try {
-    return view.getURL() || ''
-  } catch {
-    return ''
-  }
-}
-
-/*
- * 等待页面真正可读：webview 已 dom-ready、不在加载中、且已离开 about:blank。
- * open_browser 与 read_browser 可能同批并行，必须等导航落地后再取正文。
- */
-async function waitForPageReady(
-  tab: BrowserTab,
-  view: WebviewElement,
-  timeout = 12000
-): Promise<void> {
-  const started = Date.now()
-  while (Date.now() - started < timeout) {
-    const url = currentUrlOf(view)
-    if (readyTabs.has(tab.id) && !tab.loading && url && url !== 'about:blank') {
-      return
-    }
-    await sleep(150)
-  }
-}
-
-/* 解析当前可操作的页面：等待标签页创建、导航落定与加载完成 */
-async function resolveActivePage(
-  sessionId: string,
-  timeout = 12000
-): Promise<{ tab: BrowserTab; view: WebviewElement } | BrowserActionResult> {
-  const started = Date.now()
-  const state = stateOf(sessionId)
-  /* 先等标签页创建 + 宿主挂载 + 导航目标写入（open_browser 的请求由 IPC 异步转达） */
-  let tab = activeTabOf(state)
-  let view = tab ? webviews.get(tab.id) : undefined
-  while ((!tab?.hasPage || !view) && Date.now() - started < timeout) {
-    await sleep(120)
-    tab = activeTabOf(stateOf(sessionId))
-    view = tab ? webviews.get(tab.id) : undefined
-  }
-  if (!tab?.hasPage) {
-    return { ok: false, error: '右侧浏览器尚未打开页面，请先使用 open_browser 打开页面' }
-  }
-  if (!view) {
-    return { ok: false, error: '浏览器尚未就绪，请稍后重试' }
-  }
-  await waitForPageReady(tab, view, Math.max(1000, timeout - (Date.now() - started)))
-  return { tab, view }
-}
-
-/* 动作后等待页面加载结束并留出渲染稳定时间 */
-async function settlePage(sessionId: string, tabId: string, quietMs = 250): Promise<void> {
-  const started = Date.now()
-  while (Date.now() - started < 3000) {
-    const tab = findTab(sessionId, tabId)
-    if (!tab?.loading) {
-      break
-    }
-    await sleep(100)
-  }
-  await sleep(quietMs)
-}
-
-/* 读取当前标签页正文：注入脚本提取标题、地址与可见文本 */
-async function readActiveTab(
-  sessionId: string,
-  action: { selector?: string; maxChars?: number }
-): Promise<BrowserActionResult> {
-  const page = await resolveActivePage(sessionId)
-  if ('ok' in page) {
-    return page
-  }
-  const { tab, view } = page
-  const max = Math.min(Math.max(Math.floor(action.maxChars ?? 20000), 1000), 50000)
-  const script = buildReadScript(action.selector)
-  try {
-    const raw = (await view.executeJavaScript(script)) as {
-      title?: string
-      url?: string
-      text?: string
-      missing?: boolean
-    }
-    if (raw?.missing) {
-      return { ok: false, error: `未找到选择器匹配的元素：${action.selector ?? ''}` }
-    }
-    const full = raw?.text ?? ''
-    return {
-      ok: true,
-      title: raw?.title ?? tab.title,
-      url: raw?.url ?? tab.currentUrl,
-      text: full.slice(0, max),
-      truncated: full.length > max
-    }
-  } catch (error) {
-    return { ok: false, error: `读取页面失败：${(error as Error).message}` }
-  }
-}
-
-/* 页面快照：提取可交互元素并分配稳定 ref，供 click / fill 使用 */
-async function snapshotActiveTab(
-  sessionId: string,
-  action: { maxNodes?: number }
-): Promise<BrowserActionResult> {
-  const page = await resolveActivePage(sessionId)
-  if ('ok' in page) {
-    return page
-  }
-  const { tab, view } = page
-  const maxNodes = Math.min(Math.max(Math.floor(action.maxNodes ?? 120), 10), 300)
-  const script = buildSnapshotScript(maxNodes)
-  try {
-    const raw = (await view.executeJavaScript(script)) as {
-      title?: string
-      url?: string
-      nodes?: BrowserSnapshotNode[]
-      totalNodes?: number
-      text?: string
-      truncated?: boolean
-    }
-    return {
-      ok: true,
-      title: raw?.title ?? tab.title,
-      url: raw?.url ?? tab.currentUrl,
-      nodes: raw?.nodes ?? [],
-      totalNodes: raw?.totalNodes ?? 0,
-      text: raw?.text ?? '',
-      truncated: Boolean(raw?.truncated)
-    }
-  } catch (error) {
-    return { ok: false, error: `读取页面结构失败：${(error as Error).message}` }
-  }
-}
-
-/* 点击元素：优先使用快照 ref，其次 CSS 选择器 */
-async function clickActiveTab(
-  sessionId: string,
-  action: { ref?: string; selector?: string; button?: 'left' | 'right'; clickCount?: number }
-): Promise<BrowserActionResult> {
-  const page = await resolveActivePage(sessionId)
-  if ('ok' in page) {
-    return page
-  }
-  const { tab, view } = page
-  const button = action.button === 'right' ? 'right' : 'left'
-  const count = Math.min(Math.max(Math.floor(action.clickCount ?? 1), 1), 3)
-  const script = buildClickScript({ ref: action.ref, selector: action.selector, button, count })
-  try {
-    const raw = (await view.executeJavaScript(script)) as { ok?: boolean; error?: string }
-    if (!raw?.ok) {
-      return { ok: false, error: raw?.error || '点击失败：未找到目标元素' }
-    }
-  } catch (error) {
-    return { ok: false, error: `点击失败：${(error as Error).message}` }
-  }
-  await settlePage(sessionId, tab.id)
-  return {
-    ok: true,
-    title: tab.title,
-    url: tab.currentUrl,
-    summary: `已${button === 'right' ? '右键点击' : '点击'}${action.ref || action.selector || '目标元素'}`
-  }
-}
-
-/* 填写表单：支持文本、下拉、复选/单选与 contenteditable，可选择提交 */
-async function fillActiveTab(
-  sessionId: string,
-  action: { fields: BrowserFillField[]; submit?: boolean }
-): Promise<BrowserActionResult> {
-  const page = await resolveActivePage(sessionId)
-  if ('ok' in page) {
-    return page
-  }
-  const { tab, view } = page
-  if (!action.fields || action.fields.length === 0) {
-    return { ok: false, error: 'fields 不能为空' }
-  }
-  const script = buildFillScript(action.fields, action.submit === true)
-  try {
-    const raw = (await view.executeJavaScript(script)) as {
-      ok?: boolean
-      filled?: number
-      missing?: string[]
-      error?: string
-    }
-    if (!raw?.ok) {
-      return { ok: false, error: raw?.error || '填写失败', filled: raw?.filled, missing: raw?.missing }
-    }
-    await settlePage(sessionId, tab.id)
-    return {
-      ok: true,
-      title: tab.title,
-      url: tab.currentUrl,
-      filled: raw.filled ?? 0,
-      missing: raw.missing ?? [],
-      summary: `已填写 ${raw.filled ?? 0} 个字段${action.submit ? '并提交表单' : ''}`
-    }
-  } catch (error) {
-    return { ok: false, error: `填写失败：${(error as Error).message}` }
-  }
-}
-
-/* 等待页面条件：选择器 / 文本 / URL，任一命中即返回 */
-async function waitActiveTab(
-  sessionId: string,
-  action: { selector?: string; text?: string; url?: string; timeoutMs?: number }
-): Promise<BrowserActionResult> {
-  const page = await resolveActivePage(sessionId)
-  if ('ok' in page) {
-    return page
-  }
-  const { tab, view } = page
-  if (!action.selector && !action.text && !action.url) {
-    return { ok: false, error: '至少提供 selector / text / url 之一' }
-  }
-  const timeout = Math.min(Math.max(Math.floor(action.timeoutMs ?? 8000), 500), 30000)
-  const started = Date.now()
-  /* 渲染层轮询：URL 直接在标签页状态判断，选择器/文本在页面内探测，整页跳转不会中断等待 */
-  while (Date.now() - started < timeout) {
-    if (action.url && tab.currentUrl.includes(action.url)) {
-      return {
-        ok: true,
-        matched: true,
-        waitedMs: Date.now() - started,
-        title: tab.title,
-        url: tab.currentUrl
-      }
-    }
-    if (action.selector || action.text) {
-      try {
-        const raw = (await view.executeJavaScript(
-          buildProbeScript({ selector: action.selector, text: action.text })
-        )) as { matched?: boolean; title?: string; url?: string }
-        if (raw?.matched) {
-          return {
-            ok: true,
-            matched: true,
-            waitedMs: Date.now() - started,
-            title: raw.title ?? tab.title,
-            url: raw.url ?? tab.currentUrl
-          }
-        }
-      } catch {
-        /* 页面跳转中脚本上下文可能被销毁：继续轮询，下一轮会落到新页面 */
-      }
-    }
-    await sleep(200)
-  }
-  return {
-    ok: true,
-    matched: Boolean(action.url && tab.currentUrl.includes(action.url)),
-    waitedMs: Date.now() - started,
-    title: tab.title,
-    url: tab.currentUrl
-  }
-}
-
-/* 页面截图：返回 data URL 供视觉模型查看 */
-async function screenshotActiveTab(sessionId: string): Promise<BrowserActionResult> {
-  const page = await resolveActivePage(sessionId)
-  if ('ok' in page) {
-    return page
-  }
-  const { tab, view } = page
-  try {
-    const image = await view.capturePage()
-    const size = image.getSize()
-    return {
-      ok: true,
-      title: tab.title,
-      url: tab.currentUrl,
-      screenshot: image.toDataURL(),
-      screenshotWidth: size.width,
-      screenshotHeight: size.height
-    }
-  } catch (error) {
-    return { ok: false, error: `截图失败：${(error as Error).message}` }
-  }
-}
-
-/* 页面诊断：当前标签页的告警/错误与加载失败记录 */
-function diagnosticsActiveTab(sessionId: string): BrowserActionResult {
-  const state = stateOf(sessionId)
-  const tab = activeTabOf(state)
-  return {
-    ok: true,
-    title: tab?.title ?? '',
-    url: tab?.currentUrl ?? '',
-    console: tab ? (consoleLogs.get(tab.id) ?? []) : [],
-    failedLoads: tab ? (failedLoads.get(tab.id) ?? []) : []
-  }
-}
-
 /* 标签页列表（含当前激活项） */
 function tabInfos(sessionId: string): BrowserTabInfo[] {
   const state = stateOf(sessionId)
@@ -656,21 +319,6 @@ function tabInfos(sessionId: string): BrowserTabInfo[] {
     url: tab.currentUrl,
     active: tab.id === state.activeId
   }))
-}
-
-/* 标签页显示名：优先页面标题，其次主机名，最后「新标签页」 */
-export function tabLabel(tab: BrowserTab): string {
-  if (tab.title) {
-    return tab.title
-  }
-  if (tab.currentUrl) {
-    try {
-      return new URL(tab.currentUrl).host
-    } catch {
-      return tab.currentUrl
-    }
-  }
-  return t('panel.untitled')
 }
 
 /* 标签页管理：列出 / 切换 / 关闭 */
@@ -695,37 +343,6 @@ async function manageTabs(
     ok: true,
     tabs: tabInfos(sessionId),
     activeTabId: stateOf(sessionId).activeId
-  }
-}
-
-/* 历史导航：后退 / 前进 / 刷新 */
-async function historyActiveTab(
-  sessionId: string,
-  action: { action: 'back' | 'forward' | 'reload' }
-): Promise<BrowserActionResult> {
-  const state = stateOf(sessionId)
-  const tab = activeTabOf(state)
-  const view = tab ? webviews.get(tab.id) : undefined
-  if (!tab) {
-    return { ok: false, error: '浏览器尚未就绪' }
-  }
-  if (action.action === 'back') {
-    if (view?.canGoBack()) {
-      view.goBack()
-    }
-  } else if (action.action === 'forward') {
-    if (view?.canGoForward()) {
-      view.goForward()
-    }
-  } else {
-    view?.reload()
-  }
-  await settlePage(sessionId, tab.id)
-  return {
-    ok: true,
-    title: tab.title,
-    url: tab.currentUrl,
-    summary: action.action === 'back' ? '已后退' : action.action === 'forward' ? '已前进' : '已刷新页面'
   }
 }
 
@@ -784,6 +401,7 @@ async function addTab(sessionId: string, url = ''): Promise<void> {
     }
     return
   }
+  browserStore().touch(sessionId)
   const tab = createBrowserTab(url)
   state.tabs.push(tab)
   state.activeId = tab.id
@@ -800,6 +418,7 @@ async function addTab(sessionId: string, url = ''): Promise<void> {
 
 /* 切换标签页 */
 async function selectTab(sessionId: string, id: string): Promise<void> {
+  browserStore().touch(sessionId)
   stateOf(sessionId).activeId = id
   applyVisibility(sessionId)
   await nextTick()

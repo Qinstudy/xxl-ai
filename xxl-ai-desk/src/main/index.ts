@@ -5,6 +5,7 @@ import { existsSync } from 'fs'
 import { join } from 'path'
 import log from 'electron-log/main'
 import { IPC } from '@shared/ipc'
+import { APP_NAME } from '@shared/appInfo'
 import { initDatabase } from './db'
 import { registerIpc } from './ipc'
 import { ensureSeedProviders } from './services/providerService'
@@ -37,7 +38,7 @@ function createWindow(): void {
     minHeight: 720,
     show: false,
     autoHideMenuBar: true,
-    title: 'XXL-AI-Desk',
+    title: APP_NAME,
     backgroundColor: '#ffffff',
     ...(isMac
       ? {

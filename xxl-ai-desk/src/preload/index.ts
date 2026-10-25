@@ -78,7 +78,9 @@ const api: DeskApi = {
     remove: (id: string) => ipcRenderer.invoke(IPC.providerRemove, id),
     /* 查询远端可用模型 */
     remoteModels: (input: ProviderModelQuery) =>
-      ipcRenderer.invoke(IPC.providerRemoteModels, input)
+      ipcRenderer.invoke(IPC.providerRemoteModels, input),
+    /* 读取密钥明文（仅编辑态按需调用） */
+    secret: (id: string): Promise<string> => ipcRenderer.invoke(IPC.providerSecret, id)
   },
   /* 项目管理 */
   project: {
@@ -109,8 +111,6 @@ const api: DeskApi = {
     /* 读取会话历史消息 */
     messages: (sessionId: string): Promise<StoredMessage[]> =>
       ipcRenderer.invoke(IPC.sessionMessages, sessionId),
-    /* 清空会话消息 */
-    clear: (sessionId: string) => ipcRenderer.invoke(IPC.sessionClear, sessionId),
     /* 按 ID 删除指定消息 */
     removeMessages: (sessionId: string, ids: string[]) =>
       ipcRenderer.invoke(IPC.sessionDeleteMessages, sessionId, ids)
@@ -152,9 +152,6 @@ const api: DeskApi = {
       ipcRenderer.invoke(IPC.terminalResize, id, cols, rows),
     /* 销毁终端实例 */
     dispose: (id: string) => ipcRenderer.invoke(IPC.terminalDispose, id),
-    /* 销毁某会话的全部终端实例 */
-    disposeBySession: (sessionId: string) =>
-      ipcRenderer.invoke(IPC.terminalDisposeBySession, sessionId),
     /* 终端归属会话迁移（新建对话草稿 → 真实会话） */
     reassign: (fromSessionId: string, toSessionId: string) =>
       ipcRenderer.invoke(IPC.terminalReassign, fromSessionId, toSessionId),

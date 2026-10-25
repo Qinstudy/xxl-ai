@@ -15,6 +15,8 @@ export * from './contracts/shell'
 export * from './contracts/mcp'
 export * from './contracts/skill'
 export * from './contracts/browser'
+export * from './defaults'
+export * from './toolManifest'
 
 import type {
   AppSettings,
@@ -102,6 +104,8 @@ export interface DeskApi {
     remove(id: string): Promise<void>
     /* 查询远端可用模型 */
     remoteModels(input: ProviderModelQuery): Promise<string[]>
+    /* 读取密钥明文（仅编辑态按需调用） */
+    secret(id: string): Promise<string>
   }
   /* 项目管理（1:1 绑定本地磁盘目录） */
   project: {
@@ -130,8 +134,6 @@ export interface DeskApi {
     remove(id: string): Promise<void>
     /* 读取会话历史消息 */
     messages(sessionId: string): Promise<StoredMessage[]>
-    /* 清空会话消息 */
-    clear(sessionId: string): Promise<void>
     /* 按 ID 删除指定消息 */
     removeMessages(sessionId: string, ids: string[]): Promise<void>
   }
@@ -162,8 +164,6 @@ export interface DeskApi {
     resize(id: string, cols: number, rows: number): Promise<void>
     /* 销毁终端实例 */
     dispose(id: string): Promise<void>
-    /* 销毁某会话的全部终端实例 */
-    disposeBySession(sessionId: string): Promise<void>
     /* 终端归属会话迁移（新建对话草稿 → 真实会话） */
     reassign(fromSessionId: string, toSessionId: string): Promise<void>
     /* 订阅终端输出 / 退出事件（返回取消订阅函数） */
@@ -275,6 +275,7 @@ export const IPC = {
   providerSave: 'desk:provider:save',
   providerRemove: 'desk:provider:remove',
   providerRemoteModels: 'desk:provider:remote-models',
+  providerSecret: 'desk:provider:secret',
   /* 项目 */
   projectList: 'desk:project:list',
   projectCreate: 'desk:project:create',
@@ -288,7 +289,6 @@ export const IPC = {
   sessionRename: 'desk:session:rename',
   sessionRemove: 'desk:session:remove',
   sessionMessages: 'desk:session:messages',
-  sessionClear: 'desk:session:clear',
   sessionDeleteMessages: 'desk:session:delete-messages',
   /* 对话 */
   chatSend: 'desk:chat:send',
@@ -303,7 +303,6 @@ export const IPC = {
   terminalWrite: 'desk:terminal:write',
   terminalResize: 'desk:terminal:resize',
   terminalDispose: 'desk:terminal:dispose',
-  terminalDisposeBySession: 'desk:terminal:dispose-by-session',
   terminalReassign: 'desk:terminal:reassign',
   terminalEvent: 'desk:terminal:event',
   /* 本地文件系统 */

@@ -5,7 +5,7 @@ import ChatRegion from '../components/ChatRegion.vue'
 import { WorkspaceToolPanel } from '@renderer/modules/workspace'
 import { useChatStore } from '@renderer/stores/chat'
 import { DRAFT_SESSION_KEY, useWorkspaceStore } from '@renderer/stores/workspace'
-import { usePanelResize } from '@renderer/composables/usePanelResize'
+import PanelResizer from '@renderer/components/PanelResizer.vue'
 import { useTerminalTarget } from '@renderer/modules/workspace'
 import { t } from '@renderer/i18n'
 
@@ -22,17 +22,11 @@ const workspaceState = computed(() => workspace.sliceOf(workspaceKey.value))
 /* 确保当前会话的工作区状态已创建（含本地持久化恢复） */
 watch(workspaceKey, (key) => workspace.ensure(key), { immediate: true })
 
-/* 拖拽右侧栏左边缘调整宽度（统一复用 usePanelResize） */
-const { startResize: startPanelResize } = usePanelResize({
-  getSize: () => workspaceState.value.tool.width,
-  setSize: (width) => workspace.setToolWidth(workspaceKey.value, width),
-  edge: 'right'
+/* 工具面板宽度双向绑定：拖拽写入当前会话切片（含夹取） */
+const toolWidth = computed({
+  get: () => workspaceState.value.tool.width,
+  set: (width: number) => workspace.setToolWidth(workspaceKey.value, width)
 })
-
-/* 双击拖拽手柄：恢复当前会话工具面板默认宽度 */
-function resetPanelWidth(): void {
-  workspace.resetToolWidth(workspaceKey.value)
-}
 </script>
 
 <template>
@@ -57,13 +51,13 @@ function resetPanelWidth(): void {
         "
       >
         <!-- 左边缘拖拽手柄：拖拽调整侧栏宽度，双击恢复默认宽度（放大态下不可拖拽） -->
-        <div
+        <PanelResizer
           v-if="!workspaceState.tool.maximized"
-          class="side-panel-resizer"
+          v-model:size="toolWidth"
+          edge="right"
           :title="t('layout.resetPanelWidth')"
-          @mousedown="startPanelResize"
-          @dblclick="resetPanelWidth"
-        ></div>
+          @reset="workspace.resetToolWidth(workspaceKey)"
+        />
         <WorkspaceToolPanel
           :key="workspaceKey"
           :session-id="workspaceKey"
@@ -113,30 +107,4 @@ function resetPanelWidth(): void {
   min-width: 0;
 }
 
-/* 左边缘拖拽手柄：与左侧会话栏保持同宽（5px），视觉条细；下方 ::after 提供更宽命中区 */
-.side-panel-resizer {
-  position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 10;
-  width: 5px;
-  height: 100%;
-  cursor: col-resize;
-  -webkit-app-region: no-drag;
-}
-
-/* 透明命中区：视觉条保持 5px，实际可抓取范围更宽（近分割线即可拖动） */
-.side-panel-resizer::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -2px;
-  width: 16px;
-  height: 100%;
-}
-
-.side-panel-resizer:hover,
-body.resizing .side-panel-resizer {
-  background: var(--desk-primary-soft);
-}
 </style>

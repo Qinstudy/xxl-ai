@@ -23,75 +23,9 @@ body {
   font-size: 15px;
 }
 
-/* --- 外壳布局：顶部全局定栏 + 下方（左侧栏 + 内容区） --- */
-.desk-shell {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
-  background: var(--desk-bg);
-}
+/* --- 外壳布局：结构样式由 App / AppTopbar / AppSidebar 组件自身维护 --- */
 
-/* 贯通整窗的全局顶栏：红黄绿（系统）+ 后退/前进 + 折叠按钮，位置固定 */
-.desk-topbar {
-  flex-shrink: 0;
-  height: var(--desk-header-height);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 0 12px;
-  background: var(--desk-chrome-bg);
-  -webkit-app-region: drag;
-}
-
-/* macOS：为红黄绿系统按钮预留左侧宽度 */
-.desk-topbar.mac {
-  padding-left: 80px;
-}
-
-.desk-topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-/* 页面上下文（标题等）teleport 挂载点 */
-.desk-topbar-context {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-}
-
-/* 页面操作（如对话页的终端/侧栏开关）teleport 挂载点 */
-.desk-topbar-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-  -webkit-app-region: no-drag;
-}
-
-/* 顶栏之下：左侧栏（图标栏 + 列表面板） + 内容区 */
-.desk-body {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-}
-
-.desk-sidebar {
-  width: 292px;
-  flex-shrink: 0;
-  position: relative;
-  display: flex;
-  flex-direction: row;
-  background: var(--desk-panel-bg);
-  overflow: hidden;
-  transition: width 0.2s ease;
-}
-
-/* 拖拽调整侧栏宽度期间：禁用过渡与文本选中，统一为列宽光标 */
+/* 拖拽调整侧栏宽度期间：禁用文本选中，统一为列宽光标 */
 body.resizing {
   cursor: col-resize;
   user-select: none;
@@ -115,19 +49,6 @@ body.resizing-vertical {
 .sidebar-list {
   flex: 1;
   padding: 0 10px;
-}
-
-body.resizing .desk-sidebar {
-  transition: none;
-}
-
-.desk-main {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  background: var(--desk-bg);
 }
 
 /* 侧栏折叠/展开按钮：置于右侧各页面顶部标题栏左侧（全局共用） */

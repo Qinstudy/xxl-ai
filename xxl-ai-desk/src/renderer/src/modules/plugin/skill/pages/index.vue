@@ -4,10 +4,16 @@
  * @author xuxueli 2026-10-25
  */
 import { ref } from 'vue'
+import PluginCenterShell from '../../components/PluginCenterShell.vue'
 import SkillManagePanel from '../components/SkillManagePanel.vue'
 import SkillDiscoverPanel from '../components/SkillDiscoverPanel.vue'
 import SkillDetailDrawer from '../components/SkillDetailDrawer.vue'
-import { t } from '@renderer/i18n'
+
+/* 中心 TAB 定义：与 MCP 中心共用外壳 */
+const TABS = [
+  { key: 'manage', labelKey: 'plugin.skillCenter.tabManage' },
+  { key: 'discover', labelKey: 'plugin.skillCenter.tabDiscover' }
+]
 
 /* 当前 TAB：manage 管理 / discover 发现 */
 const activeTab = ref<'manage' | 'discover'>('manage')
@@ -24,95 +30,18 @@ function openDetail(id: string): void {
 </script>
 
 <template>
-  <div class="skill-center">
-    <div class="center-header">
-      <div class="tab-bar">
-        <button
-          class="tab-item"
-          :class="{ active: activeTab === 'manage' }"
-          @click="activeTab = 'manage'"
-        >
-          {{ t('plugin.skillCenter.tabManage') }}
-        </button>
-        <button
-          class="tab-item"
-          :class="{ active: activeTab === 'discover' }"
-          @click="activeTab = 'discover'"
-        >
-          {{ t('plugin.skillCenter.tabDiscover') }}
-        </button>
-      </div>
-    </div>
-
-    <div class="center-body">
-      <SkillManagePanel
-        v-show="activeTab === 'manage'"
-        @detail="openDetail"
-        @discover="activeTab = 'discover'"
-      />
-      <SkillDiscoverPanel v-show="activeTab === 'discover'" @installed="openDetail" />
-    </div>
+  <PluginCenterShell
+    :tabs="TABS"
+    :active="activeTab"
+    @update:active="activeTab = $event as 'manage' | 'discover'"
+  >
+    <SkillManagePanel
+      v-show="activeTab === 'manage'"
+      @detail="openDetail"
+      @discover="activeTab = 'discover'"
+    />
+    <SkillDiscoverPanel v-show="activeTab === 'discover'" @installed="openDetail" />
 
     <SkillDetailDrawer v-model:visible="detailVisible" :skill-id="detailId" />
-  </div>
+  </PluginCenterShell>
 </template>
-
-<style scoped lang="scss">
-.skill-center {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  background: var(--desk-bg);
-}
-
-.center-header {
-  flex-shrink: 0;
-  padding: 18px 28px 0;
-  border-bottom: 1px solid var(--desk-border);
-}
-
-.tab-bar {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-}
-
-.tab-item {
-  position: relative;
-  padding: 0 0 12px;
-  border: none;
-  background: transparent;
-  font-size: 14px;
-  color: var(--desk-text-secondary);
-  cursor: pointer;
-  transition: color 0.15s ease;
-}
-
-.tab-item:hover {
-  color: var(--desk-text);
-}
-
-.tab-item.active {
-  color: var(--desk-text);
-  font-weight: 600;
-}
-
-.tab-item.active::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--desk-primary);
-}
-
-.center-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-top: 16px;
-}
-</style>

@@ -1,9 +1,10 @@
-/* 会话工作区状态：按会话隔离的对话草稿/滚动、工具面板与底部终端 */
+/* 会话工作区状态：按会话隔离的工具面板（文件/浏览器）与底部终端 UI */
 
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { api } from '@renderer/api'
 import { useShellStore } from './shell'
+import { createSessionScopedStorage } from '@renderer/utils/sessionScopedStorage'
 
 /* 新建对话草稿态使用的固定工作区 key（首次发送创建会话后迁移给真实会话） */
 export const DRAFT_SESSION_KEY = '__draft__'
@@ -49,7 +50,6 @@ export interface WorkspaceState {
 const STORAGE_PREFIX = 'desk:workspace:'
 const STORAGE_VERSION = 1
 /* 防抖写入间隔（毫秒） */
-const PERSIST_DELAY = 300
 
 /* 默认尺寸与边界 */
 const TOOL_WIDTH_DEFAULT = 520
@@ -57,9 +57,9 @@ const TOOL_WIDTH_MIN = 240
 const TERMINAL_HEIGHT_DEFAULT = 240
 const TERMINAL_HEIGHT_MIN = 120
 const TERMINAL_HEIGHT_RESERVED = 240
-/* 会话正文最大宽度与图标栏宽度：用于计算工具面板最大宽度 */
-const CHAT_MAX_WIDTH = 944
+/* 图标栏最小占位与正文最小可用宽度：用于计算工具面板最大宽度（与 --desk-rail-width 对齐） */
 const RAIL_WIDTH = 44
+const MIN_CHAT_WIDTH = 360
 
 /* 创建默认工作区状态 */
 function createState(): WorkspaceState {
@@ -87,10 +87,11 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, Math.round(value)))
 }
 
-/* 计算工具面板最大宽度：窗口宽度扣除图标栏、左侧子菜单栏与会话正文 */
+/* 计算工具面板最大宽度：窗口宽度扣除图标栏、左侧子菜单栏与正文最小可用宽度 */
 function toolWidthMax(): number {
   const panelWidth = useShellStore().panelWidth
-  return Math.max(820, window.innerWidth - RAIL_WIDTH - panelWidth - CHAT_MAX_WIDTH)
+  const available = window.innerWidth - RAIL_WIDTH - panelWidth - MIN_CHAT_WIDTH
+  return Math.max(TOOL_WIDTH_MIN, available)
 }
 
 /* 计算终端最大高度：为正文预留空间 */
@@ -98,17 +99,16 @@ function terminalHeightMax(): number {
   return Math.max(TERMINAL_HEIGHT_MIN, window.innerHeight - TERMINAL_HEIGHT_RESERVED)
 }
 
-/* 读取本地持久化：结构非法时回落默认值 */
-function readStored(key: string): WorkspaceState | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + key)
-    if (!raw) {
-      return null
-    }
-    const parsed = JSON.parse(raw) as Partial<WorkspaceState>
-    if (parsed.version !== STORAGE_VERSION) {
-      return null
-    }
+/* 工作区状态持久化：统一版本校验、防抖与失效清理；终端运行时字段不落盘 */
+const storage = createSessionScopedStorage<WorkspaceState>({
+  prefix: STORAGE_PREFIX,
+  version: STORAGE_VERSION,
+  toStored: (state) => ({
+    ...state,
+    terminal: { ...state.terminal, tabs: [], activeId: '' }
+  }),
+  fromStored: (raw) => {
+    const parsed = raw as Partial<WorkspaceState>
     const base = createState()
     return {
       tool: {
@@ -143,57 +143,23 @@ function readStored(key: string): WorkspaceState | null {
       updateTime: Number(parsed.updateTime) || Date.now(),
       version: STORAGE_VERSION
     }
-  } catch {
-    return null
   }
+})
+
+/* 读取本地持久化：结构非法时回落默认值 */
+function readStored(key: string): WorkspaceState | null {
+  return storage.read(key)
 }
 
 export const useWorkspaceStore = defineStore('workspace', () => {
   /* 会话 key → 工作区状态 */
   const slices = ref<Record<string, WorkspaceState>>({})
-  /* 各会话持久化防抖定时器 */
-  const persistTimers = new Map<string, ReturnType<typeof setTimeout>>()
-
-  /* 写入本地持久化：终端标签属运行时资源，不落盘 */
-  function persist(key: string): void {
-    const timer = persistTimers.get(key)
-    if (timer) {
-      clearTimeout(timer)
-      persistTimers.delete(key)
-    }
-    const state = slices.value[key]
-    if (!state) {
-      return
-    }
-    const snapshot: WorkspaceState = {
-      ...state,
-      terminal: { ...state.terminal, tabs: [], activeId: '' }
-    }
-    try {
-      localStorage.setItem(STORAGE_PREFIX + key, JSON.stringify(snapshot))
-    } catch {
-      /* 本地存储不可用时忽略（仅影响恢复，不影响当前使用） */
-    }
-  }
-
-  /* 调度持久化：同一会话的连续修改合并为一次写入 */
-  function schedulePersist(key: string): void {
-    const timer = persistTimers.get(key)
-    if (timer) {
-      clearTimeout(timer)
-    }
-    persistTimers.set(
-      key,
-      setTimeout(() => persist(key), PERSIST_DELAY)
-    )
-  }
-
   /* 任意状态变更后按 key 调度持久化（草稿输入与滚动也走这里） */
   watch(
     slices,
     () => {
       for (const key of Object.keys(slices.value)) {
-        schedulePersist(key)
+        storage.schedule(key, () => slices.value[key])
       }
     },
     { deep: true }
@@ -329,22 +295,13 @@ export const useWorkspaceStore = defineStore('workspace', () => {
       version: STORAGE_VERSION
     }
     slices.value[DRAFT_SESSION_KEY] = createState()
-    persist(DRAFT_SESSION_KEY)
+    storage.write(DRAFT_SESSION_KEY, slices.value[DRAFT_SESSION_KEY])
   }
 
-  /* 删除会话工作区：清理内存、定时器与本地持久化 */
+  /* 删除会话工作区：清理内存与本地持久化 */
   function remove(sessionId: string): void {
     delete slices.value[sessionId]
-    const timer = persistTimers.get(sessionId)
-    if (timer) {
-      clearTimeout(timer)
-      persistTimers.delete(sessionId)
-    }
-    try {
-      localStorage.removeItem(STORAGE_PREFIX + sessionId)
-    } catch {
-      /* 本地存储不可用时忽略 */
-    }
+    storage.remove(sessionId)
   }
 
   /* 清理已失效会话的工作区状态（应用启动时按会话列表校准） */
@@ -355,19 +312,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
         remove(key)
       }
     }
-    try {
-      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
-        const storageKey = localStorage.key(index)
-        if (storageKey && storageKey.startsWith(STORAGE_PREFIX)) {
-          const key = storageKey.slice(STORAGE_PREFIX.length)
-          if (!valid.has(key)) {
-            localStorage.removeItem(storageKey)
-          }
-        }
-      }
-    } catch {
-      /* 本地存储不可用时忽略 */
-    }
+    storage.cleanup([...valid])
   }
 
   return {

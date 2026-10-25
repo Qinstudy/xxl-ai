@@ -9,12 +9,16 @@ const queues = new Map<string, Promise<unknown>>()
 export function enqueueSessionTask<T>(sessionId: string, task: () => Promise<T>): Promise<T> {
   const previous = queues.get(sessionId) ?? Promise.resolve()
   const next = previous.catch(() => undefined).then(task)
-  queues.set(
-    sessionId,
-    next.then(
-      () => undefined,
-      () => undefined
-    )
+  const tail = next.then(
+    () => undefined,
+    () => undefined
   )
+  queues.set(sessionId, tail)
+  /* 队列已排空：移除会话槽位，避免长期运行累积空 Promise */
+  void tail.then(() => {
+    if (queues.get(sessionId) === tail) {
+      queues.delete(sessionId)
+    }
+  })
   return next
 }

@@ -6,12 +6,12 @@
 import { onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSettingsStore } from '@renderer/stores/settings'
+import { DEFAULT_SYSTEM_PROMPT } from '@shared/ipc'
 import { t } from '@renderer/i18n'
 
 const settings = useSettingsStore()
 
-/* 自定义指令默认值（与主进程 DEFAULTS 保持一致，用于「恢复默认」） */
-const DEFAULT_SYSTEM_PROMPT = '你是 XXL-AI-Desk 智能助手，回答简洁、准确、有条理。'
+/* 自定义指令默认值（与主进程共用 shared/defaults） */
 
 /* 表单：名称 / Slogan / 自定义指令 */
 const appName = ref('')

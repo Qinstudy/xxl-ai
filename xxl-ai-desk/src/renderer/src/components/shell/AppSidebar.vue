@@ -1,16 +1,16 @@
 <script setup lang="ts">
 /*
-* 应用侧栏外壳：常驻图标栏 + 子菜单栏（首页 / 插件 / 系统设置 按板块切换）
-* @author xuxueli 2026-10-18
-*/
+ * 应用侧栏外壳：常驻图标栏 + 子菜单栏（首页 / 插件 / 系统设置 按板块切换）
+ * @author xuxueli 2026-10-18
+ */
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import ActivityRail from '@renderer/components/ActivityRail.vue'
-import SectionMenu from '@renderer/components/SectionMenu.vue'
+import ActivityRail from '@renderer/components/shell/ActivityRail.vue'
+import SectionMenu from '@renderer/components/shell/SectionMenu.vue'
 import { ChatSidebarHomePanel } from '@renderer/modules/chat'
 import { useShellStore } from '@renderer/stores/shell'
 import { useSettingsStore } from '@renderer/stores/settings'
-import { usePanelResize } from '@renderer/composables/usePanelResize'
+import PanelResizer from '@renderer/components/PanelResizer.vue'
 import { NAV_SECTIONS, pluginItemKey, sectionOfPath, type NavItem } from '@renderer/config/nav'
 import { t } from '@renderer/i18n'
 
@@ -30,17 +30,11 @@ const activeKey = computed(() =>
   section.value === 'plugin' ? pluginItemKey(route.path) : settings.activeTab
 )
 
-/* 拖拽右边缘调整子菜单栏宽度（统一复用 usePanelResize） */
-const { startResize } = usePanelResize({
-  getSize: () => shell.panelWidth,
-  setSize: shell.setPanelWidth,
-  edge: 'left'
+/* 子菜单栏宽度双向绑定：拖拽写入 store（含夹取与持久化） */
+const panelWidth = computed({
+  get: () => shell.panelWidth,
+  set: (value: number) => shell.setPanelWidth(value)
 })
-
-/* 双击拖拽手柄：恢复子菜单栏默认宽度 */
-function resetPanelWidth(): void {
-  shell.resetPanelWidth()
-}
 
 /* 子菜单项点击：插件跳路由；系统设置切分类并进入设置页 */
 function onSubmenuSelect(item: NavItem): void {
@@ -72,12 +66,12 @@ function onSubmenuSelect(item: NavItem): void {
     <!-- 子菜单栏：折叠时隐藏，仅保留左侧图标栏 -->
     <div v-show="!shell.sidebarCollapsed" class="sidebar-panel">
       <!-- 右边缘拖拽手柄：拖拽调整面板宽度，双击恢复默认宽度 -->
-      <div
-        class="sidebar-resizer"
+      <PanelResizer
+        v-model:size="panelWidth"
+        edge="left"
         :title="t('layout.resetPanelWidth')"
-        @mousedown="startResize"
-        @dblclick="resetPanelWidth"
-      ></div>
+        @reset="shell.resetPanelWidth"
+      />
 
       <ChatSidebarHomePanel v-if="!submenu" />
       <SectionMenu
@@ -92,6 +86,23 @@ function onSubmenuSelect(item: NavItem): void {
 </template>
 
 <style scoped lang="scss">
+/* 左侧栏：图标栏 + 可折叠子菜单栏 */
+.desk-sidebar {
+  width: calc(var(--desk-rail-width) + 240px);
+  flex-shrink: 0;
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  background: var(--desk-panel-bg);
+  overflow: hidden;
+  transition: width 0.2s ease;
+}
+
+/* 拖拽调整宽度期间禁用过渡 */
+:global(body.resizing) .desk-sidebar {
+  transition: none;
+}
+
 /* 列表面板：图标栏右侧，折叠时隐藏；与右侧正文之间保留间隔线 */
 .sidebar-panel {
   flex: 1;
@@ -100,22 +111,5 @@ function onSubmenuSelect(item: NavItem): void {
   flex-direction: column;
   overflow: hidden;
   border-right: 1px solid var(--desk-border);
-}
-
-/* 右边缘拖拽手柄：调整面板宽度 */
-.sidebar-resizer {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 10;
-  width: 5px;
-  height: 100%;
-  cursor: col-resize;
-  -webkit-app-region: no-drag;
-}
-
-.sidebar-resizer:hover,
-body.resizing .sidebar-resizer {
-  background: var(--desk-primary-soft);
 }
 </style>

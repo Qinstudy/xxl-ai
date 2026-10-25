@@ -6,6 +6,7 @@
 import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useProjectStore } from '@renderer/stores/project'
+import { ipcErrorMessage } from '@renderer/utils/ipcError'
 import { t } from '@renderer/i18n'
 
 const emit = defineEmits<{ example: [text: string] }>()
@@ -23,7 +24,7 @@ async function onProjectChange(value: string): Promise<void> {
     try {
       await project.createProject()
     } catch (error) {
-      ElMessage.error((error as Error).message)
+      ElMessage.error(ipcErrorMessage(error))
     }
     return
   }

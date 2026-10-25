@@ -8,6 +8,9 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@renderer/stores/chat'
 import { useProjectStore } from '@renderer/stores/project'
+import SidebarPanelHeader from '@renderer/components/SidebarPanelHeader.vue'
+import SidebarRow from '@renderer/components/SidebarRow.vue'
+import { ipcErrorMessage } from '@renderer/utils/ipcError'
 import { t } from '@renderer/i18n'
 import ProjectGroup from './ProjectGroup.vue'
 import type { SessionDTO } from '@shared/ipc'
@@ -82,7 +85,7 @@ async function onCreateProject(): Promise<void> {
   try {
     await project.createProject()
   } catch (error) {
-    ElMessage.error((error as Error).message)
+    ElMessage.error(ipcErrorMessage(error))
   }
 }
 
@@ -101,20 +104,16 @@ async function onSelect(id: string): Promise<void> {
 </script>
 
 <template>
-  <div class="sidebar-head">
-    <div class="brand">
-      <div class="brand-text">
-        <div class="brand-name">{{ t('chat.title') }}</div>
-      </div>
-    </div>
-  </div>
+  <SidebarPanelHeader title-key="chat.title" />
 
-  <!-- 新建对话：与插件/设置子菜单项保持同一图标与文字位置 -->
+  <!-- 新建对话：与插件/设置子菜单项使用同一列表行 -->
   <div class="new-chat">
-    <div class="new-btn" :class="{ active: !chat.currentId }" @click="onNew">
-      <el-icon class="new-icon"><Edit /></el-icon>
-      <span class="new-btn-label">{{ t('chat.newChatAction') }}</span>
-    </div>
+    <SidebarRow @click="onNew">
+      <template #icon>
+        <el-icon class="new-icon"><Edit /></el-icon>
+      </template>
+      {{ t('chat.newChatAction') }}
+    </SidebarRow>
   </div>
 
   <!-- 「项目:」标题：右侧 排序（...）与 + 新建项目，鼠标悬浮展示 -->
@@ -152,8 +151,6 @@ async function onSelect(id: string): Promise<void> {
       :project="group.project"
       :sessions="group.sessions"
       :expanded="isExpanded(group.project.id)"
-      :active="group.project.id === project.currentId"
-      :active-session-id="chat.currentId"
       @toggle="toggleProject(group.project.id)"
       @select="onSelect"
     />
@@ -162,64 +159,10 @@ async function onSelect(id: string): Promise<void> {
 </template>
 
 <style scoped lang="scss">
-.sidebar-head {
-  padding: 10px 16px 12px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  min-width: 0;
-}
-
-.brand-text {
-  flex: 1;
-  min-width: 0;
-}
-
-.brand-name {
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 32px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 新建对话：容器与子菜单列表同宽（左右各 10px），行内边距对齐 .menu-item */
+/* 新建对话：容器与子菜单列表同宽（左右各 10px） */
 .new-chat {
   padding: 0 10px;
   margin-bottom: 10px;
-}
-
-/* 新建对话：与子菜单项同款列表行（图标/文字位置、悬浮背景一致） */
-.new-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  margin-bottom: 2px;
-  border-radius: 10px;
-  cursor: pointer;
-  color: var(--desk-text-secondary);
-  font-size: 14px;
-  font-weight: 400;
-  transition: background 0.15s ease;
-  -webkit-app-region: no-drag;
-}
-
-.new-btn:hover {
-  background: var(--desk-primary-soft);
-  color: var(--desk-text-secondary);
-}
-
-/* 选中态（新建对话草稿态）：与插件/设置子菜单选中样式一致 */
-.new-btn.active {
-  background: var(--desk-primary-soft);
-  color: var(--desk-text-secondary);
-  font-weight: 500;
 }
 
 .new-icon {

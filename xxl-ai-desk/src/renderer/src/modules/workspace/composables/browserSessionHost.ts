@@ -12,6 +12,8 @@ const MAX_WARM_SESSIONS = 3
 
 /* 当前 warm 会话（渲染顺序稳定） */
 export const warmSessions = ref<string[]>([])
+/* 受保护的会话（当前可见会话）：LRU 淘汰时跳过，避免后台 Agent 动作把正在展示的 webview 挤掉 */
+let pinnedSessionId = ''
 /* warm 会话最近使用顺序（仅用于 LRU 淘汰） */
 const warmOrder: string[] = []
 /* 会话 ID → 宿主容器（由 BrowserHost 绑定） */
@@ -52,7 +54,12 @@ export function setSessionHost(sessionId: string, el: HTMLElement | null): void 
   sessionHosts.delete(sessionId)
 }
 
-/* 标记会话为 warm：维护 LRU 顺序并淘汰超限会话 */
+/* 固定当前可见会话：后台会话的 Agent 动作不应淘汰它 */
+export function pinWarmSession(sessionId: string): void {
+  pinnedSessionId = sessionId
+}
+
+/* 标记会话为 warm：维护 LRU 顺序并淘汰超限会话（跳过受保护会话） */
 export function markWarm(sessionId: string): void {
   const index = warmOrder.indexOf(sessionId)
   if (index >= 0) {
@@ -63,12 +70,18 @@ export function markWarm(sessionId: string): void {
   if (!warmSessions.value.includes(sessionId)) {
     warmSessions.value = [...warmSessions.value, sessionId]
   }
-  if (warmOrder.length <= MAX_WARM_SESSIONS) {
-    return
-  }
-  for (const evicted of warmOrder.splice(MAX_WARM_SESSIONS)) {
-    hooks?.onEvict(evicted)
-    removeWarmSession(evicted)
+  /* 超出上限时从最久未用一端淘汰，受保护会话保留 */
+  while (warmOrder.length > MAX_WARM_SESSIONS) {
+    const index = [...warmOrder].reverse().findIndex((id) => id !== pinnedSessionId)
+    if (index < 0) {
+      break
+    }
+    const targetIndex = warmOrder.length - 1 - index
+    const [evicted] = warmOrder.splice(targetIndex, 1)
+    if (evicted) {
+      hooks?.onEvict(evicted)
+      removeWarmSession(evicted)
+    }
   }
 }
 

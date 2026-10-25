@@ -6,6 +6,8 @@
 import { computed, watch } from 'vue'
 import { useChatStore } from '@renderer/stores/chat'
 import { DRAFT_SESSION_KEY, useWorkspaceStore } from '@renderer/stores/workspace'
+import TerminalIcon from '@renderer/components/icons/TerminalIcon.vue'
+import PanelIcon from '@renderer/components/icons/PanelIcon.vue'
 import { t } from '@renderer/i18n'
 
 const chat = useChatStore()
@@ -40,11 +42,7 @@ function toggleTool(): void {
     :title="terminalVisible ? t('chat.hideTerminal') : t('chat.showTerminal')"
     @click="toggleTerminal"
   >
-    <svg class="desk-svg-icon panel-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
-      <path d="M7.5 10l2.5 2.5-2.5 2.5" />
-      <path d="M12.5 15H17" />
-    </svg>
+    <TerminalIcon class="panel-icon" />
   </button>
   <button
     class="sidebar-toggle"
@@ -52,10 +50,7 @@ function toggleTool(): void {
     :title="toolVisible ? t('chat.hideSidePanel') : t('chat.showSidePanel')"
     @click="toggleTool"
   >
-    <svg class="desk-svg-icon panel-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
-      <path d="M15 4.5v15" />
-    </svg>
+    <PanelIcon class="panel-icon" />
   </button>
 </template>
 

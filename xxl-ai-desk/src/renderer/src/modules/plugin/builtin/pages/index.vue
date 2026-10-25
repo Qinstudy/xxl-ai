@@ -11,7 +11,8 @@ import {
   BUILTIN_TOOL_CATALOG,
   BUILTIN_TOOL_CATEGORIES,
   type BuiltinToolCategoryKey
-} from '../types'
+} from '../catalog'
+import PluginCenterShell from '../../components/PluginCenterShell.vue'
 import { t } from '@renderer/i18n'
 import type { ChatMode } from '@shared/ipc'
 
@@ -124,12 +125,12 @@ function modeLabel(modes: ChatMode[]): string {
 </script>
 
 <template>
-  <div class="builtin-tool-center">
-    <div class="center-header">
+  <PluginCenterShell>
+    <template #header>
       <div class="page-tip">{{ t('plugin.builtinTool.intro') }}</div>
-    </div>
+    </template>
 
-    <div ref="tableHost" class="center-body">
+    <div ref="tableHost" class="builtin-body">
       <section v-for="group in groups" :key="group.key" class="tool-group">
         <div class="group-head" @click="toggleGroup(group.key)">
           <div class="group-main">
@@ -189,35 +190,21 @@ function modeLabel(modes: ChatMode[]): string {
         </div>
       </section>
     </div>
-  </div>
+  </PluginCenterShell>
 </template>
 
 <style scoped lang="scss">
-.builtin-tool-center {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  background: var(--desk-bg);
-}
-
-.center-header {
-  flex-shrink: 0;
-  padding: 18px 28px 16px;
-  border-bottom: 1px solid var(--desk-border);
-}
-
+/* 说明区：位于中心外壳 header 内 */
 .page-tip {
+  padding-bottom: 16px;
   font-size: 12px;
   color: var(--desk-text-tertiary);
   line-height: 1.6;
 }
 
-.center-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 16px 28px 32px;
+/* 正文：在外壳滚动区内补充左右与底部间距 */
+.builtin-body {
+  padding: 0 28px 32px;
   font-size: 14px;
   --el-font-size-base: 14px;
 }

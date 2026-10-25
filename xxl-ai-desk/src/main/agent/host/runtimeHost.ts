@@ -152,11 +152,20 @@ function postRequest(request: WorkerRequest): void {
   worker?.postMessage(request)
 }
 
+/* 指定会话是否已有正在运行的一轮（用于 IPC 层提前拒绝重复发送，避免落库错误轮次） */
+export function isAgentRunning(sessionId: string): boolean {
+  return pendingRuns.has(sessionId)
+}
+
 /* 执行一轮对话，流式回调事件；返回成功时的完整上下文或失败信息 */
 export async function runAgent(
   input: RunAgentInput,
   onEvent: (event: HostEvent) => void
 ): Promise<{ ok: true; messages: unknown[] } | { ok: false; message: string }> {
+  /* 同一会话同时只允许一轮：避免覆盖 pendingRuns 导致前一轮 Promise 永久悬挂 */
+  if (pendingRuns.has(input.sessionId)) {
+    return { ok: false, message: '当前会话正在生成，请等待本轮结束或先停止生成' }
+  }
   let proc: UtilityProcess
   try {
     proc = await ensureWorker()

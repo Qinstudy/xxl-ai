@@ -9,6 +9,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { t } from '@renderer/i18n'
 import { useBrowserSessionStore } from '@renderer/stores/browserSession'
 import { useBrowserPanel } from '../../composables/browserRuntime'
+import GlobeIcon from '@renderer/components/icons/GlobeIcon.vue'
 
 const props = defineProps<{ sessionId: string }>()
 
@@ -165,11 +166,7 @@ onBeforeUnmount(() => {
       <!-- 加载进度条：覆盖在内容顶部，不引起 webview 尺寸抖动 -->
       <div v-if="activeTab?.hasPage && activeTab.loading" class="load-bar"><span></span></div>
       <div v-if="!activeTab?.hasPage" class="browser-empty">
-        <svg class="globe" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" />
-          <path d="M3 12h18" />
-          <path d="M12 3c2.5 2.6 4 5.6 4 9s-1.5 6.4-4 9c-2.5-2.6-4-5.6-4-9s1.5-6.4 4-9z" />
-        </svg>
+        <GlobeIcon class="globe" />
         <div class="empty-title">{{ t('panel.browserStart') }}</div>
         <div class="empty-tip">{{ t('panel.browserStartTip') }}</div>
       </div>
@@ -418,11 +415,7 @@ onBeforeUnmount(() => {
 .globe {
   width: 48px;
   height: 48px;
-  fill: none;
   stroke: var(--desk-text-tertiary);
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .empty-title {

@@ -6,7 +6,8 @@
  */
 
 import { net, protocol } from 'electron'
-import { normalize, sep } from 'path'
+import { normalize } from 'path'
+import { isWithinRoot } from '../utils/pathGuard'
 import { pathToFileURL } from 'url'
 import { listProjects } from './projectService'
 
@@ -21,12 +22,9 @@ protocol.registerSchemesAsPrivileged([
   }
 ])
 
-/* 目标路径是否位于某个已登记项目目录内（防路径穿越与任意磁盘读取） */
+/* 目标路径是否位于某个已登记项目目录内（含软链接归一化，防路径穿越） */
 function isInsideProject(target: string): boolean {
-  return listProjects().some((item) => {
-    const root = normalize(item.path)
-    return target === root || target.startsWith(root.endsWith(sep) ? root : `${root}${sep}`)
-  })
+  return listProjects().some((item) => isWithinRoot(item.path, target))
 }
 
 /* 将 URL 中的路径还原为系统路径：解码失败返回空串，Windows 需去掉盘符前的斜杠 */

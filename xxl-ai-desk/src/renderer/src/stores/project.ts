@@ -14,8 +14,6 @@ export const useProjectStore = defineStore('project', () => {
   const projects = ref<ProjectDTO[]>([])
   /* 当前选中项目 id */
   const currentId = ref('')
-  /* 项目列表是否已首次加载 */
-  const loaded = ref(false)
   /* 项目展开状态（按项目 id 记录，切换板块/页面后保留） */
   const expanded = ref<Record<string, boolean>>({})
 
@@ -30,7 +28,6 @@ export const useProjectStore = defineStore('project', () => {
     if (currentId.value && !projects.value.some((item) => item.id === currentId.value)) {
       currentId.value = ''
     }
-    loaded.value = true
   }
 
   /* 选择当前项目 */
@@ -99,7 +96,6 @@ export const useProjectStore = defineStore('project', () => {
   return {
     projects,
     currentId,
-    loaded,
     expanded,
     currentProject,
     loadProjects,

@@ -3,7 +3,7 @@
  * 文件查看器：文本编辑（语法高亮 + 行号 + ⌘/Ctrl+S 保存）、Markdown / 图片预览与只读展示。
  * @author xuxueli 2026-10-25
  */
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { renderMarkdown } from '@renderer/composables/useMarkdown'
 import { onCodeCopyClick } from '@renderer/composables/useCodeCopy'
 import { onContentLinkClick } from '@renderer/composables/useContentLink'
@@ -53,16 +53,46 @@ const lineCount = computed(() => {
   return text.split('\n').length
 })
 
+/* 高亮输入节流：连续输入时延后重算，避免逐键全量着色造成卡顿 */
+const highlightSource = ref('')
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(
+  draft,
+  (value, previous) => {
+    /* 首次（含文件切换后的初始值）立即着色，避免高亮层短暂空白 */
+    if (previous === undefined) {
+      highlightSource.value = value
+      return
+    }
+    if (highlightTimer) {
+      clearTimeout(highlightTimer)
+    }
+    highlightTimer = setTimeout(() => {
+      highlightTimer = null
+      highlightSource.value = value
+    }, 120)
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  if (highlightTimer) {
+    clearTimeout(highlightTimer)
+    highlightTimer = null
+  }
+})
+
 /* 编辑区语法高亮：按文件名推断语言，末尾补换行以对齐最后一行高度 */
 const highlightedDraft = computed(() => {
   if (!props.file) {
     return ''
   }
-  /* 超大文件跳过着色，避免逐键重算造成卡顿 */
-  if (draft.value.length > MAX_EDITOR_HIGHLIGHT) {
-    return `${escapeHtml(draft.value)}\n`
+  /* 超大文件跳过着色，避免重算造成卡顿 */
+  if (highlightSource.value.length > MAX_EDITOR_HIGHLIGHT) {
+    return `${escapeHtml(highlightSource.value)}\n`
   }
-  return `${highlightCode(draft.value, languageOf(props.file.name))}\n`
+  return `${highlightCode(highlightSource.value, languageOf(props.file.name))}\n`
 })
 
 /* 编辑器按键：⌘/Ctrl+S 保存；Tab 插入两个空格 */

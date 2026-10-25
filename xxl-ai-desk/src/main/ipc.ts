@@ -29,11 +29,11 @@ import { checkForUpdate, openDownload } from './services/updateService'
 import {
   deleteProvider,
   fetchRemoteModels,
+  getProviderSecret,
   listProviders,
   saveProvider
 } from './services/providerService'
 import {
-  clearMessages,
   createSession,
   deleteMessages,
   deleteSession,
@@ -53,7 +53,6 @@ import {
   createTerminal,
   disposeAllTerminals,
   disposeTerminal,
-  disposeTerminalsBySession,
   listTerminals,
   onTerminalEvent,
   reassignTerminals,
@@ -63,7 +62,7 @@ import {
 import { listDir, readFile, writeFile } from './services/fsService'
 import { initFsWatch, unwatchDir, watchDir } from './services/fsWatchService'
 import { listOpenWithApps, openWith } from './services/openWithService'
-import { abortChat, respondApproval, sendChat } from './services/chatService'
+import { abortChat, discardSessionRuns, respondApproval, sendChat } from './services/chatService'
 import {
   deleteMcp,
   listMcps,
@@ -198,6 +197,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.providerRemoteModels, (_event, input: ProviderModelQuery) =>
     fetchRemoteModels(input)
   )
+  /* 密钥明文仅在编辑态按需读取，列表接口保持脱敏 */
+  ipcMain.handle(IPC.providerSecret, (_event, id: string) => getProviderSecret(id))
 
   /* --- 项目（1:1 绑定本地目录） --- */
   ipcMain.handle(IPC.projectList, () => listProjects())
@@ -217,13 +218,15 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     return createProject({ name: input?.name, path })
   })
   ipcMain.handle(IPC.projectRename, (_event, id: string, name: string) => renameProject(id, name))
-  ipcMain.handle(IPC.projectRemove, (_event, id: string) => {
-    /* 级联删除前先清理项目下会话的运行时 Agent 缓存与越界白名单 */
+  ipcMain.handle(IPC.projectRemove, async (_event, id: string) => {
+    /* 级联删除前先终止项目下会话的运行中轮次，并清理运行时 Agent 缓存与越界白名单 */
     const removed = deleteProject(id)
-    removed.forEach((sessionId) => {
+    for (const sessionId of removed) {
+      discardSessionRuns(sessionId)
+      await abortChat(sessionId)
       evictAgent(sessionId)
       clearSessionPermissions(sessionId)
-    })
+    }
   })
   ipcMain.handle(IPC.projectReveal, (_event, id: string) => {
     /* 在系统文件管理器中展示项目目录（macOS Finder / Windows 资源管理器 / Linux 文件管理器） */
@@ -236,7 +239,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   /* --- 会话 --- */
   ipcMain.handle(IPC.sessionList, () => listSessions())
   ipcMain.handle(IPC.sessionCreate, (_event, input?: Partial<SessionDTO>) => createSession(input))
-  ipcMain.handle(IPC.sessionUpdate, (_event, id: string, patch: Partial<SessionDTO>) => {
+  ipcMain.handle(IPC.sessionUpdate, async (_event, id: string, patch: Partial<SessionDTO>) => {
+    /* 模型/模式变更可能影响正在运行的一轮：先终止并丢弃回写，再更新配置 */
+    discardSessionRuns(id)
+    await abortChat(id)
     evictAgent(id)
     return updateSession(id, patch)
   })
@@ -251,13 +257,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.sessionMessages, (_event, sessionId: string): StoredMessage[] =>
     listMessages(sessionId)
   )
-  ipcMain.handle(IPC.sessionClear, (_event, sessionId: string) => {
-    evictAgent(sessionId)
-    clearSessionPermissions(sessionId)
-    clearMessages(sessionId)
-  })
-  ipcMain.handle(IPC.sessionDeleteMessages, (_event, sessionId: string, ids: string[]) => {
-    /* 删除消息后清空运行时缓存，使对话上下文与存储一致 */
+  ipcMain.handle(IPC.sessionDeleteMessages, async (_event, sessionId: string, ids: string[]) => {
+    /* 删除消息后终止运行中轮次并清空运行时缓存，使对话上下文与存储一致 */
+    discardSessionRuns(sessionId)
+    await abortChat(sessionId)
     evictAgent(sessionId)
     deleteMessages(sessionId, ids)
   })
@@ -283,9 +286,6 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     resizeTerminal(id, cols, rows)
   )
   ipcMain.handle(IPC.terminalDispose, (_event, id: string) => disposeTerminal(id))
-  ipcMain.handle(IPC.terminalDisposeBySession, (_event, sessionId: string) =>
-    disposeTerminalsBySession(sessionId)
-  )
   ipcMain.handle(IPC.terminalReassign, (_event, fromSessionId: string, toSessionId: string) =>
     reassignTerminals(fromSessionId, toSessionId)
   )

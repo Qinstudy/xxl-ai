@@ -10,6 +10,7 @@ import {
   listMcpSoCategories,
   searchMcpSo
 } from '../agent/host/community/mcpSoAdapter'
+import { createTtlCache } from '../utils/ttlCache'
 import type {
   McpCategory,
   McpDiscoverDetail,
@@ -18,51 +19,21 @@ import type {
   McpDiscoverSort
 } from '@shared/ipc'
 
-/* 缓存有效期（毫秒） */
-const CACHE_TTL = 5 * 60 * 1000
+/* 社区结果缓存：默认 5 分钟，分类 30 分钟 */
+const cache = createTtlCache<unknown>({ ttl: 5 * 60 * 1000, limit: 100 })
 
 /* 分类缓存有效期（毫秒）：分类变化不频繁 */
 const CATEGORY_TTL = 30 * 60 * 1000
 
-/* 缓存容量上限（超出按写入顺序淘汰） */
-const CACHE_LIMIT = 100
-
-/* 内存缓存：key → 结果与过期时间 */
-const cache = new Map<string, { expireAt: number; value: unknown }>()
-
-/* 读取缓存（过期视为未命中） */
-function readCache<T>(key: string): T | null {
-  const entry = cache.get(key)
-  if (!entry) {
-    return null
-  }
-  if (entry.expireAt <= Date.now()) {
-    cache.delete(key)
-    return null
-  }
-  return entry.value as T
-}
-
-/* 写入缓存（超容量时淘汰最早写入项） */
-function writeCache(key: string, value: unknown, ttl = CACHE_TTL): void {
-  if (cache.size >= CACHE_LIMIT) {
-    const oldest = cache.keys().next().value
-    if (oldest) {
-      cache.delete(oldest)
-    }
-  }
-  cache.set(key, { expireAt: Date.now() + ttl, value })
-}
-
 /* 社区分类列表（服务器分类，缓存 30 分钟） */
 export async function listMcpCategories(): Promise<McpCategory[]> {
   const key = 'categories'
-  const cached = readCache<McpCategory[]>(key)
+  const cached = cache.get(key) as McpCategory[] | null
   if (cached) {
     return cached
   }
   const result = await listMcpSoCategories()
-  writeCache(key, result, CATEGORY_TTL)
+  cache.set(key, result, CATEGORY_TTL)
   return result
 }
 
@@ -87,7 +58,7 @@ export async function discoverMcp(query: McpDiscoverQuery): Promise<McpDiscoverP
       ? `category:${category}:${sort}:${page}`
       : `all:${sort}:${page}`
 
-  const cached = readCache<McpDiscoverPage>(key)
+  const cached = cache.get(key) as McpDiscoverPage | null
   if (cached) {
     return { ...cached, cached: true }
   }
@@ -97,18 +68,18 @@ export async function discoverMcp(query: McpDiscoverQuery): Promise<McpDiscoverP
     : byCategory
       ? await browseCategoryMcpSo(category, page, sort)
       : await browseMcpSo(page, sort)
-  writeCache(key, result)
+  cache.set(key, result)
   return result
 }
 
 /* MCP 详情（含可导入配置片段） */
 export async function discoverMcpDetail(slug: string): Promise<McpDiscoverDetail> {
   const key = `detail:${slug}`
-  const cached = readCache<McpDiscoverDetail>(key)
+  const cached = cache.get(key) as McpDiscoverDetail | null
   if (cached) {
     return cached
   }
   const result = await detailMcpSo(slug)
-  writeCache(key, result)
+  cache.set(key, result)
   return result
 }

@@ -9,7 +9,10 @@ import { useSettingsStore } from '@renderer/stores/settings'
 import { useProjectStore } from '@renderer/stores/project'
 import { useQuickAction } from '@renderer/composables/useQuickAction'
 import { t } from '@renderer/i18n'
+import { QUICK_ACTIONS } from '@renderer/config/quickActions'
 import { formatShortcut } from '@renderer/utils/shortcut'
+import TerminalIcon from '@renderer/components/icons/TerminalIcon.vue'
+import GlobeIcon from '@renderer/components/icons/GlobeIcon.vue'
 import type { QuickAction } from '@shared/ipc'
 
 const visible = defineModel<boolean>('visible', { required: true })
@@ -112,49 +115,20 @@ function onQuickAction(action: QuickAction): void {
           </div>
 
           <div class="palette-section">{{ t('project.quickActions') }}</div>
-          <div class="palette-item" @click="onQuickAction('newChat')">
-            <el-icon class="palette-item-icon"><Edit /></el-icon>
-            <span class="palette-item-title">{{ t('chat.newChatAction') }}</span>
+          <div
+            v-for="action in QUICK_ACTIONS"
+            :key="action.id"
+            class="palette-item"
+            @click="onQuickAction(action.id)"
+          >
+            <TerminalIcon v-if="action.svg === 'terminal'" class="palette-item-svg" />
+            <GlobeIcon v-else-if="action.svg === 'browser'" class="palette-item-svg" />
+            <el-icon v-else class="palette-item-icon">
+              <component :is="action.icon" />
+            </el-icon>
+            <span class="palette-item-title">{{ t(action.labelKey) }}</span>
             <span class="palette-item-meta">
-              {{ formatShortcut(settings.settings.shortcuts?.newChat) }}
-            </span>
-          </div>
-          <div class="palette-item" @click="onQuickAction('settings')">
-            <el-icon class="palette-item-icon"><Setting /></el-icon>
-            <span class="palette-item-title">{{ t('settings.title') }}</span>
-            <span class="palette-item-meta">
-              {{ formatShortcut(settings.settings.shortcuts?.settings) }}
-            </span>
-          </div>
-          <div class="palette-item" @click="onQuickAction('terminal')">
-            <svg class="desk-svg-icon palette-item-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
-              <path d="M7.5 10l2.5 2.5-2.5 2.5" />
-              <path d="M12.5 15H17" />
-            </svg>
-            <span class="palette-item-title">{{ t('chat.terminal') }}</span>
-            <span class="palette-item-meta">
-              {{ formatShortcut(settings.settings.shortcuts?.terminal) }}
-            </span>
-          </div>
-          <div class="palette-item" @click="onQuickAction('files')">
-            <el-icon class="palette-item-icon"><Folder /></el-icon>
-            <span class="palette-item-title">{{ t('panel.files') }}</span>
-            <span class="palette-item-meta">
-              {{ formatShortcut(settings.settings.shortcuts?.files) }}
-            </span>
-          </div>
-          <div class="palette-item" @click="onQuickAction('browser')">
-            <svg class="desk-svg-icon palette-item-svg" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M3 12h18" />
-              <path
-                d="M12 3c2.5 2.6 4 5.6 4 9s-1.5 6.4-4 9c-2.5-2.6-4-5.6-4-9s1.5-6.4 4-9z"
-              />
-            </svg>
-            <span class="palette-item-title">{{ t('panel.browser') }}</span>
-            <span class="palette-item-meta">
-              {{ formatShortcut(settings.settings.shortcuts?.browser) }}
+              {{ formatShortcut(settings.settings.shortcuts?.[action.id]) }}
             </span>
           </div>
         </div>

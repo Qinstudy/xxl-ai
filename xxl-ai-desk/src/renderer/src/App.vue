@@ -1,59 +1,24 @@
 <script setup lang="ts">
-/* 应用外壳：左侧会话栏（可折叠）+ 右侧内容区 + 全局快捷键 */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { useTerminalTarget } from '@renderer/modules/workspace'
-import { WorkspaceTerminalPanel } from '@renderer/modules/workspace/terminal'
+/* 应用外壳：三段式布局 + 全局快捷键 + 壳级宿主（终端/浏览器/审批/更新提示） */
+import { onBeforeUnmount, onMounted } from 'vue'
+import { BrowserHost, ShellTerminalHost } from '@renderer/modules/workspace'
+import UpdateDialog from '@renderer/modules/settings/components/UpdateDialog.vue'
 import ApprovalDialog from '@renderer/components/ApprovalDialog.vue'
-import AppSidebar from '@renderer/components/AppSidebar.vue'
-import AppTopbar from '@renderer/components/AppTopbar.vue'
-import { BrowserHost } from '@renderer/modules/workspace'
+import AppSidebar from '@renderer/components/shell/AppSidebar.vue'
+import AppTopbar from '@renderer/components/shell/AppTopbar.vue'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useChatStore } from '@renderer/stores/chat'
 import { useProjectStore } from '@renderer/stores/project'
-import { DRAFT_SESSION_KEY, useWorkspaceStore } from '@renderer/stores/workspace'
 import { useQuickAction } from '@renderer/composables/useQuickAction'
 import { useSessionLifecycle } from '@renderer/composables/useSessionLifecycle'
-import { sectionOfPath } from '@renderer/config/nav'
 import { matchShortcut } from '@renderer/utils/shortcut'
-import { t } from './i18n'
 import type { QuickAction } from '@shared/ipc'
 
-const route = useRoute()
 const settings = useSettingsStore()
 const chat = useChatStore()
 const project = useProjectStore()
-const workspace = useWorkspaceStore()
 const runQuickAction = useQuickAction()
 const sessionLifecycle = useSessionLifecycle()
-const { terminalCwd, terminalName } = useTerminalTarget()
-
-/* 当前工作区 key：真实会话 id；新建对话草稿态使用固定 key */
-const workspaceKey = computed(() => chat.currentId || DRAFT_SESSION_KEY)
-/* 当前会话的工作区切片 */
-const workspaceState = computed(() => workspace.sliceOf(workspaceKey.value))
-
-watch(workspaceKey, (key) => workspace.ensure(key), { immediate: true })
-
-/* 终端面板是否已首次挂载：首次打开后常驻，避免路由切换导致 PTY 重建 */
-const terminalMounted = ref(false)
-
-/* 是否对话页（终端仅在对话页展示，但组件常驻以保留会话） */
-const isChat = computed(() => sectionOfPath(route.path) === 'home')
-
-/* 终端展示条件：对话页且当前会话已打开终端 */
-const terminalVisible = computed(() => isChat.value && workspaceState.value.terminal.visible)
-
-/* 首次打开后挂载终端组件；此后仅 v-show 切换，PTY 与滚动历史保持 */
-watch(
-  terminalVisible,
-  (visible) => {
-    if (visible) {
-      terminalMounted.value = true
-    }
-  },
-  { immediate: true }
-)
 
 /* 启动后延迟检查更新的定时器（卸载时清理） */
 let updateTimer: ReturnType<typeof setTimeout> | null = null
@@ -117,16 +82,8 @@ onBeforeUnmount(() => {
           <RouterView />
         </div>
 
-        <!-- 底部终端：首次打开后常驻挂载，仅切换显隐，避免 PTY 随路由切换重建 -->
-        <WorkspaceTerminalPanel
-          v-if="terminalMounted"
-          v-show="terminalVisible"
-          :session-id="workspaceKey"
-          :cwd="terminalCwd"
-          :title="terminalName"
-          :visible="terminalVisible"
-          @close="workspace.setTerminalVisible(workspaceKey, false)"
-        />
+        <!-- 底部终端：首次打开后常驻挂载（域逻辑在 workspace 内） -->
+        <ShellTerminalHost />
       </div>
     </div>
 
@@ -137,63 +94,41 @@ onBeforeUnmount(() => {
     <ApprovalDialog />
 
     <!-- 客户端更新提示：发现新版本时引导前往下载 -->
-    <el-dialog
-      :model-value="!!settings.updateInfo?.hasUpdate"
-      class="update-dialog"
-      :title="t('update.title')"
-      width="520px"
-      align-center
-      @close="settings.dismissUpdate()"
-    >
-      <div class="update-body">
-        <div class="update-version">
-          {{ t('update.version', [settings.updateInfo?.latestVersion ?? '']) }}
-        </div>
-        <div class="update-current">
-          {{ t('update.current', [settings.updateInfo?.currentVersion ?? '']) }}
-        </div>
-        <pre v-if="settings.updateInfo?.notes" class="update-notes">{{ settings.updateInfo.notes }}</pre>
-      </div>
-      <template #footer>
-        <el-button @click="settings.dismissUpdate()">{{ t('update.later') }}</el-button>
-        <el-button type="primary" @click="settings.openUpdate()">{{ t('update.download') }}</el-button>
-      </template>
-    </el-dialog>
+    <UpdateDialog />
   </div>
 </template>
 
-<style scoped>
+<style scoped lang="scss">
+/* 外壳纵向布局：顶栏 + 正文 */
+.desk-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--desk-bg);
+}
+
+/* 顶栏之下：左侧栏（图标栏 + 列表面板） + 内容区 */
+.desk-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.desk-main {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--desk-bg);
+}
+
 /* 页面容器：占满终端以外的剩余高度，供各页面 height:100% 使用 */
 .desk-view {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
-}
-
-.update-version {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.update-current {
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--desk-text-tertiary);
-}
-
-.update-notes {
-  margin: 12px 0 0;
-  padding: 10px 12px;
-  max-height: 260px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
-  font-size: 13px;
-  color: var(--desk-text-secondary);
-  background: var(--desk-bg-elevated);
-  border: 1px solid var(--desk-border);
-  border-radius: var(--desk-radius-sm);
 }
 </style>

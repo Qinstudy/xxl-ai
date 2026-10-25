@@ -5,7 +5,8 @@
  */
 
 import { open, readdir, stat, writeFile as writeFileFs } from 'fs/promises'
-import { extname, isAbsolute, relative, resolve } from 'path'
+import { extname, resolve } from 'path'
+import { assertInside } from '../utils/pathGuard'
 import type { FileContent, FsEntry } from '@shared/ipc'
 
 /* 文本预览体积上限（超出仅截断展示） */
@@ -22,17 +23,6 @@ const IMAGE_MIME: Record<string, string> = {
   '.webp': 'image/webp',
   '.bmp': 'image/bmp',
   '.svg': 'image/svg+xml'
-}
-
-/* 校验目标路径位于根目录内（含根目录自身） */
-function assertInside(root: string, target: string): void {
-  const rootAbs = resolve(root)
-  const targetAbs = resolve(target)
-  const rel = relative(rootAbs, targetAbs)
-  if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) {
-    return
-  }
-  throw new Error('仅可访问项目目录内的文件')
 }
 
 /* 列出目录内容：目录在前、名称升序（不递归，子目录按需懒加载） */

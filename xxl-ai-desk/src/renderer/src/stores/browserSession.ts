@@ -2,6 +2,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import { createSessionScopedStorage } from '@renderer/utils/sessionScopedStorage'
 
 /* 浏览器标签页 */
 export interface BrowserTab {
@@ -40,7 +41,6 @@ let tabSeq = 0
 /* 持久化键前缀与结构版本（仅保存标签页与地址，运行时状态不落盘） */
 const STORAGE_PREFIX = 'desk:browser:'
 const STORAGE_VERSION = 1
-const PERSIST_DELAY = 300
 
 /* 新建标签页状态（url 非空时直接导航） */
 export function createBrowserTab(url = ''): BrowserTab {
@@ -56,15 +56,18 @@ export function createBrowserTab(url = ''): BrowserTab {
   }
 }
 
-/* 读取本地持久化标签页：结构非法时回落空 */
-function readStoredTabs(sessionId: string): BrowserSessionState | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_PREFIX + sessionId)
-    if (!raw) {
-      return null
-    }
-    const parsed = JSON.parse(raw) as { version?: number; tabs?: BrowserTab[]; activeId?: string }
-    if (parsed.version !== STORAGE_VERSION || !Array.isArray(parsed.tabs)) {
+/* 浏览器标签页持久化：仅保存标签与地址，运行时状态不落盘 */
+const storage = createSessionScopedStorage<BrowserSessionState>({
+  prefix: STORAGE_PREFIX,
+  version: STORAGE_VERSION,
+  toStored: (state) => ({
+    version: STORAGE_VERSION,
+    tabs: state.tabs,
+    activeId: state.activeId
+  }),
+  fromStored: (raw) => {
+    const parsed = raw as { tabs?: BrowserTab[]; activeId?: string }
+    if (!Array.isArray(parsed.tabs)) {
       return null
     }
     const tabs: BrowserTab[] = []
@@ -95,9 +98,12 @@ function readStoredTabs(sessionId: string): BrowserSessionState | null {
       activeId: restoredActive ?? tabs[0].id,
       lastUsed: Date.now()
     }
-  } catch {
-    return null
   }
+})
+
+/* 读取本地持久化标签页：结构非法时回落空 */
+function readStoredTabs(sessionId: string): BrowserSessionState | null {
+  return storage.read(sessionId)
 }
 
 /* 浏览器视图锚点：工具面板中浏览器内容区在视口中的位置 */
@@ -113,43 +119,13 @@ export const useBrowserSessionStore = defineStore('browserSession', () => {
   const sessions = ref<Record<string, BrowserSessionState>>({})
   /* 浏览器视图锚点（由 BrowserPanel 上报） */
   const anchor = ref<BrowserAnchor | null>(null)
-  /* 各会话持久化防抖定时器 */
-  const persistTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-  /* 写入本地持久化：仅保存标签页与地址 */
-  function persist(sessionId: string): void {
-    const timer = persistTimers.get(sessionId)
-    if (timer) {
-      clearTimeout(timer)
-      persistTimers.delete(sessionId)
-    }
-    const state = sessions.value[sessionId]
-    if (!state) {
-      return
-    }
-    try {
-      localStorage.setItem(
-        STORAGE_PREFIX + sessionId,
-        JSON.stringify({ version: STORAGE_VERSION, tabs: state.tabs, activeId: state.activeId })
-      )
-    } catch {
-      /* 本地存储不可用时忽略 */
-    }
-  }
-
-  /* 状态变更后按会话防抖持久化 */
+  /* 状态变更后按会话防抖持久化（仅保存标签与地址） */
   watch(
     sessions,
     () => {
       for (const sessionId of Object.keys(sessions.value)) {
-        const timer = persistTimers.get(sessionId)
-        if (timer) {
-          clearTimeout(timer)
-        }
-        persistTimers.set(
-          sessionId,
-          setTimeout(() => persist(sessionId), PERSIST_DELAY)
-        )
+        storage.schedule(sessionId, () => sessions.value[sessionId])
       }
     },
     { deep: true }
@@ -189,34 +165,12 @@ export const useBrowserSessionStore = defineStore('browserSession', () => {
   /* 删除会话浏览器状态与持久化 */
   function remove(sessionId: string): void {
     delete sessions.value[sessionId]
-    const timer = persistTimers.get(sessionId)
-    if (timer) {
-      clearTimeout(timer)
-      persistTimers.delete(sessionId)
-    }
-    try {
-      localStorage.removeItem(STORAGE_PREFIX + sessionId)
-    } catch {
-      /* 本地存储不可用时忽略 */
-    }
+    storage.remove(sessionId)
   }
 
   /* 清理已删除会话的标签页持久化 */
   function cleanup(validSessionIds: string[]): void {
-    const valid = new Set(validSessionIds)
-    try {
-      for (let index = localStorage.length - 1; index >= 0; index -= 1) {
-        const key = localStorage.key(index)
-        if (key && key.startsWith(STORAGE_PREFIX)) {
-          const sessionId = key.slice(STORAGE_PREFIX.length)
-          if (!valid.has(sessionId)) {
-            localStorage.removeItem(key)
-          }
-        }
-      }
-    } catch {
-      /* 本地存储不可用时忽略 */
-    }
+    storage.cleanup(validSessionIds)
   }
 
   return { sessions, anchor, ensure, sliceOf, touch, setAnchor, remove, cleanup }

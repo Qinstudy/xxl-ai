@@ -9,6 +9,7 @@ import { createHash } from 'crypto'
 import { delimiter } from 'path'
 import log from 'electron-log/main'
 import type { CallToolResult, McpClient, McpTransport, Tool } from '@earendil-works/pi-mcp'
+import { APP_VERSION } from '@shared/appInfo'
 import type { McpRuntimeConfig, McpTestResult, McpToolMeta } from '@shared/ipc'
 
 /* pi-mcp 为 ESM 包：运行时进程按需动态加载 */
@@ -41,7 +42,7 @@ const CALL_TIMEOUT = 60000
 const MAX_TOOLS = 1000
 
 /* 客户端标识（随 MCP 握手发送给服务端） */
-const CLIENT_INFO = { name: 'xxl-ai-desk', version: '1.2.1' }
+const CLIENT_INFO = { name: 'xxl-ai-desk', version: APP_VERSION }
 
 /* 已建立的连接缓存：服务 ID → 指纹 / 客户端 / 工具列表 */
 interface CachedConnection {

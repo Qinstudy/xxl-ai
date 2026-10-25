@@ -7,6 +7,7 @@ import { computed, ref, watch } from 'vue'
 import { useWorkspaceStore, type WorkspaceTool } from '@renderer/stores/workspace'
 import { t } from '@renderer/i18n'
 import FilePanel from './file/FilePanel.vue'
+import GlobeIcon from '@renderer/components/icons/GlobeIcon.vue'
 import BrowserPanel from './browser/BrowserPanel.vue'
 
 const props = defineProps<{ sessionId: string; root?: string; projectName?: string }>()
@@ -73,11 +74,7 @@ function toggleMaximized(): void {
           :class="{ active: activeTool === 'browser' }"
           @click="openTool('browser')"
         >
-          <svg class="tool-tab-icon globe" viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M3 12h18" />
-            <path d="M12 3c2.5 2.6 4 5.6 4 9s-1.5 6.4-4 9c-2.5-2.6-4-5.6-4-9s1.5-6.4 4-9z" />
-          </svg>
+          <GlobeIcon class="tool-tab-icon" />
           <span>{{ t('panel.browser') }}</span>
         </button>
       </div>
@@ -166,14 +163,9 @@ function toggleMaximized(): void {
   font-weight: 600;
 }
 
-.tool-tab-icon.globe {
+.tool-tab-icon {
   width: 15px;
   height: 15px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .tool-actions {

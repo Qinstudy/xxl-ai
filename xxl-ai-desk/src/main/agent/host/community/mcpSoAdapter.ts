@@ -5,6 +5,7 @@
  */
 
 import { load } from 'cheerio'
+import { isTimeoutError, requestWithTimeout } from '../../../utils/http'
 import type {
   McpCategory,
   McpDiscoverDetail,
@@ -20,36 +21,25 @@ const USER_AGENT =
 /* 站点根地址（中文站） */
 const BASE_URL = 'https://mcp.so'
 
-/* 请求超时（毫秒） */
-const TIMEOUT = 15000
-
 /* 单页最大条目 */
 const PAGE_SIZE = 24
 
 /* 抓取 HTML（超时中断，失败抛出可读错误） */
 async function fetchHtml(url: string): Promise<string> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), TIMEOUT)
   try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': USER_AGENT,
-        'Accept-Language': 'zh-CN,zh;q=0.9',
-        Accept: 'text/html,application/xhtml+xml'
-      }
+    const response = await requestWithTimeout(url, {
+      headers: { 'User-Agent': USER_AGENT },
+      accept: 'text/html,application/xhtml+xml'
     })
     if (!response.ok) {
       throw new Error(`社区访问失败（HTTP ${response.status}）`)
     }
     return await response.text()
   } catch (error) {
-    if ((error as Error).name === 'AbortError') {
+    if (isTimeoutError(error)) {
       throw new Error('社区访问超时，请稍后重试')
     }
     throw error as Error
-  } finally {
-    clearTimeout(timer)
   }
 }
 

@@ -7,7 +7,7 @@ import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useMcpStore } from '@renderer/stores/mcp'
 import { ipcErrorMessage } from '@renderer/utils/ipcError'
-import { parseMcpSnippet } from '@renderer/utils/mcpSnippet'
+import { parseMcpSnippet } from '../../utils/mcpSnippet'
 import { t } from '@renderer/i18n'
 import type { McpDTO, McpTestResult, McpType } from '@shared/ipc'
 

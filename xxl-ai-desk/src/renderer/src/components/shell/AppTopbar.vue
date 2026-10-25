@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /*
-* 全局顶栏：贯通整窗，左侧依次为首页入口、软件名称，其后展示页面标题与操作
-* @author xuxueli 2026-10-18
-*/
+ * 全局顶栏：贯通整窗，左侧依次为首页入口、软件名称，其后展示页面标题与操作
+ * @author xuxueli 2026-10-18
+ */
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -114,6 +114,47 @@ function goHome(): void {
 </template>
 
 <style scoped lang="scss">
+/* 贯通整窗的全局顶栏：红黄绿（系统）+ 首页/名称 + 页面上下文 */
+.desk-topbar {
+  flex-shrink: 0;
+  height: var(--desk-header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 12px;
+  background: var(--desk-chrome-bg);
+  -webkit-app-region: drag;
+}
+
+/* macOS：为红黄绿系统按钮预留左侧宽度 */
+.desk-topbar.mac {
+  padding-left: 80px;
+}
+
+.desk-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* 页面上下文（标题等） */
+.desk-topbar-context {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* 页面操作（如对话页的终端/侧栏开关） */
+.desk-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
 /* 首页入口与软件名称：按钮内含内边距，用负外边距收紧至视觉约 9px */
 .desk-topbar-left > .sidebar-toggle {
   margin-right: -6px;

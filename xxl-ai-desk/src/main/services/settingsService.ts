@@ -5,25 +5,7 @@
 
 import { getDb } from '../db'
 import { settingTable } from '../db/schema'
-import { DEFAULT_SHORTCUTS, type AppSettings } from '@shared/ipc'
-
-/* 默认设置 */
-const DEFAULTS: AppSettings = {
-  theme: 'light',
-  language: 'zh',
-  providerId: '',
-  modelId: '',
-  systemPrompt: '你是 XXL-AI-Desk 智能助手，回答简洁、准确、有条理。',
-  appName: '',
-  slogan: '',
-  shortcuts: DEFAULT_SHORTCUTS,
-  runtimeNodeMode: 'builtin',
-  runtimeNodePath: '',
-  runtimePythonPath: '',
-  updateAutoCheck: true,
-  builtinToolBrowserEnabled: true,
-  builtinToolGeneralEnabled: true
-}
+import { DEFAULT_APP_SETTINGS, DEFAULT_SHORTCUTS, type AppSettings } from '@shared/ipc'
 
 /* 解析快捷键配置（JSON 存储，缺省项回退默认值） */
 function parseShortcuts(raw: string | undefined): AppSettings['shortcuts'] {
@@ -46,17 +28,17 @@ export function getSettings(): AppSettings {
   const rows = getDb().select().from(settingTable).all()
   const map = new Map(rows.map((row) => [row.key, row.value]))
   return {
-    theme: (map.get('theme') as AppSettings['theme']) || DEFAULTS.theme,
-    language: (map.get('language') as AppSettings['language']) || DEFAULTS.language,
-    providerId: map.get('providerId') || DEFAULTS.providerId,
-    modelId: map.get('modelId') || DEFAULTS.modelId,
-    systemPrompt: map.get('systemPrompt') ?? DEFAULTS.systemPrompt,
-    appName: map.get('appName') ?? DEFAULTS.appName,
-    slogan: map.get('slogan') ?? DEFAULTS.slogan,
+    theme: (map.get('theme') as AppSettings['theme']) || DEFAULT_APP_SETTINGS.theme,
+    language: (map.get('language') as AppSettings['language']) || DEFAULT_APP_SETTINGS.language,
+    providerId: map.get('providerId') || DEFAULT_APP_SETTINGS.providerId,
+    modelId: map.get('modelId') || DEFAULT_APP_SETTINGS.modelId,
+    systemPrompt: map.get('systemPrompt') ?? DEFAULT_APP_SETTINGS.systemPrompt,
+    appName: map.get('appName') ?? DEFAULT_APP_SETTINGS.appName,
+    slogan: map.get('slogan') ?? DEFAULT_APP_SETTINGS.slogan,
     shortcuts: parseShortcuts(map.get('shortcuts')),
-    runtimeNodeMode: map.get('runtimeNodeMode') === 'custom' ? 'custom' : DEFAULTS.runtimeNodeMode,
-    runtimeNodePath: map.get('runtimeNodePath') ?? DEFAULTS.runtimeNodePath,
-    runtimePythonPath: map.get('runtimePythonPath') ?? DEFAULTS.runtimePythonPath,
+    runtimeNodeMode: map.get('runtimeNodeMode') === 'custom' ? 'custom' : DEFAULT_APP_SETTINGS.runtimeNodeMode,
+    runtimeNodePath: map.get('runtimeNodePath') ?? DEFAULT_APP_SETTINGS.runtimeNodePath,
+    runtimePythonPath: map.get('runtimePythonPath') ?? DEFAULT_APP_SETTINGS.runtimePythonPath,
     updateAutoCheck: map.get('updateAutoCheck') !== 'false',
     builtinToolBrowserEnabled: map.get('builtinToolBrowserEnabled') !== 'false',
     builtinToolGeneralEnabled: map.get('builtinToolGeneralEnabled') !== 'false'

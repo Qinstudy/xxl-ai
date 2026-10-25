@@ -5,6 +5,7 @@ import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@renderer/api'
 import { setLanguage, t } from '@renderer/i18n'
+import { createDefaultSettings } from '@shared/ipc'
 import type {
   AppSettings,
   ProviderDTO,
@@ -15,23 +16,8 @@ import type {
 } from '@shared/ipc'
 
 export const useSettingsStore = defineStore('settings', () => {
-  /* 应用设置（主题/语言/默认供应商与模型/系统提示词/快捷操作等） */
-  const settings = ref<AppSettings>({
-    theme: 'dark',
-    language: 'zh',
-    providerId: '',
-    modelId: '',
-    systemPrompt: '',
-    appName: '',
-    slogan: '',
-    shortcuts: {},
-    runtimeNodeMode: 'builtin',
-    runtimeNodePath: '',
-    runtimePythonPath: '',
-    updateAutoCheck: true,
-    builtinToolBrowserEnabled: true,
-    builtinToolGeneralEnabled: true
-  })
+  /* 应用设置（默认值与主进程共用 shared/defaults） */
+  const settings = ref<AppSettings>(createDefaultSettings())
   /* 供应商列表 */
   const providers = ref<ProviderDTO[]>([])
   /* 设置是否已首次加载 */
@@ -55,17 +41,6 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /* 已启用的供应商 */
   const enabledProviders = computed(() => providers.value.filter((item) => item.enabled))
-  /* 当前选中供应商（未选中为 null） */
-  const currentProvider = computed(
-    () => providers.value.find((item) => item.id === settings.value.providerId) ?? null
-  )
-  /* 当前供应商可用模型列表 */
-  const currentModels = computed(() => currentProvider.value?.models ?? [])
-  /* 是否具备可对话条件（已选模型或存在可用供应商） */
-  const ready = computed(
-    () => Boolean(currentProvider.value && settings.value.modelId) || providers.value.length > 0
-  )
-
   /* 应用主题到 DOM（Element Plus 深色模式依赖 html.dark） */
   function applyTheme(): void {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
@@ -124,6 +99,11 @@ export const useSettingsStore = defineStore('settings', () => {
   /* 远程查询供应商可用模型（不落库，供模型行下拉选择） */
   async function queryRemoteModels(input: ProviderModelQuery): Promise<string[]> {
     return api.provider.remoteModels(input)
+  }
+
+  /* 读取供应商密钥明文（编辑弹窗打开时按需调用，列表不保存密钥） */
+  async function loadProviderSecret(id: string): Promise<string> {
+    return api.provider.secret(id)
   }
 
   /* 选择数据目录（系统对话框，取消返回空串） */
@@ -206,14 +186,12 @@ export const useSettingsStore = defineStore('settings', () => {
     version,
     platform,
     enabledProviders,
-    currentProvider,
-    currentModels,
-    ready,
     load,
     saveSettings,
     saveProvider,
     removeProvider,
     queryRemoteModels,
+    loadProviderSecret,
     selectDataDir,
     saveDataDir,
     openDataDir,

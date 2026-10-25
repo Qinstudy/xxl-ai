@@ -1,7 +1,7 @@
 /*
-* 最后会话记忆：localStorage 读写最近打开的会话 id，供下次启动默认定位
-* @author xuxueli 2026-10-25
-*/
+ * 最后会话记忆：localStorage 读写最近打开的会话 id，供下次启动默认定位
+ * @author xuxueli 2026-10-25
+ */
 
 /* 本地存储键名（渲染进程 UI 状态，不入库） */
 const STORAGE_KEY = 'desk-last-session-id'

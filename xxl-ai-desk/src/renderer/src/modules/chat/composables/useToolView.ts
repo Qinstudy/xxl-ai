@@ -102,7 +102,7 @@ function detailOf(name: string, args: unknown): string {
       return clip(pick('ref') || pick('selector'))
     case 'fill_browser': {
       const fields = Array.isArray(record.fields) ? record.fields.length : 0
-      return fields > 0 ? `${fields} 个字段` : ''
+      return fields > 0 ? t('chat.toolFields', [fields]) : ''
     }
     case 'wait_browser':
       return clip(pick('selector') || pick('text') || pick('url'))

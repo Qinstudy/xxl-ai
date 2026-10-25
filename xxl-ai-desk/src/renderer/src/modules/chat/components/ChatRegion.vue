@@ -6,7 +6,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import MessageItem from './MessageItem.vue'
 import ChatComposer from './ChatComposer.vue'
 import ChatEmptyExtras from './ChatEmptyExtras.vue'
-import EmptyState from '@renderer/components/EmptyState.vue'
+import EmptyState from './EmptyState.vue'
 import { useChatStore } from '@renderer/stores/chat'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useProjectStore } from '@renderer/stores/project'
@@ -40,14 +40,34 @@ const nearBottom = ref(true)
 /* 是否正在恢复会话滚动位置：恢复期间不自动吸底 */
 const restoring = ref(false)
 
-/* 用户滚动：按距底部距离更新 nearBottom，并记录会话滚动位置 */
+/* 滚动位置写回节流：滚动期间不触发全量持久化调度 */
+let scrollWriteTimer: ReturnType<typeof setTimeout> | null = null
+
+/* 写入当前会话滚动位置（节流后执行） */
+function flushScrollTop(): void {
+  if (scrollWriteTimer) {
+    clearTimeout(scrollWriteTimer)
+    scrollWriteTimer = null
+  }
+  if (scrollRef.value) {
+    chatUi.setScrollTop(workspaceKey.value, scrollRef.value.scrollTop)
+  }
+}
+
+/* 用户滚动：立即更新 nearBottom，滚动位置按 200ms 节流写回 */
 function handleScroll(): void {
   const el = scrollRef.value
   if (!el) {
     return
   }
   nearBottom.value = el.scrollHeight - el.scrollTop - el.clientHeight < 80
-  chatUi.setScrollTop(workspaceKey.value, el.scrollTop)
+  if (scrollWriteTimer) {
+    return
+  }
+  scrollWriteTimer = setTimeout(() => {
+    scrollWriteTimer = null
+    flushScrollTop()
+  }, 200)
 }
 
 /* 滚动到底部：合并到下一动画帧执行；非强制且用户已上翻时不吸底 */
@@ -151,9 +171,7 @@ onMounted(() => {
 
 /* 卸载前记录滚动位置（离开对话页时保留） */
 onBeforeUnmount(() => {
-  if (scrollRef.value) {
-    chatUi.setScrollTop(workspaceKey.value, scrollRef.value.scrollTop)
-  }
+  flushScrollTop()
 })
 
 /* 发送消息：校验模型与项目后交给会话 store 发起生成 */

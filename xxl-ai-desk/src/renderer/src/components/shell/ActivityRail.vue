@@ -1,8 +1,8 @@
 <script setup lang="ts">
 /*
-* 左侧常驻图标栏（活动栏）：首页 / 插件 / 底部系统设置，切换一级板块
-* @author xuxueli 2026-10-18
-*/
+ * 左侧常驻图标栏（活动栏）：首页 / 插件 / 底部系统设置，切换一级板块
+ * @author xuxueli 2026-10-18
+ */
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useShellStore } from '@renderer/stores/shell'

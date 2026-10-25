@@ -7,20 +7,15 @@ import { onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { t } from '@renderer/i18n'
-import ShortcutInput from '@renderer/components/ShortcutInput.vue'
+import ShortcutInput from './ShortcutInput.vue'
+import { QUICK_ACTIONS } from '@renderer/config/quickActions'
 import { DEFAULT_SHORTCUTS } from '@shared/ipc'
 import type { QuickAction, ShortcutMap } from '@shared/ipc'
 
 const settings = useSettingsStore()
 
-/* 快捷操作清单：id 对应全局快捷键动作，label 为 i18n key */
-const quickActions: { id: QuickAction; label: string }[] = [
-  { id: 'newChat', label: 'chat.newChatAction' },
-  { id: 'settings', label: 'settings.title' },
-  { id: 'terminal', label: 'chat.terminal' },
-  { id: 'files', label: 'panel.files' },
-  { id: 'browser', label: 'panel.browser' }
-]
+/* 快捷操作清单：与命令面板共用同一注册表 */
+const quickActions = QUICK_ACTIONS
 
 /* 当前快捷键（含默认值兜底） */
 const shortcuts = ref<ShortcutMap>({})
@@ -54,7 +49,7 @@ function resetShortcuts(): void {
     <div class="shortcuts-title">{{ t('settings.shortcuts') }}</div>
     <div class="shortcuts-tip">{{ t('settings.shortcutsTip') }}</div>
     <div v-for="action in quickActions" :key="action.id" class="shortcut-row">
-      <span class="shortcut-label">{{ t(action.label) }}</span>
+      <span class="shortcut-label">{{ t(action.labelKey) }}</span>
       <ShortcutInput
         :model-value="shortcuts[action.id]"
         @update:model-value="(value: string) => onShortcutChange(action.id, value)"

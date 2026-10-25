@@ -20,6 +20,7 @@ import {
   listSkills,
   registerSkill
 } from './skillService'
+import { createTtlCache } from '../utils/ttlCache'
 import type {
   SkillDiscoverDetail,
   SkillDiscoverItem,
@@ -29,47 +30,15 @@ import type {
   SkillLeaderboard
 } from '@shared/ipc'
 
-/* 缓存有效期（毫秒） */
-const CACHE_TTL = 5 * 60 * 1000
-
-/* 缓存容量上限 */
-const CACHE_LIMIT = 200
-
 /* 搜索默认返回条数（接口上限 100） */
 const DEFAULT_LIMIT = 100
 
 /* 榜单每页条数（skills.sh 接口固定 200） */
 const BOARD_PAGE_SIZE = 200
 
-/* 内存缓存：key → 结果与过期时间 */
-const cache = new Map<string, { expireAt: number; value: RemoteSkillPage }>()
-
-/* 技能详情描述缓存：id → 描述与过期时间 */
-const detailCache = new Map<string, { expireAt: number; value: string }>()
-
-/* 读取缓存 */
-function readCache(key: string): RemoteSkillPage | null {
-  const entry = cache.get(key)
-  if (!entry) {
-    return null
-  }
-  if (entry.expireAt <= Date.now()) {
-    cache.delete(key)
-    return null
-  }
-  return entry.value
-}
-
-/* 写入缓存（超容量淘汰最早写入项） */
-function writeCache(key: string, value: RemoteSkillPage): void {
-  if (cache.size >= CACHE_LIMIT) {
-    const oldest = cache.keys().next().value
-    if (oldest) {
-      cache.delete(oldest)
-    }
-  }
-  cache.set(key, { expireAt: Date.now() + CACHE_TTL, value })
-}
+/* 列表页缓存（5 分钟）与详情描述缓存（5 分钟） */
+const cache = createTtlCache<RemoteSkillPage>({ ttl: 5 * 60 * 1000, limit: 200 })
+const detailCache = createTtlCache<string>({ ttl: 5 * 60 * 1000, limit: 200 })
 
 /* 远端条目 → 契约条目（补充排名、可安装 / 已安装标记） */
 function toDiscoverItem(
@@ -103,12 +72,12 @@ export async function discoverSkills(query: SkillDiscoverQuery): Promise<SkillDi
   const page = Math.max(Math.floor(query.page ?? 0), 0)
   const key = keyword ? `search:${keyword}:${limit}` : `board:${board}:${page}`
 
-  let remote = readCache(key)
+  let remote = cache.get(key)
   if (!remote) {
     remote = keyword
       ? await searchSkillsSh(keyword, limit)
       : await listLeaderboardSkillsSh(board, page)
-    writeCache(key, remote)
+    cache.set(key, remote)
   }
 
   /* 先对账本地目录，确保「已安装」标记与磁盘一致 */
@@ -131,17 +100,11 @@ export async function discoverSkills(query: SkillDiscoverQuery): Promise<SkillDi
 export async function discoverSkillDetail(id: string): Promise<SkillDiscoverDetail> {
   const key = id.trim()
   const cached = detailCache.get(key)
-  if (cached && cached.expireAt > Date.now()) {
-    return { id: key, description: cached.value }
+  if (cached !== null) {
+    return { id: key, description: cached }
   }
   const description = await detailSkillSh(key)
-  if (detailCache.size >= CACHE_LIMIT) {
-    const oldest = detailCache.keys().next().value
-    if (oldest) {
-      detailCache.delete(oldest)
-    }
-  }
-  detailCache.set(key, { expireAt: Date.now() + CACHE_TTL, value: description })
+  detailCache.set(key, description)
   return { id: key, description }
 }
 

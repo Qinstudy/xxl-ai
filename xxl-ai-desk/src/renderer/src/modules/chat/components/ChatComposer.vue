@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/* 输入框：Enter 发送，Shift+Enter 换行；左下角选择项目、模式与模型 */
+/* 输入框：Enter 发送，Shift+Enter 换行；底部选择对话模式与模型 */
 import { computed, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'

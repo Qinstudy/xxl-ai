@@ -5,7 +5,7 @@
  *   - 仅当前会话且浏览器工具可见时显示在面板区域，其余会话离屏保活。
  * @author xuxueli 2026-10-25
  */
-import { computed, onBeforeUnmount, onMounted, type ComponentPublicInstance } from 'vue'
+import { computed, onBeforeUnmount, onMounted, watch, type ComponentPublicInstance } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@renderer/api'
 import { useChatStore } from '@renderer/stores/chat'
@@ -17,6 +17,7 @@ import {
   openBrowserRequest
 } from '@renderer/modules/workspace/composables/browserRuntime'
 import {
+  pinWarmSession,
   setSessionHost,
   warmSessions
 } from '@renderer/modules/workspace/composables/browserSessionHost'
@@ -28,6 +29,13 @@ const route = useRoute()
 
 /* 当前工作区 key：真实会话 id；新建对话草稿态使用固定 key */
 const currentKey = computed(() => chat.currentId || DRAFT_SESSION_KEY)
+
+/* 固定当前会话：后台会话执行 Agent 动作时不淘汰当前可见 webview */
+watch(
+  currentKey,
+  (key) => pinWarmSession(key),
+  { immediate: true }
+)
 
 /* 是否对话页：离开对话页（插件/设置）时宿主不应覆盖正文 */
 const isChatPage = computed(() => sectionOfPath(route.path) === 'home')

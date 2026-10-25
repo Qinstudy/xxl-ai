@@ -6,6 +6,7 @@
  */
 
 import { app } from 'electron'
+import { isNewChatTitle } from '@shared/ipc'
 import type {
   ChatMode,
   AppSettings,
@@ -26,7 +27,7 @@ import { listEnabledSkillsForRuntime } from './skillService'
 import { getSession, listMessages, replaceMessages, updateSession } from './sessionService'
 import { getProject } from './projectService'
 import { buildRuntimePath } from './envService'
-import { abortAgent, evictAgent, runAgent } from '../agent/host/runtimeHost'
+import { abortAgent, evictAgent, isAgentRunning, runAgent } from '../agent/host/runtimeHost'
 import { resolveApproval } from '../agent/host/approval'
 
 /* 下发到渲染层的对话事件负载（携带会话上下文） */
@@ -34,6 +35,8 @@ export type ChatEventPayload = { sessionId: string } & HostEvent
 
 /* 已请求终止的会话：终止轮次不再展示/落库「调用失败」提示 */
 const abortRequested = new Set<string>()
+/* 已丢弃结果的会话：删除会话/清空消息后，正在运行的轮次不再回写，避免产生孤儿数据 */
+const discardedSessions = new Set<string>()
 
 /* 将 Agent 消息内容归一化为纯文本（用于列表预览与检索） */
 function contentToText(message: unknown): string {
@@ -105,6 +108,10 @@ function resolveRuntimeTarget(
  * 使发送失败在重载页面/切换会话后仍可见（避免前端回读消息时把错误提示覆盖丢失）。
  */
 function persistFailureRound(sessionId: string, text: string, tip: string): void {
+  /* 会话已删除或结果已丢弃：不再写入 */
+  if (discardedSessions.has(sessionId) || !getSession(sessionId)) {
+    return
+  }
   const existing = listMessages(sessionId).map((message) => ({
     role: message.role,
     content: message.content,
@@ -191,7 +198,7 @@ function toRuntimeConfig(provider: ProviderDTO): ProviderModelConfig {
     id: provider.id,
     name: provider.name,
     baseUrl: provider.baseUrl,
-    apiKey: provider.apiKey,
+    apiKey: provider.apiKey ?? '',
     headers: provider.headers,
     models: provider.models
   }
@@ -207,8 +214,14 @@ export async function sendChat(
   emit: (payload: ChatEventPayload) => void
 ): Promise<void> {
   const { sessionId, text } = input
-  /* 新一轮开始：清除上一次的终止标记 */
+  /* 同一会话已有运行中的一轮：直接下发提示，不落库错误轮次 */
+  if (isAgentRunning(sessionId)) {
+    emit({ sessionId, type: 'error', message: '当前会话正在生成，请等待本轮结束或先停止生成' })
+    return
+  }
+  /* 新一轮开始：清除上一轮的终止/丢弃标记 */
   abortRequested.delete(sessionId)
+  discardedSessions.delete(sessionId)
   /* 供应商/模型就绪后，错误提示统一带上「供应商 + 模型」上下文 */
   let providerName = ''
   let modelId = ''
@@ -243,7 +256,7 @@ export async function sendChat(
       return
     }
     /* 首次对话立即以提问作为会话标题并落库：不等到生成结束，避免侧栏长时间停留在「新对话」 */
-    if (session.title === '新对话' || !session.title) {
+    if (isNewChatTitle(session.title)) {
       updateSession(sessionId, { title: text.slice(0, 24) })
     }
 
@@ -306,6 +319,10 @@ export async function sendChat(
       return
     }
 
+    /* 会话已被删除或本轮结果已被丢弃：跳过落库，避免孤儿消息 */
+    if (discardedSessions.has(sessionId) || !getSession(sessionId)) {
+      return
+    }
     /* 落库：以运行时完整上下文覆盖会话消息，保证下次续聊一致（剔除 system，避免固化旧指令） */
     const serialized = result.messages
       .filter((message) => (message as { role?: string }).role !== 'system')
@@ -327,6 +344,10 @@ export async function sendChat(
     /* 主进程侧异常（读库/落库等）：清理运行时缓存并落库错误提示 */
     evictAgent(sessionId)
     fail((error as Error).message)
+  } finally {
+    /* 本轮结束：清理会话级标记，避免长期累积 */
+    abortRequested.delete(sessionId)
+    discardedSessions.delete(sessionId)
   }
 }
 
@@ -334,6 +355,11 @@ export async function sendChat(
 export async function abortChat(sessionId: string): Promise<void> {
   abortRequested.add(sessionId)
   await abortAgent(sessionId)
+}
+
+/* 丢弃指定会话正在运行/后续回写的结果（删除会话、清空消息时调用） */
+export function discardSessionRuns(sessionId: string): void {
+  discardedSessions.add(sessionId)
 }
 
 /* 回传越界审批选择（唤醒运行时进程中等待的越界确认） */

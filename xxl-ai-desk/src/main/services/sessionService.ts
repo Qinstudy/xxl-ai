@@ -8,6 +8,7 @@ import { and, asc, eq, gt, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
 import { messageTable, sessionTable } from '../db/schema'
 import { disposeTerminalsBySession } from './terminalService'
+import { NEW_CHAT_TITLE } from '@shared/ipc'
 import type { SessionDTO, StoredMessage } from '@shared/ipc'
 
 type SessionRow = typeof sessionTable.$inferSelect
@@ -58,7 +59,7 @@ export function createSession(input: Partial<SessionDTO> = {}): SessionDTO {
   const now = new Date().toISOString()
   const record = {
     id: input.id || randomUUID(),
-    title: input.title || '新对话',
+    title: input.title || NEW_CHAT_TITLE,
     projectId: input.projectId || '',
     providerId: input.providerId || '',
     modelId: input.modelId || '',
