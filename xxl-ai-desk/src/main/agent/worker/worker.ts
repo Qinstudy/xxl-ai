@@ -150,29 +150,36 @@ async function handleRun(input: RunAgentInput): Promise<void> {
       generalToolsEnabled: input.generalToolsEnabled !== false,
       isAborted: () => isSessionAborted(input.sessionId)
     })
-    /* 创建 Agent 期间已被终止：不再发起模型请求，直接回传当前上下文 */
+    /* 模型上下文由主进程提供：覆盖 Agent 状态，Worker 不持有完整历史 */
+    agent.state.messages = [...input.messages] as never
+    /* 创建 Agent 期间已被终止：不再发起模型请求，本次没有新增消息 */
     if (isSessionAborted(input.sessionId)) {
       flushDelta(input.sessionId)
-      const messages = agent.state.messages.filter(
-        (message) => (message as { role?: string }).role !== 'system'
-      )
-      post({ type: 'run-done', sessionId: input.sessionId, messages })
+      post({ type: 'run-done', sessionId: input.sessionId, messages: [] })
       return
     }
-    await runPrompt(agent, input.text, (event) => {
-      /* 用户已终止：错误事件按正常结束下发，避免 UI 误报失败 */
-      const normalized =
-        event.type === 'error' && isSessionAborted(input.sessionId)
-          ? ({ type: 'done' } as HostEvent)
-          : event
-      emitEvent(input.sessionId, normalized)
-    }, input.sessionId)
+    const newMessages = await runPrompt(
+      agent,
+      input.text,
+      (event) => {
+        /* 用户已终止：错误事件按正常结束下发，避免 UI 误报失败 */
+        const normalized =
+          event.type === 'error' && isSessionAborted(input.sessionId)
+            ? ({ type: 'done' } as HostEvent)
+            : event
+        emitEvent(input.sessionId, normalized)
+      },
+      input.sessionId
+    )
     /* 结束前冲刷残余增量，保证文本完整落库/展示 */
     flushDelta(input.sessionId)
-    const messages = agent.state.messages.filter(
-      (message) => (message as { role?: string }).role !== 'system'
-    )
-    post({ type: 'run-done', sessionId: input.sessionId, messages })
+    post({
+      type: 'run-done',
+      sessionId: input.sessionId,
+      messages: newMessages.filter(
+        (message) => (message as { role?: string }).role !== 'system'
+      )
+    })
   } catch (error) {
     /* 运行时构建/执行异常（如模型未找到）：清理该会话缓存并回传错误，由主进程落库提示 */
     flushDelta(input.sessionId)
