@@ -36,6 +36,8 @@
 		<!-- mybatis & db -->
 		<mybatis-spring-boot-starter.version>4.1.0</mybatis-spring-boot-starter.version>
 		<mysql-connector-j.version>26.10.0</mysql-connector-j.version>
+		<!-- poi (excel, xxl-tool ExcelTool 运行时依赖) -->
+		<poi.version>6.0.0</poi.version>
 		<!-- xxl-sso -->
 		<xxl-sso.version>2.4.1</xxl-sso.version>
 		<!-- ip2region -->
@@ -88,6 +90,13 @@
 			</dependency>
 
 			<!-- ********************************* for plugin start ********************************* -->
+			<!-- poi -->
+			<dependency>
+				<groupId>org.apache.poi</groupId>
+				<artifactId>poi-ooxml</artifactId>
+				<version>${poi.version}</version>
+			</dependency>
+
 			<!-- spring-ai -->
 			<dependency>
 				<groupId>org.springframework.ai</groupId>

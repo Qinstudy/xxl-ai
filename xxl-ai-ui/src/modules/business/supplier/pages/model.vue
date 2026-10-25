@@ -140,7 +140,10 @@
         <el-table-column :label="t('common.serialNo')" align="center" type="index" width="60" />
         <el-table-column
           :label="t('business.supplier.remoteModelId')"
-          align="center"
+          align="left"
+          header-align="left"
+          class-name="import-model-id"
+          label-class-name="import-model-id"
           prop="modelId"
           min-width="140"
           :show-overflow-tooltip="true"
@@ -356,3 +359,9 @@ function cancelImport() {
 // --------------------------------- page init ---------------------------------
 getList()
 </script>
+<style scoped lang="scss">
+/* 导入弹框：模型标识列左对齐时增加左侧留白，避免贴边且右侧过空 */
+:deep(.import-model-id .cell) {
+  padding-left: 40px;
+}
+</style>
