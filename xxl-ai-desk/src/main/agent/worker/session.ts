@@ -42,6 +42,25 @@ const runtimes = new Map<string, Promise<Agent>>()
 /* 已请求终止的会话：覆盖「Agent 尚未创建完成就点击终止」的场景 */
 const abortedSessions = new Set<string>()
 
+/*
+ * MCP 装配等待（毫秒）：连接已就绪（缓存命中）时几毫秒返回，本轮即有 MCP 工具；
+ * 冷启动/慢服务不阻塞首字，未就绪则先跑，装配完成后直接追加到会话 Agent。
+ */
+const MCP_DISCOVERY_BUDGET = 2000
+
+/* 在预算内等待任务完成：超时返回 null，任务继续在后台执行 */
+function withinBudget<T>(task: Promise<T>, budgetMs: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), budgetMs)
+  })
+  return Promise.race([task, timeout]).finally(() => {
+    if (timer) {
+      clearTimeout(timer)
+    }
+  })
+}
+
 /* 标记会话开始新一轮（清除上一次终止标记） */
 export function clearSessionAbort(sessionId: string): void {
   abortedSessions.delete(sessionId)
@@ -69,23 +88,35 @@ async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
     generalToolsEnabled: options.generalToolsEnabled
   })
   const tools = entries.map((entry) => entry.tool)
-  /* MCP 工具：随会话装配（未开启的服务不下发，连接失败的服务自动跳过） */
-  const mcpTools = await createMcpTools({
+  /* MCP 工具：先等一个短预算（已连接/缓存命中即刻就绪），未就绪也不阻塞首字 */
+  const mcpTask = createMcpTools({
     servers: options.mcpServers,
     mode: options.mode,
     runtimePath: options.runtimePath,
     isAborted: options.isAborted
   })
+  const readyMcpTools = await withinBudget(mcpTask, MCP_DISCOVERY_BUDGET)
   /* 历史消息随 initialState 注入：Agent 会在其前自动补上系统指令（直接覆盖 state.messages 会把系统指令冲掉） */
   const agent = new AgentClass({
     initialState: {
       systemPrompt: `${options.systemPrompt}${buildToolGuide(entries)}`,
       model,
-      tools: [...tools, ...mcpTools],
+      tools: [...tools, ...(readyMcpTools ?? [])],
       messages: (options.messages ?? []) as never[]
     },
     streamFn: models.streamSimple.bind(models)
   })
+  /*
+   * 后台装配完成：直接替换运行中 Agent 的工具集（Pi 官方支持，下一次请求生效并自动告知模型），
+   * 无需重建 Agent，会话上下文不丢。
+   */
+  if (readyMcpTools === null) {
+    void mcpTask
+      .then((lateMcpTools) => {
+        agent.state.tools = [...tools, ...lateMcpTools]
+      })
+      .catch(() => undefined)
+  }
   return agent
 }
 

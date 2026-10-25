@@ -127,8 +127,8 @@ function seedMcpServers(db: Database.Database): void {
       name: 'Fetch MCP Server',
       command: 'uvx',
       args: ['mcp-server-fetch'],
-      /* 内置默认开启：轻量网页抓取 */
-      enabled: 1,
+      /* 内置默认关闭：需现场安装 Python 依赖（uvx），由用户按需开启 */
+      enabled: 0,
       remark:
         '网页抓取：获取网页内容并转换为 Markdown 返回给 Agent，适合阅读和总结网页。依赖本机可用的 uv/uvx。'
     },

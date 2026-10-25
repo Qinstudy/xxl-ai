@@ -8,10 +8,14 @@
  */
 
 import type { AgentTool } from '@earendil-works/pi-agent-core'
-import type { Tool } from '@earendil-works/pi-mcp'
 import log from 'electron-log/main'
 import type { ChatMode, McpRuntimeConfig } from '@shared/ipc'
-import { callMcpTool, getMcpConnection, loadPiMcp } from './client'
+import {
+  ASSEMBLY_CONNECT_TIMEOUT,
+  callMcpTool,
+  getMcpConnection,
+  loadPiMcp
+} from './client'
 import { buildToolName, uniqueToolName } from './naming'
 
 /*
@@ -31,22 +35,35 @@ export async function createMcpTools(options: {
   }
   const [{ Type }, mcp] = await Promise.all([import('@earendil-works/pi-ai'), loadPiMcp()])
 
+  /*
+   * 并行连接各服务：单个服务慢或超时不再串行叠加等待，
+   * 失败服务按连接失败冷却快速跳过（见 client.ts）。
+   */
+  const discoveredList = await Promise.all(
+    servers.map(async (server) => {
+      try {
+        const connection = await getMcpConnection(server, ASSEMBLY_CONNECT_TIMEOUT)
+        return { server, tools: connection.tools }
+      } catch (error) {
+        log.warn(`[mcp] 服务连接失败，已跳过：${server.name} ${(error as Error).message}`)
+        return null
+      }
+    })
+  )
+
   const tools: AgentTool[] = []
   const usedNames = new Set<string>()
 
-  for (const server of servers) {
-    /* 已被终止：不再继续连接后续服务 */
+  /* 按配置顺序装配工具，保证同名工具序号稳定（与连接并发顺序无关） */
+  for (const discoveredItem of discoveredList) {
+    if (!discoveredItem) {
+      continue
+    }
+    /* 已被终止：不再装配后续服务的工具 */
     if (options.isAborted?.()) {
       break
     }
-    let discovered: Tool[]
-    try {
-      const connection = await getMcpConnection(server)
-      discovered = connection.tools
-    } catch (error) {
-      log.warn(`[mcp] 服务连接失败，已跳过：${server.name} ${(error as Error).message}`)
-      continue
-    }
+    const { server, tools: discovered } = discoveredItem
 
     for (const tool of discovered) {
       /* Plan 模式只读：仅暴露显式声明只读的工具 */

@@ -35,9 +35,9 @@ const toolOpen = ref<Record<string, boolean>>({})
 /* 最后一个片段下标（用于判断是否处于流式跟随的尾段） */
 const lastIndex = computed(() => props.message.parts.length - 1)
 
-/* 生成中文案：尚无输出为「正在思考」，已有输出则为「正在生成」（尾部常驻活动指示） */
+/* 生成中文案：尚无输出为「正在准备」，已有输出则为「正在生成」（尾部常驻活动指示） */
 const pendingLabel = computed(() =>
-  props.message.parts.length === 0 ? t('chat.thinkingPending') : t('chat.generating')
+  props.message.parts.length === 0 ? t('chat.preparing') : t('chat.generating')
 )
 
 /* 本轮总耗时（仅流式轮次有时间戳，重载后不展示） */

@@ -52,7 +52,7 @@
     "modeBuild": "Build",
     "modeTip": "Plan is read-only (reads project files only); Build can read/write files and run commands",
     "thinking": "Thinking",
-    "thinkingPending": "Thinking",
+    "preparing": "Preparing…",
     "thinkingActive": "Thinking…",
     "thinkingDone": "Thought",
     "generating": "Generating",

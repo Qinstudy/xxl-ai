@@ -21,8 +21,17 @@ export function loadPiMcp(): Promise<PiMcpModule> {
   return modulePromise
 }
 
-/* 初始化超时（连接握手；首次 npx 下载依赖可能较慢） */
+/* 初始化超时（连接握手；显式连通测试用，保持可预期等待） */
 const CONNECT_TIMEOUT = 30000
+
+/*
+ * 对话装配期握手超时：首次 npx / uvx 需现场安装依赖（实测可达 1 分钟），
+ * 装配已移出首字关键路径（见 session.ts 预算），故放宽以允许冷安装一次完成。
+ */
+export const ASSEMBLY_CONNECT_TIMEOUT = 120000
+
+/* 连接失败冷却：同一配置在冷却期内直接快速失败，避免每个新会话重复等待超时 */
+const FAILURE_COOLDOWN = 5 * 60 * 1000
 
 /* 工具列举 / 调用超时 */
 const LIST_TIMEOUT = 30000
@@ -41,6 +50,17 @@ interface CachedConnection {
   tools: Tool[]
 }
 const connections = new Map<string, CachedConnection>()
+
+/* 失败冷却记录：服务 ID → 指纹 / 到期时间 / 失败原因 */
+interface CachedFailure {
+  fingerprint: string
+  until: number
+  message: string
+}
+const failures = new Map<string, CachedFailure>()
+
+/* 进行中的握手：服务 ID + 指纹 → 连接 Promise（并发请求共享一次连接，避免重复拉起子进程） */
+const inflight = new Map<string, Promise<{ client: McpClient; tools: Tool[] }>>()
 
 /* 运行时 PATH（含设置的 Node / Python 环境，供 stdio 解析 npx / uvx） */
 let runtimePath = ''
@@ -132,14 +152,14 @@ function describeConnectError(error: Error, stderr: string, server: McpRuntimeCo
 }
 
 /* 建立新连接（含 initialize 握手） */
-async function connect(server: McpRuntimeConfig): Promise<McpClient> {
+async function connect(server: McpRuntimeConfig, timeoutMs = CONNECT_TIMEOUT): Promise<McpClient> {
   const { McpClient } = await loadPiMcp()
   const readStderr = (): string =>
     stderrCapture.get(server.id || fingerprintOf(server)) ?? ''
   const transport = await createTransport(server)
   const client = new McpClient({
     ...CLIENT_INFO,
-    requestTimeoutMs: CONNECT_TIMEOUT
+    requestTimeoutMs: timeoutMs
   })
   try {
     await client.connect(transport)
@@ -166,14 +186,59 @@ async function listTools(client: McpClient): Promise<Tool[]> {
   return (tools ?? []).slice(0, MAX_TOOLS)
 }
 
-/* 获取（或重建）连接：配置指纹变化时关闭旧连接 */
+/* 记录连接失败：冷却期内直接跳过，避免每个新会话重复等待握手超时 */
+function recordFailure(server: McpRuntimeConfig, fingerprint: string, error: unknown): void {
+  failures.set(server.id, {
+    fingerprint,
+    until: Date.now() + FAILURE_COOLDOWN,
+    message: (error as Error).message || '连接失败'
+  })
+}
+
+/* 建立连接并列举工具（成功写缓存并清除冷却；失败写入冷却记录） */
+async function establish(
+  server: McpRuntimeConfig,
+  fingerprint: string,
+  timeoutMs: number
+): Promise<{ client: McpClient; tools: Tool[] }> {
+  let client: McpClient
+  try {
+    client = await connect(server, timeoutMs)
+  } catch (error) {
+    recordFailure(server, fingerprint, error)
+    throw error
+  }
+  try {
+    const tools = await listTools(client)
+    connections.set(server.id, { fingerprint, client, tools })
+    failures.delete(server.id)
+    return { client, tools }
+  } catch (error) {
+    await closeClient(client)
+    recordFailure(server, fingerprint, error)
+    throw error
+  }
+}
+
+/* 获取（或重建）连接：配置指纹变化时关闭旧连接；冷却期内快速失败 */
 export async function getMcpConnection(
-  server: McpRuntimeConfig
+  server: McpRuntimeConfig,
+  timeoutMs = CONNECT_TIMEOUT
 ): Promise<{ client: McpClient; tools: Tool[] }> {
   const fingerprint = fingerprintOf(server)
   const cached = connections.get(server.id)
   if (cached && cached.fingerprint === fingerprint) {
     return { client: cached.client, tools: cached.tools }
+  }
+
+  /* 冷却期内：直接抛错（调用方跳过该服务，不阻塞本轮），到期后自动重试 */
+  const failure = failures.get(server.id)
+  if (failure && failure.fingerprint === fingerprint) {
+    if (failure.until > Date.now()) {
+      const remain = Math.ceil((failure.until - Date.now()) / 1000)
+      throw new Error(`${failure.message}（${remain} 秒后重试）`)
+    }
+    failures.delete(server.id)
   }
 
   /* 配置变更：先关闭旧连接，再重建 */
@@ -182,15 +247,17 @@ export async function getMcpConnection(
     connections.delete(server.id)
   }
 
-  const client = await connect(server)
-  try {
-    const tools = await listTools(client)
-    connections.set(server.id, { fingerprint, client, tools })
-    return { client, tools }
-  } catch (error) {
-    await closeClient(client)
-    throw error
+  /* 并发请求共享同一次握手：避免首轮装配与后台装配重复拉起子进程 */
+  const inflightKey = `${server.id}:${fingerprint}`
+  const running = inflight.get(inflightKey)
+  if (running) {
+    return running
   }
+  const task = establish(server, fingerprint, timeoutMs).finally(() => {
+    inflight.delete(inflightKey)
+  })
+  inflight.set(inflightKey, task)
+  return task
 }
 
 /* 关闭客户端（忽略关闭异常；stdio 会同时终止子进程组） */
@@ -206,6 +273,7 @@ async function closeClient(client: McpClient): Promise<void> {
 export async function closeAllMcpClients(): Promise<void> {
   const list = Array.from(connections.values())
   connections.clear()
+  failures.clear()
   stderrCapture.clear()
   await Promise.all(list.map((item) => closeClient(item.client)))
 }
@@ -233,7 +301,7 @@ export async function testMcpServer(
   const start = Date.now()
   let client: McpClient | null = null
   try {
-    client = await connect(server)
+    client = await connect(server, CONNECT_TIMEOUT)
     const tools = await listTools(client)
     const elapsedMs = Date.now() - start
     return {

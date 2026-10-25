@@ -1348,9 +1348,16 @@ docker compose down
 
 ### v1.2.2 Release Notes[ING]
 - 1、【优化】SKILL与MCP导入优化（Desk版），移除非必要文件和大小限制，提升导入效率和兼容性；
-- 2、【TODO】SKILL支持从Github安装；
-- 3、【TODO】侧边工具栏优化：会话级别工具栏状态隔离；
-- 4、【TODO】Desk版本：记忆；
+- 2、【TODO】
+  - SKILL支持从Github安装；
+  - SKILL统一安装位置，查看不需要审批；
+  - SKILL按需启用：选择后才启用；
+- 3、【TODO】右边更名为 工具栏；
+  - 侧边工具栏优化：会话级别工具栏状态隔离；
+  - 终端工具挪到工具栏；
+- 4、【TODO】会话确认机制：Agent不确定任务，设计调研表单主动与用户确认；
+- 5、【TODO】长程任务：动态规划任务 -> 份步骤执行 -> 结果验收；失败自动巡检、延续执行，防止死循环；设计一套机制；
+- 6、【TODO】思考折叠区域高度max设置，超出滚动；
 
 
 ### TODO LIST
@@ -1362,6 +1369,8 @@ docker compose down
     - Chat 对话增强：对话记忆控制、多模态输入；
 - 2、云版：OpenAPI：针对搭建的Agent提供OpenAPI接口能力，通过agentId + accessToken访问，便于集成到第三方系统应用（提供内置Agent对话能力，可用于功能调试或快速集成应用）。
 - 3、云版：可观测：支持Agent可观测，包括Session对话、工具/知识/记忆等Trace明细可观测等。
+- 4、【TODO】Desk版本：记忆；
+
 
 ## 七、其他
 
