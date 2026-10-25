@@ -68,8 +68,9 @@ const columnWidths = computed(() => {
   }
 })
 
-/* 浏览器类开关状态（文件操作类固定启用） */
+/* 浏览器 / 通用类开关状态（其它分类固定启用） */
 const browserEnabled = computed(() => settings.settings.builtinToolBrowserEnabled)
+const generalEnabled = computed(() => settings.settings.builtinToolGeneralEnabled)
 
 /* 已展开的分类（默认全部折叠，点击分类行展开/收起工具明细） */
 const expandedKeys = ref<BuiltinToolCategoryKey[]>([])
@@ -88,16 +89,26 @@ function toggleGroup(key: BuiltinToolCategoryKey): void {
 
 /* 分类当前是否启用 */
 function isEnabled(key: BuiltinToolCategoryKey): boolean {
-  return key === 'browser' ? browserEnabled.value : true
+  if (key === 'browser') {
+    return browserEnabled.value
+  }
+  if (key === 'general') {
+    return generalEnabled.value
+  }
+  return true
 }
 
-/* 切换浏览器类工具（保存设置后由主进程清理运行时缓存，下一轮对话生效） */
+/* 切换浏览器 / 通用类工具（保存设置后由主进程清理运行时缓存，下一轮对话生效） */
 async function onToggle(key: BuiltinToolCategoryKey, value: boolean): Promise<void> {
-  if (key !== 'browser') {
+  if (key !== 'browser' && key !== 'general') {
     return
   }
   try {
-    await settings.saveSettings({ builtinToolBrowserEnabled: value })
+    await settings.saveSettings(
+      key === 'browser'
+        ? { builtinToolBrowserEnabled: value }
+        : { builtinToolGeneralEnabled: value }
+    )
     ElMessage.success(
       value ? t('plugin.builtinTool.enabledOn') : t('plugin.builtinTool.enabledOff')
     )
@@ -280,6 +291,12 @@ function modeLabel(modes: ChatMode[]): string {
 
 .group-detail {
   padding: 8px 0 16px;
+}
+
+/* 二级表格首列与一级分类名称左对齐（分类名称位于箭头右侧 24px） */
+.group-detail :deep(.el-table th:first-child .cell),
+.group-detail :deep(.el-table td:first-child .cell) {
+  padding-left: 24px;
 }
 
 .group-desc {

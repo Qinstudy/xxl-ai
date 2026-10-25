@@ -145,6 +145,7 @@ async function handleRun(input: RunAgentInput): Promise<void> {
       mcpServers: input.mcpServers ?? [],
       skills: input.skills ?? [],
       browserToolsEnabled: input.browserToolsEnabled !== false,
+      generalToolsEnabled: input.generalToolsEnabled !== false,
       isAborted: () => isSessionAborted(input.sessionId)
     })
     /* 创建 Agent 期间已被终止：不再发起模型请求，直接回传当前上下文 */

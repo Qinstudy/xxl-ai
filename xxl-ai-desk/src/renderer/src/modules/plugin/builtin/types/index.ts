@@ -9,8 +9,8 @@
 
 import type { ChatMode } from '@shared/ipc'
 
-/* 内置工具分类：fs 文件 / shell 终端 / browser 浏览器（可开关）/ system 系统 */
-export type BuiltinToolCategoryKey = 'fs' | 'shell' | 'browser' | 'system'
+/* 内置工具分类：fs 文件 / shell 终端 / browser 浏览器（可开关）/ general 通用（可开关） */
+export type BuiltinToolCategoryKey = 'fs' | 'shell' | 'browser' | 'general'
 
 /* 工具目录项 */
 export interface BuiltinToolCatalogItem {
@@ -61,10 +61,10 @@ export const BUILTIN_TOOL_CATEGORIES: BuiltinToolCategory[] = [
     switchable: true
   },
   {
-    key: 'system',
-    titleKey: 'plugin.builtinTool.category.system',
-    descriptionKey: 'plugin.builtinTool.categoryDesc.system',
-    switchable: false
+    key: 'general',
+    titleKey: 'plugin.builtinTool.category.general',
+    descriptionKey: 'plugin.builtinTool.categoryDesc.general',
+    switchable: true
   }
 ]
 
@@ -200,7 +200,7 @@ export const BUILTIN_TOOL_CATALOG: BuiltinToolCatalogItem[] = [
   },
   {
     name: 'get_current_time',
-    category: 'system',
+    category: 'general',
     titleKey: 'chat.tool.time',
     descriptionKey: 'plugin.builtinTool.desc.time',
     readOnly: true,

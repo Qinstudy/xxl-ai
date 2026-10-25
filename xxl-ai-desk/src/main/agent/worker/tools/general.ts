@@ -1,12 +1,16 @@
 /*
- * 系统类内置工具：当前时间等无副作用的能力。
+ * 通用类内置工具：当前时间等无副作用的能力。
  */
 
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { ALL_MODES, describe, text, type ToolContext, type ToolEntry } from './shared'
 
-/* 构建系统类工具 */
-export async function createSystemTools(_context: ToolContext): Promise<ToolEntry[]> {
+/* 构建通用类工具 */
+export async function createGeneralTools(context: ToolContext): Promise<ToolEntry[]> {
+  /* 通用工具开关关闭时不装配任何通用工具 */
+  if (!context.generalToolsEnabled) {
+    return []
+  }
   const { Type } = await import('@earendil-works/pi-ai')
 
   /* 获取当前时间：本地日期时间，可选 IANA 时区 */
@@ -39,7 +43,7 @@ export async function createSystemTools(_context: ToolContext): Promise<ToolEntr
   return [
     {
       meta: {
-        group: 'system',
+        group: 'general',
         readOnly: true,
         modes: ALL_MODES,
         maxOutput: 2000

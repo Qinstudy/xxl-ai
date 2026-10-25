@@ -21,7 +21,8 @@ const DEFAULTS: AppSettings = {
   runtimeNodePath: '',
   runtimePythonPath: '',
   updateAutoCheck: true,
-  builtinToolBrowserEnabled: true
+  builtinToolBrowserEnabled: true,
+  builtinToolGeneralEnabled: true
 }
 
 /* 解析快捷键配置（JSON 存储，缺省项回退默认值） */
@@ -57,7 +58,8 @@ export function getSettings(): AppSettings {
     runtimeNodePath: map.get('runtimeNodePath') ?? DEFAULTS.runtimeNodePath,
     runtimePythonPath: map.get('runtimePythonPath') ?? DEFAULTS.runtimePythonPath,
     updateAutoCheck: map.get('updateAutoCheck') !== 'false',
-    builtinToolBrowserEnabled: map.get('builtinToolBrowserEnabled') !== 'false'
+    builtinToolBrowserEnabled: map.get('builtinToolBrowserEnabled') !== 'false',
+    builtinToolGeneralEnabled: map.get('builtinToolGeneralEnabled') !== 'false'
   }
 }
 

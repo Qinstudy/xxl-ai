@@ -294,8 +294,9 @@ export async function sendChat(
       mcpServers: listEnabledMcpServers(),
       /* SKILL：已启用技能索引，运行时进程据此装配 read_skill */
       skills,
-      /* 内置工具：浏览器类按设置开关决定是否下发 */
+      /* 内置工具：浏览器 / 通用类按设置开关决定是否下发 */
       browserToolsEnabled: settings.builtinToolBrowserEnabled,
+      generalToolsEnabled: settings.builtinToolGeneralEnabled,
       text
     }
     const result = await runAgent(runInput, emitEvent)

@@ -45,6 +45,8 @@ export interface AppSettings {
   updateAutoCheck: boolean
   /* 浏览器类内置工具是否启用（关闭后模型不再获得 open_browser / read_browser） */
   builtinToolBrowserEnabled: boolean
+  /* 通用类内置工具是否启用（关闭后模型不再获得时间等通用能力） */
+  builtinToolGeneralEnabled: boolean
 }
 
 /* 运行时可执行文件检测入参 */

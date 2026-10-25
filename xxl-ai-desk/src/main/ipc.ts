@@ -168,7 +168,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.settingsSave, (_event, patch: Partial<AppSettings>) => {
     const saved = saveSettings(patch)
     /* 自定义指令与内置工具开关变更后清空运行时缓存，使全部会话（含旧对话）下次对话即生效 */
-    if (patch.systemPrompt !== undefined || patch.builtinToolBrowserEnabled !== undefined) {
+    if (
+      patch.systemPrompt !== undefined ||
+      patch.builtinToolBrowserEnabled !== undefined ||
+      patch.builtinToolGeneralEnabled !== undefined
+    ) {
       resetAgents()
     }
     return saved

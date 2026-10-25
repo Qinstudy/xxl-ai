@@ -7,7 +7,7 @@
 
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { type ToolContext, type ToolEntry } from './shared'
-import { createSystemTools } from './system'
+import { createGeneralTools } from './general'
 import { createFsTools } from './fs'
 import { createShellTools } from './shell'
 import { createBrowserTools } from './browser'
@@ -15,7 +15,7 @@ import { createSkillTools } from './skill'
 
 /* 按域聚合的工具工厂（新增域在此登记） */
 const FACTORIES: Array<(context: ToolContext) => Promise<ToolEntry[]>> = [
-  createSystemTools,
+  createGeneralTools,
   createFsTools,
   createShellTools,
   createBrowserTools,

@@ -78,6 +78,8 @@ export interface RunAgentInput {
   skills: SkillRuntimeConfig[]
   /* 浏览器类内置工具是否启用（关闭时不装配 open_browser / read_browser） */
   browserToolsEnabled: boolean
+  /* 通用类内置工具是否启用（关闭时不装配时间等通用能力） */
+  generalToolsEnabled: boolean
   /* 本轮用户输入 */
   text: string
 }
