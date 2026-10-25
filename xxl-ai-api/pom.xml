@@ -75,12 +75,6 @@
 			<artifactId>spring-boot-starter-data-redis</artifactId>
 		</dependency>
 
-		<!-- poi -->
-		<dependency>
-			<groupId>org.apache.poi</groupId>
-			<artifactId>poi-ooxml</artifactId>
-		</dependency>
-
 		<!-- ********************************* for plugin start ********************************* -->
 
 		<!-- spring-ai：模型（chat/embedding，OpenAI 兼容协议） -->

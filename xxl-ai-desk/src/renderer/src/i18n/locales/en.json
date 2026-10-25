@@ -342,6 +342,7 @@
       "sortStars": "Most popular",
       "sortLatest": "Recently added",
       "sortName": "Name",
+      "stars": "Stars",
       "remoteServer": "Remote",
       "copyFail": "Copy failed"
     },

@@ -342,6 +342,7 @@
       "sortStars": "最热门",
       "sortLatest": "最近添加",
       "sortName": "名称排序",
+      "stars": "星标数",
       "remoteServer": "远程",
       "copyFail": "复制失败"
     },
