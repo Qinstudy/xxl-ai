@@ -175,7 +175,7 @@ export function ensureSeedProviders(): void {
       baseUrl: 'https://opencode.ai/zen/go/v1',
       apiKey: '',
       headers: { 'x-opencode-session': '{session}' },
-      models: ['deepseek-v4-flash', 'mimo-v2.5'],
+      models: ['deepseek-v4.1-flash', 'glm-5.3'],
       enabled: true,
       sort: 1
     },
