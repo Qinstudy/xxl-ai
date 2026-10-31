@@ -136,7 +136,7 @@ const { tabs, activeId, setContainer, activate, openTerminal, disposeTab } = use
 
 /* 关闭图标：默认隐藏，悬浮标签时展示 */
 .terminal-tab-close {
-  font-size: var(--desk-font-sm);
+  font-size: var(--desk-icon-xs);
   visibility: hidden;
 }
 

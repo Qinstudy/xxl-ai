@@ -143,7 +143,7 @@ function forwardContextMenu(entry: FsEntry, position: { x: number; y: number }):
 .tree-caret {
   flex-shrink: 0;
   width: 12px;
-  font-size: var(--desk-font-xs);
+  font-size: var(--desk-icon-xs);
   color: var(--desk-text-tertiary);
   transition: transform 0.15s ease;
 }
@@ -158,7 +158,7 @@ function forwardContextMenu(entry: FsEntry, position: { x: number; y: number }):
 
 .tree-icon {
   flex-shrink: 0;
-  font-size: var(--desk-font-base);
+  font-size: var(--desk-icon-sm);
   color: var(--desk-text-tertiary);
 }
 

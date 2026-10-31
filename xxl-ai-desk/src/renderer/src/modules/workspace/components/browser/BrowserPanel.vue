@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- 更多操作：页面操作与开发者工具 -->
-      <el-dropdown trigger="click" popper-class="browser-more-menu" @command="onMore">
+      <el-dropdown trigger="click" @command="onMore">
         <button class="nav-btn" :title="t('common.actions')">
           <el-icon><MoreFilled /></el-icon>
         </button>
@@ -255,7 +255,7 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   background: transparent;
   color: var(--desk-text-tertiary);
-  font-size: var(--desk-font-xs);
+  font-size: var(--desk-icon-sm);
   cursor: pointer;
 }
 
@@ -277,7 +277,7 @@ onBeforeUnmount(() => {
 .tab-add {
   width: 26px;
   height: 26px;
-  font-size: var(--desk-font-base);
+  font-size: var(--desk-icon-sm);
   border-radius: 8px;
 }
 
@@ -299,7 +299,7 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   background: transparent;
   color: var(--desk-text-secondary);
-  font-size: var(--desk-font-md);
+  font-size: var(--desk-icon-sm);
   display: flex;
   align-items: center;
   justify-content: center;

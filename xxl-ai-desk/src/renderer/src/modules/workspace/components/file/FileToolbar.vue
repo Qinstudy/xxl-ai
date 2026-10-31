@@ -198,7 +198,7 @@ const emit = defineEmits<{
 }
 
 .panel-btn .chevron {
-  font-size: var(--desk-font-xs);
+  font-size: var(--desk-icon-xs);
 }
 
 /* 打开按钮：左半默认打开 + 右半打开方式下拉，整体保持一个按钮外观 */

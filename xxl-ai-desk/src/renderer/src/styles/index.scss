@@ -714,19 +714,15 @@ html.dark .el-button--primary {
   color: var(--desk-primary);
 }
 
-/* --- 下拉菜单选项：字体与左侧菜单文案一致，首图标与文字留白 --- */
+/* --- 下拉菜单选项：统一紧凑菜单字号，首图标与文字留白 --- */
 .el-dropdown-menu__item {
-  font-size: var(--desk-font-base);
+  font-size: var(--desk-font-sm);
 }
 
 .el-dropdown-menu__item > .el-icon:first-child {
   margin-right: 8px;
 }
 
-/* 浏览器工具「...」菜单：与工具 Tab / 地址栏保持 13px */
-.browser-more-menu .el-dropdown-menu__item {
-  font-size: var(--desk-font-sm);
-}
 
 /*
  * 弹层与窗口拖拽区：抽屉/对话框右上角关闭按钮位于全局顶栏的拖拽区（-webkit-app-region: drag）内，

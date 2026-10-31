@@ -288,7 +288,7 @@ function toolDetailsText(tool: ToolCallState): string {
 
 .step-icon {
   flex-shrink: 0;
-  font-size: var(--desk-font-base);
+  font-size: var(--desk-icon-sm);
   color: var(--desk-text-tertiary);
 }
 

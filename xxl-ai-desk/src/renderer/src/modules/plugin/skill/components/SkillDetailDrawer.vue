@@ -251,7 +251,7 @@ async function onReveal(): Promise<void> {
 /* 详情正文：字号略小以贴合抽屉宽度，代码块与引用样式统一由全局 Markdown 样式提供 */
 .detail-markdown {
   padding: 4px 2px;
-  font-size: var(--desk-font-sm);
+  font-size: var(--desk-font-base);
   line-height: 1.7;
   color: var(--desk-text);
 }

@@ -217,7 +217,7 @@ function onQuickAction(action: QuickAction): void {
 
 .palette-item-icon {
   flex-shrink: 0;
-  font-size: var(--desk-font-md);
+  font-size: var(--desk-icon-sm);
 }
 
 /* 内联 SVG 图标（终端 / 浏览器）：尺寸 */

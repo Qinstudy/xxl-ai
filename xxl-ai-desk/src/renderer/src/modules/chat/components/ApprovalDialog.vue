@@ -98,7 +98,7 @@ onBeforeUnmount(() => {
 }
 
 .approval-icon {
-  font-size: var(--desk-font-lg);
+  font-size: var(--desk-icon-lg);
   color: var(--el-color-warning);
 }
 
