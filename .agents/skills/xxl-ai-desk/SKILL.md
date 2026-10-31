@@ -9,79 +9,124 @@ Desk 是 **Electron + Vue3 + Pi + SQLite/Drizzle** 的三进程桌面应用；�
 
 > 仅适用于本地版 `xxl-ai-desk`。云版（`xxl-ai-api` + `xxl-ai-ui`）请加载 `xxl-ai` Skill，二者互不依赖。
 
-## 1. 代码架构
+## 1. 代码结构
 
 ### 1.1 三进程
 
-```
-Renderer（Vue3 + Element Plus，无 Node 直连）
-  stores / modules / components / i18n
-        │ preload 白名单（window.desk.*）
-Main（Electron 主进程，CJS）
-  ipc.ts（薄网关） · services/*（业务） · db/* · config/*
-  agent/host/*（运行时托管 + 审批）
-        │ utilityProcess + parentPort（shared/agentProtocol.ts）
-Agent 运行时进程（CJS）
-  agent/worker/{worker,session,tools,sandbox,models,mcp}
-```
-
-### 1.2 目录
+| 进程 | 入口 | 职责 | 边界 |
+|---|---|---|---|
+| Renderer | `src/renderer/src` | 界面、Pinia 状态、模块业务 | 只经 `@renderer/api` 访问能力，无 Node / FS / DB |
+| Main | `src/main/index.ts` | 窗口、IPC 网关、`services/*` 业务、host 运行时托管、`desk-file` 协议 | 唯一 `getDb()` 出口；不直接执行 Agent 会话 |
+| Worker | `src/main/agent/worker/worker.ts`（utilityProcess） | Agent 会话、工具、MCP、技能沙箱 | 不访问 DB 与主进程内部，只经 `shared/agentProtocol.ts` |
 
 ```
-xxl-ai-desk/src/
+Renderer ──preload 白名单（DeskApi）──▶ Main ──utilityProcess + parentPort──▶ Worker
+```
+
+### 1.2 目录（与代码一致）
+
+```
+src/
 ├── main/
-│   ├── index.ts                 入口：DB 初始化 → 种子 → IPC → 建窗
-│   ├── ipc.ts                   全部 IPC handler（薄网关）
-│   ├── config/paths.ts          数据目录 / DB 路径（基础设施）
-│   ├── db/{schema.ts,index.ts}  Drizzle 表结构 / better-sqlite3 + DDL + 内置种子
-│   ├── services/*Service.ts     业务 CRUD 与编排（唯一 getDb 出口）
+│   ├── index.ts                入口：DB 初始化 → 种子 → 协议 → IPC → 建窗
+│   ├── ipc.ts                  IPC 注册总入口（薄网关）
+│   ├── config/paths.ts         数据目录 / DB 路径
+│   ├── db/{schema,index}.ts    Drizzle 表结构 / DDL + 种子（仅全新安装）
+│   ├── utils/                  pathGuard · http · ttlCache
+│   ├── services/*.ts           业务 CRUD 与编排（唯一 getDb 出口）
 │   └── agent/
-│       ├── host/                主进程侧：runtimeHost / approval / community（社区抓取）
-│       └── worker/              运行时进程侧：worker / session / tools / sandbox / models / mcp
-├── preload/index.ts             contextBridge 白名单
+│       ├── host/               runtimeHost · approval · browserBridge · community/{mcpSo,skillsSh}Adapter · skills/githubInstaller
+│       └── worker/             worker · session · sandbox · models · mcp/{client,naming,tools} · tools/{fs,shell,browser,general,skill,shared,index}
+├── preload/index.ts            contextBridge 白名单（DeskApi）
 ├── shared/
-│   ├── ipc.ts                   聚合：re-export contracts + IPC 常量 + DeskApi
-│   ├── contracts/*.ts           按域 DTO（app/provider/project/session/chat/terminal/fs/shell/mcp）
-│   └── agentProtocol.ts         主进程 ⇄ 运行时进程协议
+│   ├── ipc.ts                  契约聚合 + IPC 常量 + DeskApi
+│   ├── contracts/*.ts          按域 DTO（app/provider/project/session/chat/terminal/fs/shell/mcp/browser/skill）
+│   ├── agentProtocol.ts        Main ⇄ Worker 协议
+│   ├── i18n/{index.ts,locales/{zh,en}.json}   文案（渲染层 / 主进程 / worker 共用）
+│   └── fileTypes.ts · defaults.ts · history.ts · providerUrl.ts · browserUrl.ts · appInfo.ts
 └── renderer/src/
-    ├── api/index.ts             唯一能力入口：export const api = window.desk
-    ├── stores/*.ts              Pinia（状态 + 调 api）
-    ├── modules/{domain}/{module}/{pages,components,composables}
-    ├── components/              仅跨模块通用件
-    ├── composables / utils      含响应式 / 纯函数
-    ├── router/index.ts          Hash 路由
-    └── i18n/locales/{zh,en}.json
+    ├── api/index.ts            唯一能力入口：export const api = window.desk
+    ├── components/             跨模块通用件（ApprovalDialog / MarkdownBlock / PanelResizer / Sidebar*）
+    │   ├── shell/              外壳：AppTopbar / AppSidebar / ActivityRail / SectionMenu
+    │   └── icons/
+    ├── composables/            跨模块组合式函数（usePanelResize / useSessionLifecycle / useQuickAction）
+    ├── utils/                  无 Vue / 组件依赖的纯工具（ipcError / shortcut / localFileUrl）
+    ├── stores/*.ts             根 store（project/settings/workspace/mcp/skill/chatUi/shell/browserSession）
+    │   └── stores/chat/        会话域拆分：index / stream / messageMapping / lastSession
+    ├── modules/{chat,workspace,plugin,settings}/
+    ├── i18n/index.ts           装配 shared 文案 + t()
+    ├── config/nav.ts           板块 ↔ 路由 ↔ 标题 ↔ 子菜单（唯一导航来源）
+    ├── router/index.ts         Hash 路由（直接 import 模块 pages）
+    ├── styles/{tokens,index}.scss   设计令牌 / 全局样式
+    ├── assets/                 图标等静态资源
+    └── types/index.ts          全局基础类型
+```
+
+模块目录构成（按实际）：
+
+```
+modules/chat/        pages/ · components/ · composables/ · utils/ · index.ts
+modules/workspace/   components/{browser,file,terminal}/ · composables/ · utils/ · terminal.ts · index.ts
+modules/plugin/      pages/ · components/ · utils/ · builtin/{pages,catalog.ts} · mcp/{pages,components}/ · skill/{pages,components}/
+modules/settings/    pages/ · components/ · index.ts
 ```
 
 ### 1.3 分层与依赖（硬约束）
 
 | 层 | 允许依赖 | 禁止 |
 |---|---|---|
-| `services/*` | `db`、`config`、shared 契约、`agent/host` 门面 | import `agent/worker/*`；自写协议/SDK；在 `ipc.ts` 写业务 |
-| `agent/host/*` | electron、services（读配置）、shared 契约 | 定义 `ipcMain` handler；写业务表 |
-| `agent/worker/*` | shared 契约、官方运行时库 | 访问 DB、写业务状态、做业务校验 |
-| `ipc.ts` | services / host 门面 | 业务编排、连接管理、SQL |
-| `preload` | shared 契约 | 业务逻辑、暴露任意 Node 能力 |
-| `renderer` | `@renderer/api`、本模块内部 | 散落 `window.desk`、跨模块 import 内部文件 |
+| `services/*` | `db` · `config` · `main/utils` · `shared/*` · `agent/host` 门面 · 其它 service（编排） | import `agent/worker/*`；自写协议 / SDK；在 `ipc.ts` 写业务 |
+| `agent/host/*` | electron · `services/*`（读配置 / 导入）· `shared/*` | 定义 `ipcMain` handler；直接写业务表 |
+| `agent/worker/*` | `shared/*`（含 `agentProtocol`）· Pi 官方 SDK · `electron-log` | 访问 DB、`services/*`、主进程内部模块；做业务校验 |
+| `ipc.ts` | `services/*` · `agent/host` 门面 | 业务编排、状态清理、连接管理、SQL |
+| `preload` | `shared/ipc`（DeskApi 契约） | 业务逻辑；暴露任意 Node 能力 |
+| `renderer` | `@renderer/api` · 本模块内部 · `@shared/*` · `@renderer/{components,composables,utils,stores}` | 直接 `window.desk`（仅 `api/index.ts` 例外）、`node:`、跨模块内部文件 |
 
-判定：`services` import `agent/worker` 违规；组件里出现 `spawn / 协议 / DB` 违规；反向依赖一律违规。
+判定：
+- `services` import `agent/worker` → 违规；`agent/*` 出现 `getDb()` / DDL → 违规。
+- renderer 里出现 `window.desk`（除 `api/index.ts`）、`fs`、`child_process` → 违规。
+- 跨模块引用只允许：模块 `index.ts` 导出、对应 store、全局 `components/composables/utils`。
 
 补充：
-
 - **唯一持久化出口**：`getDb()` 只在 `services/*`；`agent/*` 可经 service 读配置，不写业务表。
-- **job 编排在 service**：如对话编排在 `services/chatService.ts`，`ipc.ts` 只注册与转发。
-- **基础设施独立**：路径解析在 `config/paths.ts`，`db` 不反向依赖 `services`。
-- **agent 按进程分层**：host 可用 electron API；worker 仅用 `electron-log` 等运行时能力；跨进程只走 `shared/agentProtocol.ts`。
-- **运行时门面**：需要运行时能力时，由 `services/{module}RuntimeService.ts` 编排 → `agent/host` 门面 → worker；配置模块不 import 运行时实现。
+- **运行时门面**：需要运行时能力时，`services/*RuntimeService.ts` 编排 → `agent/host` 门面 → worker。
+- **基础设施独立**：路径解析在 `config/paths.ts`；`db` 不反向依赖 `services`。
+- **本地文件访问**：渲染层一律经 `utils/localFileUrl.ts#toLocalFileUrl()` 转 `desk-file://`，禁止 `file://`；新增文件类型需同步 `shared/fileTypes.ts` 与 `index.html` 的 CSP（`img-src` / `media-src`）。
+- **存量偏差**（新增代码按上表执行，改到旧文件时顺手收敛）：
+  - `agent/host/skills/githubInstaller.ts` 直接 import `services/skillImportService`、`skillLimits`（方向反了，目标下沉 `shared/`）。
+  - `agent/worker/sandbox.ts` 直接 import `main/utils/pathGuard`（目标下沉 `shared/`）。
+  - `ipc.ts` 部分 handler 含会话运行时清理与 `resetAgents()`（目标改由 service 提供统一入口）。
+  - `composables/` 内有纯函数模块（`useMarkdown` / `useHighlight` / `useCodeBlock` / `useContentLink`），`utils/persistedWidth.ts` 依赖 Vue：新增按 §1.4 语义落位，触碰旧文件时顺手收敛。
 
 ### 1.4 模块边界（硬约束）
 
-- **一个功能 = 一个模块**：后端 service、契约、IPC、preload、store、页面/组件、i18n、SQL、需求目录同属该模块。
-- **只暴露公共 API**：跨模块只用 store 公开方法/状态与通用组件；禁止 import 其他模块的 `pages/`、内部 `components/`、内部 `utils/`。
-- **工具上移条件**：`utils / composables / components` 至少被 2 个模块使用才上移；否则留在模块内。
-- **禁止垃圾桶文件**：`utils.ts / helpers.ts / common.ts / manager.ts` 不得承载多领域逻辑，文件名必须表达领域语义。
-- **闭环检验**：改一个功能应只动「模块目录 + 其契约」；若需动 3 个以上模块，先重划边界。
+- **一个功能 = 一个模块**：service、契约、IPC、preload、store、页面/组件、文案、SQL、需求目录同属该模块。
+- **模块自包含**：页面放 `pages/`（页内弹窗内联）、模块内共享件放 `components/`、组合式函数放 `composables/`、纯函数放 `utils/`、跨模块出口放 `index.ts`。
+- **跨模块只走公共面**：模块 `index.ts`、store、全局 `components/composables/utils`；禁止 import 其它模块的 `pages/`、内部 `components/`、内部 `utils/`。唯一例外是路由挂载页面（无 `index.ts` 的 `plugin` 只由路由引用 `pages/`）。
+- **index.ts 只导出跨模块真正需要的**：不把内部 `components/composables` 全量透传（当前 `chat` / `workspace` 的 barrel 存在透传，新增导出按本规则）。
+- **上移条件**：`components / composables / utils` 被 **2 个及以上模块**使用才上移到 `renderer/src` 对应目录。
+- **目录规模**：单个模块目录 ≤20 个文件；超限按子业务拆分（参考 `plugin/mcp`、`plugin/skill`）。
+- **禁止桶文件**：`utils.ts / common.ts / helpers.ts / manager.ts` 不得承载多领域逻辑，文件名必须表达领域语义。
+- **会话级 UI 状态**：跨面板/跨页面的会话态放 `stores/workspace.ts` 与 `createSessionScopedStorage`，不放组件局部或全局单例。
+- **闭环检验**：改一个功能应只动「模块目录 + 其契约 + 调用方」；若要动 3 个以上模块，先重划边界。
 - **适配器扩展**：多实现场景用「接口 + 注册表」，新增实现只加文件、不改调用方。
+
+### 1.5 落位速查
+
+| 新增内容 | 落位 |
+|---|---|
+| 跨进程 DTO / IPC 常量 / DeskApi | `shared/contracts/*.ts` + `shared/ipc.ts` |
+| 跨进程纯函数 / 常量（如文件类型、URL 归一） | `shared/*.ts` |
+| 主进程业务与编排 | `main/services/{module}Service.ts` |
+| 主进程运行时门面 / 审批 / 社区抓取 | `main/agent/host/*` |
+| Agent 工具 / 会话 / MCP | `main/agent/worker/*` |
+| IPC 注册 | `main/ipc.ts`（只转发） |
+| 渲染能力入口 | `renderer/src/api/index.ts` |
+| 跨模块组件 / 组合式函数 / 纯工具 | `renderer/src/{components,composables,utils}` |
+| 模块页面 / 模块内组件 | `renderer/src/modules/{domain}/{module}/{pages,components}` |
+| 模块状态 | `renderer/src/stores/{module}.ts`（复杂域用 `stores/{module}/`） |
+| 文案 | `shared/i18n/locales/{zh,en}.json` |
+| 颜色 / 尺寸令牌 | `renderer/src/styles/tokens.scss` |
 
 ## 2. 代码约束
 
@@ -97,6 +142,8 @@ xxl-ai-desk/src/
 - **写库结构必须合法**：写入前保证下游可消费；历史脏数据在读取边界归一化。
 - 结构变更两处同步：`db/schema.ts` 与 `db/index.ts` 的 `DDL`（仅面向全新安装，不做旧库迁移）。
 - 敏感值不落明文、不进日志；列表脱敏，编辑态才解密。
+- **SQLite 无外键级联**：删除父记录（项目 / 会话 / 消息 / 终端）必须由 service 手动级联并清理运行时，禁止依赖数据库约束。
+- **跨进程文案**：主进程 / worker 的用户可见错误用 `shared/i18n` 的 `translate(language, 'runtime.*')`；新增文案禁止硬编码中文（存量待收敛）。
 
 ### 2.2 运行时与资源 [硬]
 
@@ -108,7 +155,6 @@ xxl-ai-desk/src/
 
 ### 2.3 UI 与样式 [硬]
 
-- `AppTopbar` / `Sidebar` 只做外壳与路由上下文，域逻辑下沉 `modules/{module}`。
 - 颜色/尺寸只用 tokens；组件样式 scoped；全局选择器（`:global`、`:has`、`body ...`）必须写明影响面并验证。
 - 弹层统一 `append-to-body`，并处理 `-webkit-app-region` 拖拽区，避免关闭按钮点击被窗口拖动吞掉。
 - 列表/表格复用统一规范（字号、列宽、操作按钮间距），禁止各页面自行一套。
@@ -124,7 +170,6 @@ xxl-ai-desk/src/
 | Vue 组件 | ≤1000 行；页面 SFC ≤1000 行 | Vue 风格指南 |
 | service | ≤1000 行 / 导出方法 ≤15 | 模块宽度控制 |
 | 单文件 TS | ≤1000 行 | ESLint `max-lines` |
-| 模块目录 | ≤20 个文件 | 边界控制 |
 
 超限必须回答：**能否按职责拆出新文件/新模块？**
 
@@ -140,10 +185,10 @@ xxl-ai-desk/src/
 
 1. **需求确认（必须）**：模块命名、字段与校验、系统能力（对话框/shell/终端/文件）、页面形态、改动范围、验证范围；确认后写入需求目录的 `方案.md`。
 2. **需求落盘**：`xxl-ai-spec/{yyyyMMdd}-{module}/` 建 `方案.md` 与建表 SQL（SQLite DDL）。
-3. **数据结构**：同步 `db/schema.ts` + `db/index.ts` 的 `DDL`。
+3. **数据结构**：按 §2.1 同步 `db/schema.ts` 与 `db/index.ts` 的 `DDL`。
 4. **主进程落位**：`services/{module}Service.ts` + 契约 + IPC + preload；需要运行时再加 `{module}RuntimeService.ts` 与 `agent/*` 实现。
-5. **渲染进程落位**：store + 页面/组件 + 路由 + i18n。
-6. **验证**：`npm run type-check` → `npm run build` → 必要时 `npm run dev` 联调；涉及 IPC/运行时/生命周期必须做端到端验证（真实 UI + 真实调用 + 进程残留检查），完成后清理测试数据并恢复用户状态。
+5. **渲染进程落位**：store + 页面/组件 + 路由 + 文案。
+6. **验证**：按 §7 执行（`type-check` → `build` → 端到端）；完成后清理测试数据并恢复用户状态。
 
 `方案.md` 最小结构：需求结论 / 数据库设计 / 后端改动 / 前端改动 / 验证结果。
 
@@ -155,7 +200,7 @@ xxl-ai-desk/src/
 |---|---|---|
 | `schema.ts` | `src/main/db/schema.ts` | `sqliteTable('desk_widget', {...})` |
 | `index.ts` | `src/main/db/index.ts` | DDL 建表 + 内置种子（全新安装生效，不做旧库迁移） |
-| `WidgetService.ts` | `src/main/services/widgetService.ts` | CRUD/编排；唯一 `getDb()` 出口 |
+| `widgetService.ts` | `src/main/services/widgetService.ts` | CRUD/编排；唯一 `getDb()` 出口 |
 | handler | `src/main/ipc.ts` | `ipcMain.handle(IPC.widget*, ...)`，薄网关 |
 | 契约 | `src/shared/contracts/widget.ts` + `src/shared/ipc.ts` | DTO + `IPC.widget*` + `DeskApi.widget` |
 | 暴露 | `src/preload/index.ts` | `widget: { list, save, remove }` |
@@ -192,7 +237,7 @@ export function saveWidget(input: Partial<WidgetDTO>): WidgetDTO {
 ```
 
 ```ts
-/* ipc.ts（若影响运行时，在 handler 内统一 resetAgents()/evictAgent()） */
+/* ipc.ts：只注册与转发；运行时失效/清理在 service 内完成 */
 ipcMain.handle(IPC.widgetList, () => listWidgets())
 ipcMain.handle(IPC.widgetSave, (_e, dto: Partial<WidgetDTO>) => saveWidget(dto))
 ipcMain.handle(IPC.widgetRemove, (_e, id: string) => deleteWidget(id))
@@ -211,7 +256,7 @@ export interface WidgetDTO { id: string; name: string; enabled: boolean; addTime
 | store | `src/renderer/src/stores/{module}.ts` | Pinia；只经 `api.{module}` 访问能力 |
 | 页面/组件 | `src/renderer/src/modules/{domain}/{module}/{pages,components}` | 模块自包含 |
 | 路由 | `src/renderer/src/router/index.ts` | 新页面登记（Hash） |
-| i18n | `src/renderer/src/i18n/locales/{zh,en}.json` | 成对新增 |
+| 文案 | `src/shared/i18n/locales/{zh,en}.json` | 成对新增 |
 
 ```ts
 export const useWidgetStore = defineStore('widget', () => {
@@ -233,40 +278,40 @@ export const useWidgetStore = defineStore('widget', () => {
 
 - 能力访问统一 `import { api } from '@renderer/api'`；禁止直接 `window.desk`。
 - 引用优先别名：`@renderer/*`、`@shared/*`；禁止 3 层以上 `../`。
-- `utils/*` 无 Vue 依赖；`composables/*` 含响应式；单模块专用不放公共目录。
 - 组件 PascalCase；文案规范（`t()`、zh/en 成对、`common.*` 复用、插值）以 `AGENTS.md`「国际化」为准。
-- i18n 单一文件 `src/renderer/src/i18n/locales/{zh,en}.json`；语言由设置驱动。
+- 落位、模块边界与目录语义见 §1.2–§1.5，此处不重复。
 
 ## 5. 界面外壳
 
 ```
 desk-shell（纵向）
-├─ AppTopbar   全局顶栏（固定最顶部，整体 -webkit-app-region: drag）
+├─ AppTopbar    全局顶栏（固定最顶部，整体 -webkit-app-region: drag）
 └─ desk-body（横向）
-   ├─ Sidebar  活动栏（常驻）+ 子菜单栏（可折叠/可拖拽）
-   └─ desk-main 正文
+   ├─ AppSidebar   ActivityRail（常驻图标栏）+ SectionMenu（可折叠/可拖拽子菜单）
+   └─ desk-main    正文
 ```
 
-- **导航单一来源**：板块 ↔ 入口路径 ↔ 顶栏标题 ↔ 子菜单项均在 `config/nav.ts`；新增板块只改此处（ActivityRail 加按钮 + 注册路由 + 正文页）。
+- **导航单一来源**：板块 ↔ 入口路径 ↔ 顶栏标题 ↔ 子菜单项均在 `config/nav.ts`（`NAV_SECTIONS` / `SECTION_ENTRY` / `SECTION_ICON`）。新增板块需同步：`nav.ts`、`ActivityRail` 按钮、路由与正文页。
 - **顶栏**：左侧依次为首页入口（回到对话模块新建对话页）与软件名称（`appName` 优先、回落 `app.name`），其后为板块图标 + 标题/操作，标题随路由（首页=会话标题，插件=「插件」，设置=「系统设置」）；软件名称与标题间的细线仅在有标题时展示；交互控件 `no-drag`。
 - **子菜单**：标题 18px/600，条目 14px/400，选中项 600 + 浅底；不展示 Logo；点击当前板块按钮切换子菜单栏折叠/展开，图标栏常驻。
 - **shell 不承载域逻辑**：域内逻辑下沉 `modules/{module}`。
-- **面板交互统一复用**：拖拽用 `composables/usePanelResize.ts`（edge：左右缘/上下缘）；尺寸用 `utils/persistedWidth.ts#createPersistedWidth`（读取/夹取/持久化/复位），左侧栏、右侧栏、底部终端共用。
+- **面板交互统一复用**：拖拽用 `composables/usePanelResize.ts` + `components/PanelResizer.vue`；宽度持久化左侧栏用 `utils/persistedWidth.ts`，终端等会话级尺寸走 `stores/workspace.ts`（按会话持久化）。
 - **共享选中态归属域**：跨「子菜单 ↔ 页面」的选中态放所属域 store（如 `settings.activeTab`），不塞进 `layout`。
 - **配色分层**：`--desk-chrome-bg`（顶栏+图标栏）> `--desk-panel-bg`（子菜单栏）> `--desk-bg`（正文）；不加分隔线，仅「子菜单栏 ↔ 正文」保留 1px `--desk-border`。
 - **尺寸令牌**：`--desk-header-height`、`--desk-rail-width`；自绘 SVG 统一 `.desk-svg-icon`，尺寸由使用处覆盖。
 
 ## 6. Agent 运行时
 
-新增 Agent 能力落 `src/main/agent/`，不改 IPC；按进程归属落位。
+新增 Agent 能力落 `src/main/agent/`，按进程归属落位；工具/会话扩展不需要新 IPC，只有新增跨进程能力才动 `shared/agentProtocol.ts` 与 `ipc.ts` / `preload`。
 
 | 需求 | 落位 | 要点 |
 |---|---|---|
-| 内置工具 | `agent/worker/tools/` | `createBuiltinTools()` 用 `Type.Object` 定义 `AgentTool`；只读工具常驻，写/命令类仅 build；是否进入「内置工具」页见 §6.1 |
-| 文件类工具 | `tools.ts` + `sandbox.ts` | 必须先过 `guardPath({ sessionId, rootDir, target, action, tool })`，越界返回拦截错误 |
+| 内置工具 | `agent/worker/tools/{fs,shell,browser,general,skill}.ts` | `createBuiltinToolEntries()` 用 `Type.Object` 定义 `AgentTool`；只读工具常驻，写/命令类仅 build；是否进入「内置工具」页见 §6.1 |
+| 文件类工具 | `agent/worker/tools/fs.ts` + `agent/worker/sandbox.ts` | 必须先过 `guardPath({ sessionId, rootDir, target, action, tool })`，越界返回拦截错误 |
 | 越界审批 | `sandbox.ts` + `host/runtimeHost.ts` + `host/approval.ts` | worker 经 `parentPort` 发 `approval-request`，主进程弹窗回传 `once/session/deny` |
 | MCP | `agent/worker/mcp/{client,tools}.ts` | 使用 Pi 官方 `@earendil-works/pi-mcp`；工具转换 `toLlmContent` + `Type.Unsafe` + `signal` |
 | 会话装配 | `agent/worker/session.ts` | 会话级 Agent 缓存 + 事件流 + 工具合并 |
+| 工具注册表 | `agent/worker/tools/shared.ts` | `ALL_MODES` / `BUILD_ONLY` / `describe` / `toolError` / `createGuard`；新增工具复用，不重复实现 |
 | 协议 | `shared/agentProtocol.ts` | 改 `HostEvent`/`WorkerRequest` 需同步 worker.ts、session.ts、runtimeHost.ts |
 | 模型 | `agent/worker/models.ts` | `normalizeBaseUrl`、`buildModels`、`{session}` 占位替换 |
 
@@ -293,19 +338,18 @@ desk-shell（纵向）
 - [ ] 结构一致：`schema.ts` / `DDL`。
 - [ ] `services/*` 是唯一 `getDb()` 出口；`ipc.ts` 仅网关；契约 / IPC 常量 / `DeskApi` / preload 齐备。
 - [ ] 依赖方向符合 §1.3；配置与运行时未耦合；运行时使用官方方案。
-- [ ] 新增/变更依赖为精确版本（无 `^` / `~` / 区间），`package-lock.json` 已同步。
+- [ ] 新增/变更依赖为精确版本（无 `^` / `~` / 区间）；lock 当前被 `.gitignore` 忽略，如放开需同步提交。
 - [ ] 通道 `desk:{module}:{action}`；时间 ISO；布尔归一。
-- [ ] 渲染仅经 `api`；路由已登记；文案 `t()` 且 zh/en 成对；无硬编码中文。
+- [ ] 渲染仅经 `api`；路由已登记；文案 `t()` / 主进程 `translate()` 且 zh/en 成对；无硬编码中文。
 - [ ] 「内置工具」仅收录客户端核心能力，未混入 MCP / SKILL 等插件内部工具。
 - [ ] UI 复用 tokens/外壳/列表规范；弹层 append-to-body 且拖拽区可用；全局样式已验证影响面。
 - [ ] 资源生命周期闭环；超时/取消/失败隔离/进程无残留。
 - [ ] `npm run type-check`、`npm run build` 通过；涉及 IPC/运行时完成端到端验证。
 - [ ] 注释与命名符合既有风格；无死代码/调试残留/测试数据。
 
-## 8. 参考文件
+## 8. 参考实现
 
-- 主进程：`services/{provider,project,session,chat,mcp}Service.ts`、`config/paths.ts`、`db/{schema,index}.ts`
-- 契约与网关：`shared/ipc.ts`、`shared/contracts/*`、`main/ipc.ts`、`preload/index.ts`
-- 运行时：`agent/host/{runtimeHost,approval}.ts`、`agent/worker/{worker,session,tools,sandbox,models}.ts`、`agent/worker/mcp/*`、`shared/agentProtocol.ts`
-- 渲染：`api/index.ts`、`stores/{project,settings,chat,mcp}.ts`、`modules/chat/*`、`modules/plugin/*`、`modules/settings/pages/index.vue`
+- 主进程：`services/chatService.ts`（编排）、`services/sessionService.ts`（CRUD + 级联）、`agent/host/runtimeHost.ts`
+- 渲染：`modules/plugin/mcp/{pages,components}`（管理 + 发现）、`stores/chat/{index,stream}.ts`
+- 运行时：`agent/worker/session.ts`、`agent/worker/tools/shared.ts`
 - 构建：`package.json`（`type-check` / `build` / `dev`）、`electron.vite.config.ts`
