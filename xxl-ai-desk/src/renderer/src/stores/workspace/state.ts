@@ -10,7 +10,7 @@ export const STORAGE_PREFIX = 'desk:workspace:'
 export const STORAGE_VERSION = 3
 
 /* 工具面板当前工具 */
-export type WorkspaceTool = 'files' | 'browser' | 'terminal' | 'git'
+export type WorkspaceTool = 'files' | 'browser' | 'terminal' | 'git' | 'logs'
 
 /* 工具面板布局模式：dock = 与正文并排，focus = 占满正文 */
 export type ToolPanelMode = 'dock' | 'focus'
@@ -150,7 +150,8 @@ export function normalizeState(raw: unknown): WorkspaceState {
       activeTool:
         parsed.toolPanel?.activeTool === 'browser' ||
         parsed.toolPanel?.activeTool === 'terminal' ||
-        parsed.toolPanel?.activeTool === 'git'
+        parsed.toolPanel?.activeTool === 'git' ||
+        parsed.toolPanel?.activeTool === 'logs'
           ? parsed.toolPanel.activeTool
           : 'files',
       width: Math.max(

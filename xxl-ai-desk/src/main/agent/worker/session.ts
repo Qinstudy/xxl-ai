@@ -14,6 +14,13 @@ import type { BuiltinToolSwitches } from '@shared/agentProtocol'
 import { contentBlocks } from '@shared/ipc'
 import { translate, type AppLanguage } from '@shared/i18n'
 import type { McpRuntimeConfig, SkillRuntimeConfig } from '@shared/ipc'
+import {
+  createTraceHooks,
+  createTraceTarget,
+  handleTraceMessageEnd,
+  handleTraceToolEnd,
+  handleTraceToolStart
+} from './trace'
 
 /* 创建/获取会话 Agent 所需的运行时配置 */
 export interface AgentRuntimeOptions {
@@ -21,7 +28,6 @@ export interface AgentRuntimeOptions {
   provider: ProviderModelConfig
   modelId: string
   systemPrompt: string
-  messages?: unknown[]
   /* 对话模式（plan 只读 / build 读写）与项目根目录（文件沙箱边界） */
   mode: ChatMode
   rootDir: string
@@ -176,16 +182,20 @@ async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
     isAborted: options.isAborted
   })
   const readyMcpTools = await withinBudget(mcpTask, MCP_DISCOVERY_BUDGET)
-  /* 历史消息随 initialState 注入：Agent 会在其前自动补上系统指令（直接覆盖 state.messages 会把系统指令冲掉） */
+  /*
+   * 模型通讯采集钩子常驻：是否真正记录由「本轮是否 begin」决定，
+   * 这样开发者模式在会话中途开启也能立即生效，无需清理运行时缓存。
+   */
+  /* 历史消息不随 initialState 注入：每轮由 applyRunMessages 统一下发 */
   const agent = new AgentClass({
     initialState: {
       systemPrompt: `${options.systemPrompt}${buildToolGuide(entries)}`,
       model,
-      tools: [...tools, ...(readyMcpTools ?? [])],
-      messages: (options.messages ?? []) as never[]
+      tools: [...tools, ...(readyMcpTools ?? [])]
     },
     streamFn: (model, context, options) =>
-      models.streamSimple(model, context, { ...options, timeoutMs: REQUEST_TIMEOUT_MS })
+      models.streamSimple(model, context, { ...options, timeoutMs: REQUEST_TIMEOUT_MS }),
+    ...createTraceHooks(createTraceTarget(options.sessionId), options.provider.id, options.modelId)
   })
   /*
    * 后台装配完成：直接替换运行中 Agent 的工具集（Pi 官方支持，下一次请求生效并自动告知模型），
@@ -199,6 +209,18 @@ async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
       .catch(() => undefined)
   }
   return agent
+}
+
+/*
+ * 应用本轮历史：系统指令在创建 Agent 时固化（指令 / 记忆 / 技能索引 / 模式说明），
+ * 变更由主进程 evictAgent / resetAgents 触发重建；这里仅替换历史，避免把 system 消息冲掉。
+ * 协议侧消息为不透明结构，边界处统一断言为运行时消息。
+ */
+export function applyRunMessages(agent: Agent, messages: unknown[]): void {
+  const state = agent.state.messages as RuntimeMessage[]
+  /* 按角色保留系统消息，不依赖「固定在下标 0」的隐式约定 */
+  const systemMessages = state.filter((message) => message.role === 'system')
+  agent.state.messages = [...systemMessages, ...(messages as RuntimeMessage[])] as never
 }
 
 /* 获取（或创建）会话 Agent */
@@ -288,6 +310,8 @@ export async function runPrompt(
 ): Promise<RuntimeMessage[]> {
   const tr = (key: string, params?: Array<string | number>): string =>
     translate(language, key, params)
+  /* 采集目标：会话 + 对话来源（记忆生成使用独立目标，互不覆盖） */
+  const traceTarget = createTraceTarget(sessionId)
   const unsubscribe = agent.subscribe((event) => {
     switch (event.type) {
       case 'message_update': {
@@ -300,6 +324,7 @@ export async function runPrompt(
         break
       }
       case 'tool_execution_start':
+        handleTraceToolStart(traceTarget, event.toolCallId, event.toolName, event.args)
         sink({
           type: 'tool_start',
           toolCallId: event.toolCallId,
@@ -308,6 +333,11 @@ export async function runPrompt(
         })
         break
       case 'tool_execution_end':
+        handleTraceToolEnd(traceTarget, event.toolCallId, {
+          isError: event.isError,
+          text: toolResultText(event.result),
+          durationMs: event.durationMs
+        })
         sink({
           type: 'tool_end',
           toolCallId: event.toolCallId,
@@ -317,6 +347,9 @@ export async function runPrompt(
           details: (event.result as { details?: unknown } | undefined)?.details,
           durationMs: event.durationMs
         })
+        break
+      case 'message_end':
+        handleTraceMessageEnd(traceTarget, event.message)
         break
       default:
         break

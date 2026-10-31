@@ -22,6 +22,11 @@ watch(workspaceKey, (key) => workspace.ensure(key), { immediate: true })
 /* 当前会话工具面板的显隐状态 */
 const toolPanelVisible = computed(() => workspaceState.value.toolPanel.visible)
 
+/* 开关提示文案：随面板状态切换 */
+const toggleTitle = computed(() =>
+  toolPanelVisible.value ? t('workspace.hideToolPanel') : t('workspace.showToolPanel')
+)
+
 /* 切换当前会话的工具面板显隐 */
 function toggleToolPanel(): void {
   workspace.toggleTool(workspaceKey.value)
@@ -29,14 +34,26 @@ function toggleToolPanel(): void {
 </script>
 
 <template>
-  <button
-    class="icon-button"
-    :class="{ active: toolPanelVisible }"
-    :title="toolPanelVisible ? t('workspace.hideToolPanel') : t('workspace.showToolPanel')"
-    @click="toggleToolPanel"
+  <!-- 悬浮提示即时展示：与左侧图标栏保持一致，关闭延迟与过渡 -->
+  <el-tooltip
+    :content="toggleTitle"
+    placement="bottom"
+    effect="light"
+    popper-class="desk-tooltip"
+    :show-after="0"
+    :hide-after="0"
+    :offset="8"
+    transition=""
   >
-    <SidePanelIcon class="panel-icon" />
-  </button>
+    <button
+      class="icon-button"
+      :class="{ active: toolPanelVisible }"
+      :aria-label="toggleTitle"
+      @click="toggleToolPanel"
+    >
+      <SidePanelIcon class="panel-icon" />
+    </button>
+  </el-tooltip>
 </template>
 
 <style scoped lang="scss">

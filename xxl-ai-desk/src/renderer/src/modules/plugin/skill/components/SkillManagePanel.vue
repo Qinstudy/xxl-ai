@@ -115,7 +115,7 @@ async function onImport(kind: 'directory' | 'zip'): Promise<void> {
   }
 }
 
-/* 新建 SKILL：下拉选择来源（Zip / 目录 / GitHub / 去发现页浏览） */
+/* 新建 SKILL：下拉选择来源（Zip / 目录 / GitHub / 去市场页浏览） */
 function onCreate(command: 'zip' | 'directory' | 'github' | 'discover'): void {
   if (command === 'zip') {
     void onImport('zip')

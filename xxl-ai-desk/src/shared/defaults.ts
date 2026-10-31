@@ -32,7 +32,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   builtinToolShellEnabled: true,
   builtinToolGeneralEnabled: true,
   builtinToolInteractionEnabled: true,
-  agentMemoryEnabled: false
+  agentMemoryEnabled: false,
+  developerMode: false
 }
 
 /* 生成一份可安全修改的默认设置副本（含嵌套 shortcuts） */

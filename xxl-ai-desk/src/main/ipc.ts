@@ -18,6 +18,7 @@ import type {
   GithubSkillInstallInput,
   GithubSkillQuery,
   InteractionResult,
+  LogPageQuery,
   McpDTO,
   McpDiscoverQuery,
   ProviderDTO,
@@ -85,6 +86,11 @@ import {
   watchGitProject
 } from './services/gitService'
 import { abortChat, discardSessionRuns, respondInteraction, sendChat } from './services/chatService'
+import {
+  clearTraces,
+  listMessagePage,
+  listTraces
+} from './services/sessionLogService'
 import { deleteMcp, listMcps, saveMcp } from './services/mcpService'
 import { listMcpTools, testMcp } from './services/mcpRuntimeService'
 import { discoverMcp, discoverMcpDetail, listMcpCategories } from './services/mcpDiscoverService'
@@ -305,7 +311,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   handle(IPC.sessionRename, (_event, id: string, title: string) => {
     updateSession(id, { title })
   })
-  handle(IPC.sessionRemove, (_event, id: string) => {
+  handle(IPC.sessionRemove, async (_event, id: string) => {
+    /* 删除前先丢弃回写并终止运行中轮次：避免被删会话继续耗 token / 执行工具 */
+    discardSessionRuns(id)
+    await abortChat(id)
     evictAgent(id)
     clearSessionPermissions(id)
     deleteSession(id)
@@ -452,4 +461,9 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   handle(IPC.skillGithubCancel, (_event, query: GithubSkillQuery) =>
     cancelGithubSkills(query)
   )
+
+  /* --- 会话日志（开发者模式） --- */
+  handle(IPC.sessionLogMessages, (_event, query: LogPageQuery) => listMessagePage(query))
+  handle(IPC.sessionLogTraces, (_event, query: LogPageQuery) => listTraces(query))
+  handle(IPC.sessionLogClear, (_event, sessionId: string) => clearTraces(sessionId))
 }

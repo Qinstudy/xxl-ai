@@ -63,10 +63,25 @@ function goHome(): void {
 <template>
   <header class="desk-topbar" :class="{ mac: settings.platform === 'darwin' }">
     <div class="desk-topbar-left">
-      <!-- 首页入口：回到对话模块新建对话页（软件名称左侧） -->
-      <button class="icon-button home-button" :title="t('chat.newChatAction')" @click="goHome">
-        <el-icon><HomeFilled /></el-icon>
-      </button>
+      <!-- 首页入口：回到对话模块新建对话页（软件名称左侧）；提示即时展示 -->
+      <el-tooltip
+        :content="t('chat.newChatAction')"
+        placement="bottom"
+        effect="light"
+        popper-class="desk-tooltip"
+        :show-after="0"
+        :hide-after="0"
+        :offset="8"
+        transition=""
+      >
+        <button
+          class="icon-button home-button"
+          :aria-label="t('chat.newChatAction')"
+          @click="goHome"
+        >
+          <el-icon><HomeFilled /></el-icon>
+        </button>
+      </el-tooltip>
       <!-- 软件名称：原导航按钮位置 -->
       <div class="topbar-brand">{{ appName }}</div>
       <!-- 有标题时展示分隔线（｜），分隔软件名称与标题 -->

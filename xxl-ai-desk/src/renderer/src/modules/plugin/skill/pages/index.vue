@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
- * SKILL 技能中心：顶部「SKILL 管理 / 发现 SKILL」TAB，编排管理面板、发现面板与详情抽屉。
+ * SKILL 技能中心：顶部「SKILL 管理 / SKILL 市场」TAB，编排管理面板、发现面板与详情抽屉。
  * @author xuxueli 2026-10-25
  */
 import { ref } from 'vue'

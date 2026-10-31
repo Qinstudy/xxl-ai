@@ -5,6 +5,7 @@
  */
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useWorkspaceStore, type WorkspaceTool } from '@renderer/stores/workspace'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { t } from '@renderer/i18n'
 import FilePanel from './file/FilePanel.vue'
 import { GitIcon, GlobeIcon, TerminalIcon } from '@renderer/components/icons'
@@ -12,6 +13,8 @@ import BrowserPanel from './browser/BrowserPanel.vue'
 import GitPanel from './git/GitPanel.vue'
 /* 终端按需加载：未打开终端 Tab 时不加载 xterm */
 const TerminalPanel = defineAsyncComponent(() => import('./terminal/TerminalPanel.vue'))
+/* 会话日志按需加载：仅开发者模式可见 */
+const SessionLogPanel = defineAsyncComponent(() => import('./log/SessionLogPanel.vue'))
 
 const props = defineProps<{
   sessionId: string
@@ -22,6 +25,9 @@ const props = defineProps<{
 
 /* 会话工作区 store：提供本会话的面板显隐/宽度/当前工具/布局模式 */
 const workspace = useWorkspaceStore()
+/* 应用设置：开发者模式决定是否展示「会话日志」 */
+const settings = useSettingsStore()
+const developerMode = computed(() => settings.settings.developerMode)
 
 /* 当前会话的工具面板状态 */
 const toolPanel = computed(() => workspace.sliceOf(props.sessionId).toolPanel)
@@ -33,7 +39,8 @@ const opened = ref<Record<WorkspaceTool, boolean>>({
   files: false,
   browser: false,
   terminal: false,
-  git: false
+  git: false,
+  logs: false
 })
 
 /* 标记已打开过的工具，使其面板首次打开后保持挂载（切换用 v-show） */
@@ -41,6 +48,17 @@ watch(
   activeTool,
   (tool) => {
     opened.value[tool] = true
+  },
+  { immediate: true }
+)
+
+/* 关闭开发者模式后若仍停留在日志 Tab，回退到文件面板，避免空白 */
+watch(
+  [developerMode, activeTool],
+  ([enabled, tool]) => {
+    if (!enabled && tool === 'logs') {
+      workspace.setTool(props.sessionId, 'files')
+    }
   },
   { immediate: true }
 )
@@ -98,6 +116,15 @@ function toggleFocus(): void {
           <GlobeIcon class="tool-tab-icon" />
           <span>{{ t('panel.browser') }}</span>
         </button>
+        <button
+          v-if="developerMode"
+          class="tool-tab"
+          :class="{ active: activeTool === 'logs' }"
+          @click="openTool('logs')"
+        >
+          <el-icon><Document /></el-icon>
+          <span>{{ t('workspace.log.tab') }}</span>
+        </button>
       </div>
       <div class="tool-actions">
         <button
@@ -123,6 +150,12 @@ function toggleFocus(): void {
         :project-name="props.projectName"
       />
       <BrowserPanel v-if="opened.browser" v-show="activeTool === 'browser'" :session-id="props.sessionId" />
+      <SessionLogPanel
+        v-if="opened.logs"
+        v-show="activeTool === 'logs'"
+        :session-id="props.sessionId"
+        :active="toolPanel.visible && activeTool === 'logs'"
+      />
       <TerminalPanel
         v-if="opened.terminal"
         v-show="activeTool === 'terminal'"

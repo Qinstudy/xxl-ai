@@ -9,6 +9,7 @@ import { execFileSync, spawn } from 'child_process'
 import { utilityProcess, type UtilityProcess } from 'electron'
 import log from 'electron-log/main'
 import { getTempDir } from '../../config/paths'
+import { recordTrace } from '../../services/sessionLogService'
 import { openInteraction, cancelInteraction, clearInteractions } from './interaction'
 import { requestBrowserAction } from './browserBridge'
 import type {
@@ -66,8 +67,11 @@ function ensureWorker(): Promise<UtilityProcess> {
   }
   const proc = utilityProcess.fork(join(__dirname, 'agent/worker/worker.js'), [], {
     serviceName: 'xxl-ai-desk-agent',
-    /* 运行时进程与主进程写入同一目录的按天日志 */
-    env: { ...process.env, XXL_AI_LOG_DIR: getTempDir() }
+    /* 运行时进程与主进程写入同一目录的按天日志；开发标记用于打开请求上下文调试日志 */
+    env: {
+      ...process.env,
+      XXL_AI_LOG_DIR: getTempDir()
+    }
   })
   worker = proc
   workerReady = new Promise<UtilityProcess>((resolve, reject) => {
@@ -183,6 +187,10 @@ async function handleMessage(message: WorkerMessage): Promise<void> {
       }
       break
     }
+    case 'llm-trace':
+      /* 模型通讯：开发者模式关闭时 service 内部直接丢弃 */
+      recordTrace(message.sessionId, message.trace)
+      break
     default:
       break
   }

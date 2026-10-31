@@ -8,6 +8,9 @@ import { useRoute } from 'vue-router'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { t } from '@renderer/i18n'
 import GeneralSettings from '../components/GeneralSettings.vue'
+import DataDirSettings from '../components/DataDirSettings.vue'
+import RuntimeSettings from '../components/RuntimeSettings.vue'
+import DeveloperSettings from '../components/DeveloperSettings.vue'
 import PersonalizationSettings from '../components/PersonalizationSettings.vue'
 import ProviderSettings from '../components/ProviderSettings.vue'
 import AboutSettings from '../components/AboutSettings.vue'
@@ -28,6 +31,13 @@ if (typeof route.query.tab === 'string' && route.query.tab) {
         <el-tabs v-model="settings.activeTab" class="settings-tabs">
           <el-tab-pane :label="t('settings.general')" name="general">
             <GeneralSettings />
+          </el-tab-pane>
+          <el-tab-pane :label="t('settings.runtimeTab')" name="runtime">
+            <div class="settings-pane">
+              <DataDirSettings />
+              <RuntimeSettings />
+              <DeveloperSettings />
+            </div>
           </el-tab-pane>
           <el-tab-pane :label="t('settings.personalization')" name="personalization">
             <PersonalizationSettings />
@@ -73,5 +83,12 @@ if (typeof route.query.tab === 'string' && route.query.tab) {
   max-width: 940px;
   margin: 0 auto;
   padding: 28px 32px 48px;
+}
+
+/* 独立子菜单首个分区不重复画顶部分隔线 */
+.settings-pane > :first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 </style>

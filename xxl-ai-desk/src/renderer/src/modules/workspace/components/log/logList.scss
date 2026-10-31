@@ -1,0 +1,100 @@
+/*
+ * 会话日志列表通用样式：对话记录与模型通讯共用的列表骨架。
+ *   - 仅被 log 目录下的列表组件 @use，不进入全局样式；
+ *   - 尺寸与字号统一走 tokens，避免两个列表各写一套。
+ */
+
+/* 列表容器：占满面板高度，列表滚动、表头/分页固定 */
+.log-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* 行区域：唯一滚动容器 */
+.log-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 8px;
+}
+
+/* 单行：整行可点击，悬浮高亮 */
+.log-row {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.log-row:hover {
+  background: var(--desk-primary-soft);
+}
+
+/* 行首元信息：角色 / 步骤 / 模型 / 状态 / 时间 */
+.log-row-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--desk-font-xs);
+  color: var(--desk-text-tertiary);
+}
+
+.log-meta {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 摘要行：标签 + 单行省略正文 */
+.log-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-top: 4px;
+  font-size: var(--desk-font-sm);
+  color: var(--desk-text);
+  line-height: 1.5;
+}
+
+.log-text-body {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 摘要类型标签：思考 / 工具 / 图片 / 失败 */
+.log-tag {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: var(--desk-selected-bg);
+  color: var(--desk-text-tertiary);
+  font-size: var(--desk-font-xs);
+  line-height: 18px;
+}
+
+/* 空态 / 加载态 */
+.log-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--desk-font-sm);
+  color: var(--desk-text-tertiary);
+}
+
+/* 分页栏 */
+.log-footer {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 10px;
+  border-top: 1px solid var(--desk-border);
+}

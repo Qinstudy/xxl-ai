@@ -7,8 +7,6 @@ import { computed } from 'vue'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { t } from '@renderer/i18n'
 import ShortcutSettings from './ShortcutSettings.vue'
-import DataDirSettings from './DataDirSettings.vue'
-import RuntimeSettings from './RuntimeSettings.vue'
 import { THEME_PRESETS, type AppSettings } from '@shared/ipc'
 
 const settings = useSettingsStore()
@@ -69,8 +67,6 @@ const language = computed<AppSettings['language']>({
     </el-form>
 
     <ShortcutSettings />
-    <DataDirSettings />
-    <RuntimeSettings />
   </div>
 </template>
 

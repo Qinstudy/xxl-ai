@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
- * MCP 插件中心：MCP 管理 / 发现 MCP 两个 TAB + 各面板与抽屉编排。
+ * MCP 插件中心：MCP 管理 / MCP 市场两个 TAB + 各面板与抽屉编排。
  * @author xuxueli 2026-10-24
  */
 import { ref } from 'vue'

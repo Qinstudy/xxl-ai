@@ -37,7 +37,7 @@ export const useAgentStore = defineStore('agent', () => {
     const target = memories.value.find((item) => item.projectId === projectId)
     if (target) {
       target.content = ''
-      target.lastMessageId = ''
+      target.lastMessageTime = ''
       target.updateTime = ''
     }
   }

@@ -281,6 +281,7 @@ export async function sendChat(
     const skills = listEnabledSkillsForRuntime()
     /* 自定义指令全局生效：统一取当前设置，并附技能索引与模式说明（个性化变更对旧对话同样生效） */
     /* Agent 记忆：开启且会话归属项目时注入，作为可能过时的历史事实，冲突以当前指令为准 */
+    /* 注意：系统提示词在会话 Agent 创建时固化，以下任一来源变更都必须 evictAgent / resetAgents 重建 */
     const memory = settings.agentMemoryEnabled && project ? getAgentMemory(project.id) : ''
     const memoryPrompt = memory ? translate(language, 'agent.memoryInject', [memory]) : ''
     const systemPrompt = [
@@ -328,7 +329,9 @@ export async function sendChat(
         general: settings.builtinToolGeneralEnabled,
         interaction: settings.builtinToolInteractionEnabled
       },
-      text
+      text,
+      /* 开发者模式：开启后采集模型通讯 trace，主进程落库供「会话日志」展示 */
+      traceEnabled: settings.developerMode
     }
     const result = await runAgent(runInput, emitEvent)
     if (!result.ok) {

@@ -77,7 +77,8 @@ export function getSettings(): AppSettings {
     builtinToolShellEnabled: map.get('builtinToolShellEnabled') !== 'false',
     builtinToolGeneralEnabled: map.get('builtinToolGeneralEnabled') !== 'false',
     builtinToolInteractionEnabled: map.get('builtinToolInteractionEnabled') !== 'false',
-    agentMemoryEnabled: map.get('agentMemoryEnabled') === 'true'
+    agentMemoryEnabled: map.get('agentMemoryEnabled') === 'true',
+    developerMode: map.get('developerMode') === 'true'
   }
 }
 

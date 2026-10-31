@@ -17,6 +17,8 @@ export * from './contracts/mcp'
 export * from './contracts/skill'
 export * from './contracts/browser'
 export * from './contracts/agent'
+export * from './contracts/log'
+export * from './limits'
 export * from './defaults'
 export * from './history'
 
@@ -58,6 +60,11 @@ import type {
   BrowserOpenTabRequest
 } from './contracts/browser'
 import type { AgentMemoryDTO, AgentMemorySaveInput } from './contracts/agent'
+import type {
+  LlmTraceDTO,
+  LogPageQuery,
+  PageResult
+} from './contracts/log'
 import type {
   McpCategory,
   McpDiscoverDetail,
@@ -309,6 +316,15 @@ export interface DeskApi {
     /* 从 GitHub 安装：释放扫描产生的临时归档 */
     githubCancel(query: GithubSkillQuery): Promise<void>
   }
+  /* 会话日志（开发者模式）：对话记录与模型通讯 trace */
+  sessionLog: {
+    /* 对话记录分页（复用 StoredMessage） */
+    messages(query: LogPageQuery): Promise<PageResult<StoredMessage>>
+    /* 模型通讯分页 */
+    traces(query: LogPageQuery): Promise<PageResult<LlmTraceDTO>>
+    /* 清空指定会话的通讯记录 */
+    clearTraces(sessionId: string): Promise<void>
+  }
 }
 
 /* IPC 通道名（统一 desk:{module}:{action}；主进程经 ipcMain.handle 注册，preload 经 ipcRenderer.invoke/on 使用） */
@@ -419,5 +435,9 @@ export const IPC = {
   skillInstall: 'desk:skill:install',
   skillGithubInspect: 'desk:skill:github-inspect',
   skillGithubInstall: 'desk:skill:github-install',
-  skillGithubCancel: 'desk:skill:github-cancel'
+  skillGithubCancel: 'desk:skill:github-cancel',
+  /* 会话日志（开发者模式） */
+  sessionLogMessages: 'desk:session-log:messages',
+  sessionLogTraces: 'desk:session-log:traces',
+  sessionLogClear: 'desk:session-log:clear'
 } as const

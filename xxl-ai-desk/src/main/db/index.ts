@@ -93,11 +93,33 @@ CREATE TABLE IF NOT EXISTS desk_agent_memory (
   id              TEXT PRIMARY KEY,
   project_id      TEXT NOT NULL DEFAULT '',
   content         TEXT NOT NULL DEFAULT '',
-  last_message_id TEXT NOT NULL DEFAULT '',
+  last_time       TEXT NOT NULL DEFAULT '',
   add_time        TEXT NOT NULL DEFAULT '',
   update_time     TEXT NOT NULL DEFAULT ''
 );
 CREATE UNIQUE INDEX IF NOT EXISTS i_desk_agent_memory_project ON desk_agent_memory (project_id);
+CREATE TABLE IF NOT EXISTS desk_llm_trace (
+  id               TEXT PRIMARY KEY,
+  session_id       TEXT NOT NULL DEFAULT '',
+  run_id           TEXT NOT NULL DEFAULT '',
+  step             INTEGER NOT NULL DEFAULT 0,
+  provider_id      TEXT NOT NULL DEFAULT '',
+  model_id         TEXT NOT NULL DEFAULT '',
+  phase            TEXT NOT NULL DEFAULT 'chat',
+  status           TEXT NOT NULL DEFAULT 'success',
+  http_status      INTEGER NOT NULL DEFAULT 0,
+  duration_ms      INTEGER NOT NULL DEFAULT 0,
+  input_tokens     INTEGER NOT NULL DEFAULT 0,
+  output_tokens    INTEGER NOT NULL DEFAULT 0,
+  reasoning_tokens INTEGER NOT NULL DEFAULT 0,
+  request          TEXT NOT NULL DEFAULT '',
+  response         TEXT NOT NULL DEFAULT '',
+  tool_calls       TEXT NOT NULL DEFAULT '[]',
+  error            TEXT NOT NULL DEFAULT '',
+  add_time         TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS i_desk_llm_trace_session ON desk_llm_trace (session_id, add_time);
+CREATE INDEX IF NOT EXISTS i_desk_llm_trace_run ON desk_llm_trace (run_id, step);
 `
 
 /* 原生 better-sqlite3 连接（迁移直接执行 SQL 用） */
@@ -114,8 +136,36 @@ export function initDatabase(): void {
   sqlite = new Database(file)
   sqlite.pragma('journal_mode = WAL')
   sqlite.exec(DDL)
+  migrateAgentMemoryCursor(sqlite)
   seedMcpServers(sqlite)
   database = drizzle(sqlite, { schema })
+}
+
+/*
+ * 记忆游标列迁移：last_message_id（会话内 ID）→ last_time（项目级时间）。
+ *   - 仅存量库需要；新库由 DDL 直接建新列；
+ *   - 先用旧 ID 回填新列，避免已纳入内容被重复压缩，再删除废弃列。
+ */
+function migrateAgentMemoryCursor(db: Database.Database): void {
+  const columns = db.prepare('PRAGMA table_info(desk_agent_memory)').all() as Array<{
+    name?: string
+  }>
+  const names = new Set(columns.map((column) => column.name ?? ''))
+  if (!names.has('last_time')) {
+    db.exec("ALTER TABLE desk_agent_memory ADD COLUMN last_time TEXT NOT NULL DEFAULT ''")
+  }
+  if (!names.has('last_message_id')) {
+    return
+  }
+  db.exec(`
+    UPDATE desk_agent_memory
+    SET last_time = COALESCE(
+      (SELECT add_time FROM desk_message WHERE id = desk_agent_memory.last_message_id),
+      last_time
+    )
+    WHERE last_message_id <> ''
+  `)
+  db.exec('ALTER TABLE desk_agent_memory DROP COLUMN last_message_id')
 }
 
 /* 内置 MCP 初始化标记：写入成功后不再重置，避免用户删除后被重新写回 */

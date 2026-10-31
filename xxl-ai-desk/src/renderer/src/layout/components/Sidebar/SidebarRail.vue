@@ -55,7 +55,7 @@ function go(key: SectionKey): void {
         :hide-after="0"
         :offset="8"
         transition=""
-        popper-class="rail-tooltip"
+        popper-class="desk-tooltip"
       >
         <button
           class="rail-btn"

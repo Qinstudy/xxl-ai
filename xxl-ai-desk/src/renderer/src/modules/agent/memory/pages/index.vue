@@ -8,7 +8,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useAgentStore } from '@renderer/stores/agent'
 import { t } from '@renderer/i18n'
-import { AGENT_MEMORY_MAX_CHARS, AGENT_MEMORY_ROUND_LIMIT, type AgentMemoryDTO } from '@shared/ipc'
+import {
+  AGENT_MEMORY_MAX_CHARS,
+  AGENT_MEMORY_MESSAGE_LIMIT,
+  type AgentMemoryDTO
+} from '@shared/ipc'
 import AgentPageShell from '../../components/AgentPageShell.vue'
 
 const settings = useSettingsStore()
@@ -16,6 +20,22 @@ const agent = useAgentStore()
 
 /* 记忆开关（全局设置） */
 const memoryEnabled = computed(() => settings.settings.agentMemoryEnabled)
+
+/* 项目名筛选：draft 为输入草稿，keyword 为点击「查询」/ 回车后才生效的条件 */
+const draftKeyword = ref('')
+const keyword = ref('')
+
+/* 查询请求中：按钮 loading，避免重复点击 */
+const querying = ref(false)
+
+/* 按项目名过滤后的列表：忽略首尾空白与大小写 */
+const visibleMemories = computed<AgentMemoryDTO[]>(() => {
+  const query = keyword.value.trim().toLowerCase()
+  if (!query) {
+    return agent.memories
+  }
+  return agent.memories.filter((item) => item.projectName.toLowerCase().includes(query))
+})
 
 /* 查看 / 编辑弹窗 */
 const dialogVisible = ref(false)
@@ -46,6 +66,25 @@ async function loadMemories(): Promise<void> {
     await agent.loadMemories()
   } catch (error) {
     ElMessage.error((error as Error).message)
+  }
+}
+
+/* 应用输入框中的筛选条件（「查询」/ 回车 / 清空时调用） */
+function applyFilter(): void {
+  keyword.value = draftKeyword.value.trim()
+}
+
+/* 查询：应用筛选并重新拉取记忆（进入页面时只加载一次，停留期间需手动刷新） */
+async function query(): Promise<void> {
+  applyFilter()
+  if (!memoryEnabled.value) {
+    return
+  }
+  querying.value = true
+  try {
+    await loadMemories()
+  } finally {
+    querying.value = false
   }
 }
 
@@ -114,13 +153,31 @@ onMounted(loadMemories)
       <span class="memory-switch-label">{{ t('agent.memoryEnabled') }}</span>
       <el-switch :model-value="memoryEnabled" @update:model-value="onToggle" />
       <span class="memory-switch-tip">
-        {{ t('agent.memoryRule', [AGENT_MEMORY_ROUND_LIMIT]) }}
+        {{ t('agent.memoryRule', [AGENT_MEMORY_MESSAGE_LIMIT]) }}
       </span>
+    </div>
+
+    <div v-if="memoryEnabled" class="memory-toolbar">
+      <el-input
+        v-model="draftKeyword"
+        class="memory-filter"
+        clearable
+        :placeholder="t('agent.memoryFilterPlaceholder')"
+        @keyup.enter="query"
+        @clear="applyFilter"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
+      <el-button type="primary" :loading="querying" @click="query">
+        {{ t('common.search') }}
+      </el-button>
     </div>
 
     <el-table
       v-if="memoryEnabled"
-      :data="agent.memories"
+      :data="visibleMemories"
       class="memory-table"
       row-key="projectId"
       style="width: 100%"
@@ -128,15 +185,15 @@ onMounted(loadMemories)
       <el-table-column
         prop="projectName"
         :label="t('agent.memoryProject')"
-        min-width="180"
+        min-width="200"
         show-overflow-tooltip
       />
-      <el-table-column :label="t('agent.memoryContent')" min-width="320" show-overflow-tooltip>
+      <el-table-column :label="t('agent.memoryContent')" min-width="420" show-overflow-tooltip>
         <template #default="{ row }">
           <span class="memory-summary">{{ summary(row.content) }}</span>
         </template>
       </el-table-column>
-      <el-table-column :label="t('agent.memoryUpdatedAt')" width="180">
+      <el-table-column :label="t('agent.memoryUpdatedAt')" width="190">
         <template #default="{ row }">{{ formatTime(row.updateTime) }}</template>
       </el-table-column>
       <el-table-column :label="t('common.actions')" width="160" align="center">
@@ -152,7 +209,10 @@ onMounted(loadMemories)
         </template>
       </el-table-column>
       <template #empty>
-        <el-empty :description="t('agent.memoryEmpty')" :image-size="80" />
+        <el-empty
+          :description="keyword.trim() ? t('agent.memoryFilterEmpty') : t('agent.memoryEmpty')"
+          :image-size="80"
+        />
       </template>
     </el-table>
     <div v-else class="memory-off">{{ t('agent.memoryOff') }}</div>
@@ -204,6 +264,23 @@ onMounted(loadMemories)
 .memory-table {
   font-size: var(--desk-font-base);
   --el-font-size-base: 14px;
+}
+
+/* 行高加大：内容与操作按钮不再挤在一起 */
+.memory-table :deep(.el-table__cell) {
+  padding: 10px 0;
+}
+
+/* 筛选栏：与 MCP 管理页工具条同一节奏（间距 / 下方留白） */
+.memory-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 4px 0 14px;
+}
+
+.memory-filter {
+  max-width: 320px;
 }
 
 .memory-summary {

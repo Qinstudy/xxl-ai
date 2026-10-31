@@ -6,6 +6,7 @@ import { join } from 'path'
 import { IPC } from '@shared/ipc'
 import { APP_NAME } from '@shared/appInfo'
 import { initDatabase } from './db'
+import { purgeExpiredTraces } from './services/sessionLogService'
 import { registerIpc } from './ipc'
 import { cleanupGithubArchiveTemps } from './agent/host/skills/githubArchive'
 import { ensureSeedProviders } from './services/providerService'
@@ -129,6 +130,8 @@ if (!gotLock) {
   app.whenReady().then(() => {
     initLogger()
     initDatabase()
+    /* 清理过期模型通讯记录（开发者模式） */
+    purgeExpiredTraces()
     cleanupGithubArchiveTemps()
     ensureSeedProviders()
     registerLocalFileProtocol()

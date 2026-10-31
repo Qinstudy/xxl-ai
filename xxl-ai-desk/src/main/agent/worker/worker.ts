@@ -5,9 +5,18 @@
  */
 
 import log from 'electron-log/main'
+import { randomUUID } from 'crypto'
 import { initWorkerLogger } from './logger'
 import {
+  beginTraceRun,
+  clearTraceRuns,
+  createTraceTarget,
+  endTraceRun,
+  setTraceSink
+} from './trace'
+import {
   abortAgent,
+  applyRunMessages,
   clearSessionAbort,
   evictAgent,
   getAgent,
@@ -44,6 +53,11 @@ const port = process.parentPort
 
 /* 日志先就绪：后续装配与运行异常都能落盘 */
 initWorkerLogger()
+
+/* 模型通讯 trace 回传：仅开发者模式开启时 worker 才会开启采集 */
+setTraceSink((sessionId, trace) => {
+  post({ type: 'llm-trace', sessionId, trace })
+})
 
 /* 增量事件合批窗口（毫秒）：把高频 token 合并后再跨进程，降低 IPC 与主进程转发开销 */
 const COALESCE_MS = 40
@@ -138,7 +152,6 @@ async function handleRun(input: RunAgentInput): Promise<void> {
       provider: input.provider,
       modelId: input.modelId,
       systemPrompt: input.systemPrompt,
-      messages: input.messages,
       mode: input.mode,
       rootDir: input.rootDir,
       language: input.language,
@@ -148,8 +161,10 @@ async function handleRun(input: RunAgentInput): Promise<void> {
       tools: input.tools,
       isAborted: () => isSessionAborted(input.sessionId)
     })
-    /* 模型上下文由主进程提供：覆盖 Agent 状态，Worker 不持有完整历史 */
-    agent.state.messages = [...input.messages] as never
+
+    /* 应用本轮历史：保留构造时注入的 system 消息，历史由主进程下发 */
+    applyRunMessages(agent, input.messages)
+
     /* 创建 Agent 期间已被终止：不再发起模型请求，本次没有新增消息 */
     if (isSessionAborted(input.sessionId)) {
       flushDelta(input.sessionId)
@@ -167,6 +182,10 @@ async function handleRun(input: RunAgentInput): Promise<void> {
       })
       return
     }
+    /* 开发者模式：本轮开始采集模型通讯 trace（关闭时不建状态，事件回调自动空转） */
+    if (input.traceEnabled) {
+      beginTraceRun(createTraceTarget(input.sessionId), randomUUID())
+    }
     const newMessages = await runPrompt(
       agent,
       input.text,
@@ -181,6 +200,8 @@ async function handleRun(input: RunAgentInput): Promise<void> {
       input.sessionId,
       input.language
     )
+    /* 采集收尾：正常结束；用户中止时标记 aborted */
+    endTraceRun(createTraceTarget(input.sessionId), '', isSessionAborted(input.sessionId))
     /* 结束前冲刷残余增量，保证文本完整落库/展示 */
     flushDelta(input.sessionId)
     post({
@@ -192,6 +213,7 @@ async function handleRun(input: RunAgentInput): Promise<void> {
     })
   } catch (error) {
     /* 运行时构建/执行异常（如模型未找到）：清理该会话缓存并回传错误，由主进程落库提示 */
+    endTraceRun(createTraceTarget(input.sessionId), (error as Error).message)
     flushDelta(input.sessionId)
     cancelSessionInteractions(input.sessionId)
     evictAgent(input.sessionId)
@@ -278,6 +300,8 @@ function handleRequest(message: WorkerRequest): void {
       deltaBuffers.delete(message.sessionId)
       cancelSessionInteractions(message.sessionId)
       evictAgent(message.sessionId)
+      /* 会话被清出运行时：同步丢弃未完成的采集状态 */
+      clearTraceRuns(message.sessionId)
       break
     }
     case 'clear-permissions':
@@ -292,6 +316,8 @@ function handleRequest(message: WorkerRequest): void {
       deltaBuffers.clear()
       cancelAllInteractions()
       resetAgents()
+      /* 运行时重置：丢弃全部未完成的采集状态 */
+      clearTraceRuns()
       /* 配置变更/退出：关闭全部 MCP 连接，释放 stdio 子进程 */
       void closeAllMcpClients()
       break

@@ -29,6 +29,11 @@ export function createPanelActions(stateOf: StateOf) {
     state.toolPanel.visible = true
   }
 
+  /* 仅切换当前工具，不改变面板显隐（如开发者模式关闭后的回退） */
+  function setTool(key: string, tool: WorkspaceTool): void {
+    stateOf(key).toolPanel.activeTool = tool
+  }
+
   /* 设置工具面板宽度（保存期望宽度，实际显示上限由布局组件按会话区宽度约束） */
   function setToolWidth(key: string, width: number): void {
     stateOf(key).toolPanel.width = Math.max(LAYOUT.toolPanel.minWidth, Math.round(width))
@@ -59,6 +64,7 @@ export function createPanelActions(stateOf: StateOf) {
     setToolVisible,
     toggleTool,
     openTool,
+    setTool,
     setToolWidth,
     resetToolWidth,
     setToolMode,

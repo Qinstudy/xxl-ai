@@ -25,9 +25,12 @@ import type {
   GitDiffResult,
   GitOperationResult,
   GitStatus,
+  LlmTraceDTO,
+  LogPageQuery,
   McpDTO,
   McpDiscoverQuery,
   OpenWithApp,
+  PageResult,
   ProviderDTO,
   ProviderModelQuery,
   ProjectCreateInput,
@@ -320,6 +323,16 @@ const api: DeskApi = {
     /* 从 GitHub 安装：释放临时归档 */
     githubCancel: (query: GithubSkillQuery) =>
       ipcRenderer.invoke(IPC.skillGithubCancel, query)
+  },
+  /* 会话日志（开发者模式） */
+  sessionLog: {
+    /* 对话记录分页 */
+    messages: (query: LogPageQuery) => ipcRenderer.invoke(IPC.sessionLogMessages, query),
+    /* 模型通讯分页 */
+    traces: (query: LogPageQuery): Promise<PageResult<LlmTraceDTO>> =>
+      ipcRenderer.invoke(IPC.sessionLogTraces, query),
+    /* 清空本会话通讯记录 */
+    clearTraces: (sessionId: string) => ipcRenderer.invoke(IPC.sessionLogClear, sessionId)
   }
 }
 

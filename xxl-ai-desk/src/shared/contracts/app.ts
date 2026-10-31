@@ -65,6 +65,8 @@ export interface AppSettings {
   builtinToolInteractionEnabled: boolean
   /* Agent 记忆是否启用（开启后每 30 轮对话异步压缩生成项目记忆） */
   agentMemoryEnabled: boolean
+  /* 开发者模式：开启后记录模型通讯 trace，并在工具面板展示「会话日志」 */
+  developerMode: boolean
 }
 
 /* 运行时可执行文件检测入参 */

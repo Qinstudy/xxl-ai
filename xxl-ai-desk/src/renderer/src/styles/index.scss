@@ -79,8 +79,8 @@ body.resizing-vertical {
   color: var(--desk-text);
 }
 
-/* 左侧图标栏悬浮提示：浅色浮层 + 外阴影，与深色图标栏形成层次 */
-.rail-tooltip.el-popper {
+/* 图标悬浮提示（左侧图标栏 / 顶栏）：浅色浮层 + 外阴影，与底层形成层次 */
+.desk-tooltip.el-popper {
   padding: 6px 12px;
   border-radius: 8px;
   border-color: var(--desk-border);
@@ -91,8 +91,8 @@ body.resizing-vertical {
     0 10px 28px color-mix(in srgb, var(--theme-shadow) 24%, transparent);
 }
 
-/* 浮层紧贴图标栏，不需要箭头 */
-.rail-tooltip .el-popper__arrow {
+/* 浮层紧贴图标，不需要箭头 */
+.desk-tooltip .el-popper__arrow {
   display: none;
 }
 

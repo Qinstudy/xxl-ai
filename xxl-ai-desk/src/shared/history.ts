@@ -1,17 +1,14 @@
 /*
  * 对话历史窗口：限制送给模型的上下文规模，并剔除历史思考内容。
- *   - 最多保留最近 50 条消息；
+ *   - 最多保留最近 HISTORY_MAX_MESSAGES 条消息；
  *   - 起始位置向前对齐到真实用户消息，避免从半轮开始；
- *   - 总字符超过 12 万时从最旧内容继续丢弃；
+ *   - 总字符超过 HISTORY_MAX_CHARS 时从最旧内容继续丢弃；
  *   - thinking 不回传（仅正文 / 工具调用 / 工具结果进入上下文）。
  * @author xuxueli 2026-10-26
  */
 
 import { isAutoContinuePrompt, translate } from './i18n'
-
-/* 历史窗口上限 */
-const HISTORY_MAX_MESSAGES = 50
-const HISTORY_MAX_CHARS = 120_000
+import { HISTORY_MAX_CHARS, HISTORY_MAX_MESSAGES } from './limits'
 
 /* 运行期消息最小结构 */
 interface HistoryMessage {

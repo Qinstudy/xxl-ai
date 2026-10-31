@@ -7,6 +7,7 @@
 import type { ChatMode, McpRuntimeConfig, McpTestResult, McpToolMeta, SkillRuntimeConfig } from './ipc'
 import type { BrowserAction, BrowserActionResult } from './contracts/browser'
 import type { InteractionRequest, InteractionResult } from './contracts/chat'
+import type { LlmTraceInput } from './contracts/log'
 
 /* 供应商运行时配置（主进程解密后传给运行时，与 Pi Models 构建入参一致） */
 export interface ProviderModelConfig {
@@ -81,12 +82,18 @@ export interface RunAgentInput {
   tools: BuiltinToolSwitches
   /* 本轮用户输入 */
   text: string
+  /* 开发者模式：开启后采集模型通讯 trace 并回传主进程落库 */
+  traceEnabled: boolean
 }
 
 /* Agent 记忆生成入参（主进程组装提示词，运行时进程只调用模型） */
 export interface MemoryGenerateInput {
   /* 请求标识（结果回传关联） */
   requestId: string
+  /* 归属会话（trace 记录用） */
+  sessionId: string
+  /* 开发者模式：开启后采集本次模型调用 trace */
+  traceEnabled: boolean
   /* 供应商运行时配置 */
   provider: ProviderModelConfig
   /* 模型 ID */
@@ -126,3 +133,4 @@ export type WorkerMessage =
   | { type: 'mcp-tools-result'; requestId: string; tools: McpToolMeta[] } /* 工具列表结果 */
   | { type: 'memory-result'; requestId: string; ok: boolean; content?: string; message?: string } /* 记忆生成结果 */
   | { type: 'mcp-result-error'; requestId: string; message: string } /* MCP 操作失败 */
+  | { type: 'llm-trace'; sessionId: string; trace: LlmTraceInput } /* 模型通讯 trace（开发者模式） */

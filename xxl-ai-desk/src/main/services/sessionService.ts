@@ -6,7 +6,7 @@
 import { randomUUID } from 'crypto'
 import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
-import { messageTable, sessionTable } from '../db/schema'
+import { llmTraceTable, messageTable, sessionTable } from '../db/schema'
 import { disposeTerminalsBySession } from './terminalService'
 import { NEW_CHAT_TITLE } from '@shared/ipc'
 import type { SessionDTO, StoredMessage } from '@shared/ipc'
@@ -28,8 +28,8 @@ function toSessionDTO(row: SessionRow): SessionDTO {
   }
 }
 
-/* 行记录 → DTO */
-function toMessageDTO(row: MessageRow): StoredMessage {
+/* 行记录 → DTO（会话日志分页复用） */
+export function toMessageDTO(row: MessageRow): StoredMessage {
   return {
     id: row.id,
     sessionId: row.sessionId,
@@ -95,6 +95,8 @@ export function updateSession(id: string, patch: Partial<SessionDTO>): SessionDT
 export function deleteSession(id: string): void {
   const db = getDb()
   db.delete(messageTable).where(eq(messageTable.sessionId, id)).run()
+  /* 通讯记录随会话级联清理（SQLite 无外键级联） */
+  db.delete(llmTraceTable).where(eq(llmTraceTable.sessionId, id)).run()
   db.delete(sessionTable).where(eq(sessionTable.id, id)).run()
   /* 级联回收该会话的终端进程（服务层统一闭环） */
   disposeTerminalsBySession(id)
