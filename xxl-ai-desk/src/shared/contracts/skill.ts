@@ -51,6 +51,8 @@ export interface SkillContentChunk {
 
 /* 技能详情：正文 + 文件清单 */
 export interface SkillDetail extends SkillDTO {
+  /* 技能目录绝对路径（详情页解析 Markdown 相对图片等资源） */
+  dir: string
   /* SKILL.md 正文首屏（完整内容经 skill.content 按偏移续读） */
   content: SkillContentChunk
   /* 附属文件列表（不含隐藏文件，全量返回） */

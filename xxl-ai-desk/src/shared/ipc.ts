@@ -175,6 +175,8 @@ export interface DeskApi {
     read(root: string, path: string): Promise<FileContent>
     /* 写入文件内容 */
     write(root: string, path: string, content: string): Promise<void>
+    /* 删除文件（移入系统废纸篓） */
+    trash(root: string, path: string): Promise<void>
     /* 监听目录变更（本地增删文件后自动刷新）；onChange 返回取消订阅函数 */
     watch(dir: string): Promise<void>
     /* 取消目录监听 */
@@ -306,6 +308,7 @@ export const IPC = {
   fsList: 'desk:fs:list',
   fsRead: 'desk:fs:read',
   fsWrite: 'desk:fs:write',
+  fsTrash: 'desk:fs:trash',
   fsWatch: 'desk:fs:watch',
   fsUnwatch: 'desk:fs:unwatch',
   fsChange: 'desk:fs:change',

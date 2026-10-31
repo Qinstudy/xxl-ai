@@ -6,6 +6,7 @@
 
 import { open, readdir, stat, writeFile as writeFileFs } from 'fs/promises'
 import { extname, resolve } from 'path'
+import { shell } from 'electron'
 import { assertInside } from '../utils/pathGuard'
 import type { FileContent, FsEntry } from '@shared/ipc'
 
@@ -67,6 +68,20 @@ export async function writeFile(root: string, file: string, content: string): Pr
     throw new Error('目标是目录，无法写入')
   }
   await writeFileFs(file, content, 'utf8')
+}
+
+/* 删除文件：移入系统废纸篓（限定项目目录内，且不允许删除根目录） */
+export async function trashFile(root: string, file: string): Promise<void> {
+  assertInside(root, file)
+  const target = resolve(file)
+  if (target === resolve(root)) {
+    throw new Error('不允许删除项目根目录')
+  }
+  const info = await stat(target)
+  if (info.isDirectory()) {
+    throw new Error('暂不支持删除目录')
+  }
+  await shell.trashItem(target)
 }
 
 /* 读取文件：文本截断读取；二进制判定；图片附带 dataUrl */

@@ -17,26 +17,74 @@ description: 在 XXL-AI 前后端分离模式（xxl-ai-api 端口 8080 + xxl-ai-
 
 ```
 xxl-ai-api/src/main
-├── java/com/xxl/ai/api/framework/…        ← 平台内置（controller/service/mapper/model/constant/enums/web）
-├── java/com/xxl/ai/api/business/{module}    ← 新增业务落此（功能完备：全部 CRUD + 对外操作入口，controller/service/mapper/model 齐全；同名业务一级化 /business/{module}；多业务再按 /business/{module}/{business} 聚合，如 supplier 聚合 supplier+model）
-├── java/com/xxl/ai/api/business/harness     ← 底层支撑（模型构建/对话执行/对话生成 worker/RAG/Skill 工具/MCP 调用/连通探测等），无 controller，只被上层业务调用
+├── java/com/xxl/ai/api/framework/         ← 平台内置：controller/{system,base}、service(+impl)、mapper、
+│                                            model/{entity,dto,adaptor}、constant/{enums,consts}、
+│                                            web/{xxlsso,xxllog,error}、annotation/config/util
+├── java/com/xxl/ai/api/business/{module}/ ← 新增业务（功能完备；同名业务一级化，多业务按 {module}/{business} 聚合）
+├── java/com/xxl/ai/api/business/harness/  ← 运行时支撑层（llm/chat/rag/mcp/skill/supplier），无 controller
+├── resources/mapper/framework/…           ← 平台 Mapper XML
 └── resources/mapper/business/{module}/    ← 业务 Mapper XML（按模块平铺，文件名标识业务）
 xxl-ai-ui/src
-├── modules/framework/{domain}/{module}/     ← 平台内置模块（auth/system/dashboard/…，同目录聚合 pages+api+types）
-├── modules/business/{module}/               ← 业务模块（pages/ + api/ + types/ 三子目录；同名业务直接一级，多业务在模块内聚合）
-└── types/index.ts                           ← 全局基础类型（Response/PageModel/PageQuery…）
+├── modules/framework/{domain}/{module}/   ← 平台内置模块（auth/system/dashboard/…，pages+api+types 同模块聚合）
+├── modules/business/{module}/             ← 业务模块（pages/ + api/ + types/；模块内共享件可加 components/、composables/）
+└── types/index.ts                         ← 全局基础类型（Response/PageModel/PageQuery…）
 ```
 
-> 🔒 **business / harness 边界（强制）**：`business/{module}` 是**功能完备**的业务模块——包含该模块**全部 CRUD 与对外操作入口**（controller/service/mapper/model 齐全，非元数据操作也在本模块的 Controller 暴露）；`business/harness` 是**底层支撑层**，**无自己的 controller**，只为上层业务提供模型构建/对话执行/对话生成 worker/RAG/Skill 工具/MCP 调用/连通探测等运行时实现。业务 Controller 暴露操作入口并委托 harness 的 Service 接口（business → harness 单向依赖）；harness 可反向经 business 的 Mapper 读取元数据。运行时接口 URL 保持不变，前端 `api/` 无需改动。细则见根 `AGENTS.md` 4.3）。
+> 🔒 business / harness 边界见下文「business / harness 边界」；命名、注释、依赖版本见 `AGENTS.md`「通用约定」。
 
-通用规范（返回结构、注释、命名、DB）见仓库根 `AGENTS.md` 第六节。
+## 环境与命令
+
+前置：JDK 17+、Maven 3.6+、Node 22+、MySQL 8、Redis（RAG 向量化另需 Milvus）。
+
+```bash
+# 初始化数据库：执行 doc/db/tables_xxl_ai.sql（连接字符集要求见「标准流程」的 SQL 执行规范）
+
+# 本地启动（连接配置见 xxl-ai-api/src/main/resources/application.properties，默认 admin/123456）
+cd xxl-ai-api && mvn spring-boot:run      # 8080
+cd xxl-ai-ui && npm i && npm run dev      # 3000（代理 /api → 8080）
+cd xxl-ai-sample && mvn spring-boot:run    # 8091（可选）
+
+# 构建与部署（前端产物内嵌 api，单包单端口）
+cd xxl-ai-ui && npm i && npm run build && npm run sync:dist && cd ..
+mvn clean package -Dmaven.test.skip=true
+java -jar xxl-ai-api/target/xxl-ai-api-*.jar          # http://localhost:8080
+cd docker && docker compose up -d --build              # 或起 docker 栈
+```
+
+- 前端为 **Hash 路由**（`/#/xxx`），无需服务端回退；生产 `VITE_APP_BASE_API` 为空、接口在根路径。
+- `xxl-ai-api` / `xxl-ai-sample` 的 Dockerfile 均为 `ADD target/*.jar`：compose 构建前必须完成模块打包，只跑 `-pl xxl-ai-api` 会让 sample 镜像报 `lstat .../target: no such file`。
+
+## business / harness 边界
+
+| 层 | 职责 | 边界 |
+|---|---|---|
+| `business/{module}` | 业务编排（校验、空间归属、状态回写、DTO 组装）+ 全部对外入口 | 自带 controller，路径 `/{module}[/{business}]` |
+| `business/harness` | 运行时能力（模型构建/对话执行、对话生成 worker + 队列/结果流/SSE、MCP、RAG、技能沙箱、供应商探测） | **不定义任何 `@RestController`**、不校验空间归属、不新增元数据表 |
+
+```
+business/harness
+├── llm       LlmModelFactory、LlmChatTool
+├── chat      ChatStreamTool（任务队列 + 生成消费 + 结果流 + SSE 转发）
+├── rag       RagTool（向量化/检索/清理/Advisor）
+├── mcp       McpClientTool、McpToolFactory
+├── skill     SkillToolFactory（物化 + 执行沙箱）
+└── supplier  SupplierApiTool（供应商 HTTP 探测）
+```
+
+判定一句话：是业务编排（校验归属、读写业务状态、组装返回）→ `business/{module}` 的 Service；只是它调用的底层能力（HTTP、SDK、模型、向量库、进程沙箱、SSE/队列）→ `harness`。
+
+- **单向依赖**：业务 Service/Controller 直接注入 harness 工具类。示例：`AgentServiceImpl`→`SkillToolFactory#evict`、`KnowledgeDocServiceImpl`/`KnowledgeBaseServiceImpl`→`RagTool`、`SupplierServiceImpl`→`SupplierApiTool`、`McpServiceImpl`→`McpClientTool`、`ChatService`→`ChatStreamTool`。
+- **允许反向读元数据**：harness 可按 ID 经 business 的 Mapper/Service 读配置，但不把 CRUD 挪进 harness。
+- **禁止项**：`business/{module}` 不得新增 `client/rag/tool/stream` 等运行时子包，不得直接依赖 spring-ai / Milvus / MCP SDK / Redis；harness 不得新增 controller 与元数据表。
+- **命名**：harness 内新增能力优先 `XxxTool` / `XxxClient` / `XxxFactory`。
+- **例外**：`harness/chat/ChatStreamTool` 按 uuid 复校 Agent 并回填消息，属对话域运行时的既定行为。运行时接口 URL 保持不变，前端 `api/` 无需改动。
 
 ## 标准流程
 
 0. **需求落盘（先建立）**：先按「需求落盘（xxl-ai-spec）」一节在项目根 `xxl-ai-spec/{yyyyMMdd}-{business}/` 创建需求子目录，随后确认的需求结论、方案、SQL 全部落入该目录（见下文专属章节）。
 1. **需求确认（第一步，必须）**：接到任务先不写代码，主动向用户确认需求细节，用户确认后再执行。至少确认：模块与业务命名（`{module}/{business}`）及目录归属；核心字段、状态/枚举下拉、是否需文件上传/富文本等特殊组件；页面形态（标准 CRUD / 详情页 / 多页签，仅动后端时则不动前端）；菜单+按钮+角色授权是否一并处理；验证范围与启动端口（api 8080 / vue 3000）。确认结果即时回填到子目录 `方案.md`。
-2. **建表**：`xxl_ai_*` SQL，公共字段 `id/add_time/update_time`，TINYINT 状态，`COMMENT` 注释；SQL 脚本写入该需求子目录（如 `{business}-table.sql`、`{business}-init.sql`）。
-3. **生成或手写代码**：本 Skill 缺省策略为 AI 按模板直生等价代码落位（后端 6 件套 + 前端 vue3 文件），落位细则见下方「后端落位清单 / 前端落位清单」。
+2. **建表**：按「数据库约定」建 `xxl_ai_*` 表，SQL 脚本写入该需求子目录（如 `{business}-table.sql`、`{business}-init.sql`）。
+3. **生成或手写代码**：平台内置代码生成器已下线，缺省由 AI 按模板直生等价代码落位（后端 6 件套 + 前端 vue3 文件），落位细则见下方「后端落位清单 / 前端落位清单」。
 4. **落位**：业务一级化——后端 Java 落 `business/{module}`（同名业务；多业务模块在模块下再分 `{business}`），Mapper XML 落 `resources/mapper/business/{module}/`；前端业务模块聚合落 `modules/business/{module}/`（pages/index.vue + api/index.ts + types/index.ts）。
 5. **菜单/权限**：在 `XxlRoleEnum#buildRoleResources` 对应角色分支追加菜单(type=1)；页面按钮 `v-hasPermi` 复用菜单权限标识（需按钮级细粒度时再追加 type=2 按钮资源）。
 6. **验证**：起 `xxl-ai-api`(8080) + `xxl-ai-ui`(3000，代理 /api→8080)，菜单可见、CRUD 可用、权限生效；验证结果回填 `方案.md`。
@@ -145,9 +193,18 @@ SQL 脚本：`{business}-table.sql`
 后端要点：
 
 - Controller 分页方法签名：`int offset(默认0)`、`int pagesize(默认10)` + 查询参数，返回 `Response<PageModel<XxxDTO/Entity>>`。
+- 统一返回 `Response{ code, msg, data }`（`com.xxl.tool.response.Response`），code 200 成功；Java set/get 不折叠，使用正常方法体。
 - 参数校验用 `StringTool/RegexTool/CollectionTool`，失败 `Response.ofFail("提示")`；唯一性校验库中查一遍再插。
 - DTO 时间展示转字符串（`DateTool.formatDateTime`），用 Adaptor 完成 entity→dto。
 - 接口路径**全小写**：`/{module}/pageList|load|insert|delete|update`（多业务模块为 `/{module}/{business}/...`）。**参数通道约定**：结构化实体与集合（insert/update 的 DTO、delete 的 `List<Long>`）一律走 JSON 请求体（后端 `@RequestBody`、前端 `data`）；仅简单标量、分页与查询条件走 URL 参数（后端 `@RequestParam`、前端 `params`）。
+
+## 数据库约定
+
+- 表名前缀 `xxl_ai_`；字段下划线命名，Java 属性驼峰。
+- 公共字段 `id`（自增主键）、`add_time`、`update_time`；状态字段 `TINYINT`（0 正常 / 1 停用类）。
+- 唯一索引 `i_` 前缀；字段一律 `COMMENT`；枚举取值不建表，优先用框架枚举（见「枚举下拉」）。
+- 状态类下拉优先选择框/单选；`add_time` / `update_time` 写入用 `NOW()`。
+- 所有 `.sql` 首行含 `SET NAMES utf8mb4;`。
 
 ## 前端落位清单（3 文件）
 
@@ -159,7 +216,15 @@ SQL 脚本：`{business}-table.sql`
 
 页面（列表页及其内联弹窗，拆分子页如 `model.vue`、`doc.vue`、`conv.vue` 也放 `pages/`）放 `pages/`，接口放 `api/`，类型放 `types/`，三者同模块聚合、无 barrel 登记；全局基础类型（Response/PageModel/ListQuery…）统一从 `@/types` 引用。「框架」内置模块在 `modules/framework/`，业务禁止混入。
 
-**i18n 落位**：用户可见文案一律 `import { t } from '@/i18n'` 引用，**禁止硬编码中文**（注释除外）；文案 key 统一维护在 `src/i18n/locales/{zh,en}.json` **单一文件**内（按域名节点分区，如 `business.*`；`app` 前置 → 公共组 `common`/`modal`/`request`/`layout`/`components` → 平台业务组 `auth`/`system`/`dashboard`/`help`/`error` → 常规业务模块），zh/en 成对补。通用词（新增/修改/删除/搜索/操作/状态/正常/停用/保存成功…）复用 `common.*`，插值用 `t('key',[v])`（`{0}`）。
+**i18n 落位**：通用规则见 `AGENTS.md`「国际化」；本节只规定本模式落位：文案 key 统一维护在 `src/i18n/locales/{zh,en}.json` **单一文件**内（按域名节点分区，如 `business.*`；`app` 前置 → 公共组 `common`/`modal`/`request`/`layout`/`components` → 平台业务组 `auth`/`system`/`dashboard`/`help`/`error` → 常规业务模块），zh/en 成对补。
+
+### Vue 约定
+
+- 组件 import 名与模板标签统一 PascalCase（`import NoticeDetailView` ↔ `<NoticeDetailView>`）。
+- script 除基础 import 外按「ref data → fun → page init」三节组织，节顶注释 `/* --- {功能，前后33个-} --- */`。
+- 响应式数据一律 `ref`，禁止 `reactive` 与 `toRefs(data)` 解构；按用途收敛为对象：`queryParams`（搜索栏）、`table`（表格数据与状态）、`formState`（表单与校验规则）。
+- 少写桥接：`defineModel('visible')` + 模板 `v-model` 直连；模板直接用 `props.row`，不建冗余 computed 别名。
+- 通用能力复用 `@/composables/*`、`@/components`、`@/utils/modal`，禁止重复造轮子。
 
 types 参考 `src/modules/framework/system/user/types/index.ts` 封口写法；api 参考 `src/modules/framework/system/user/api/index.ts`。
 
@@ -247,7 +312,7 @@ if (role == ADMIN) {
 - [ ] `xxl-ai-api` 下 `mvn -q compile` 通过。
 - [ ] 后端：Controller 全 `@XxlSso`，方法顺序 `pageList/load/insert/delete/update`，分页 `offset/pagesize`，XML resultMap + `NOW()`，校验 `Response.ofFail`。
 - [ ] 前端：types 三件齐（实体/Query/ListQuery），同模块聚合、无 barrel 登记；api 封装 `Promise<Response<PageModel<T>>>`；列表页三段式 + `ref` 收敛 + `usePageParams`。
-- [ ] 权限：菜单在 `XxlRoleEnum` 已注册；按钮 `v-hasPermi` 复用菜单权限标识（`{module}:default` / `{module}:{business}`）。注释符合 AGENTS.md 6.1。
+- [ ] 权限：菜单在 `XxlRoleEnum` 已注册；按钮 `v-hasPermi` 复用菜单权限标识（`{module}:default` / `{module}:{business}`）。注释符合 `AGENTS.md`「通用约定」。
 - [ ] 边界：业务模块功能完备，含全部 CRUD 与对外操作入口（controller 齐全）；运行时实现统一落 `business/harness`，harness 无 controller、只被上层调用；运行时接口 URL 不变。
 - [ ] i18n：页面无硬编码中文（注释除外），`t('key')` 引用且 zh/en 文案已成对维护；通用词复用 `common.*`。语言配置 `default-settings.ts` 的 `language`。
 - [ ] 防乱码：所有 `.sql` 首行有 `SET NAMES utf8mb4;`。
@@ -257,4 +322,4 @@ if (role == ADMIN) {
 
 - 列表页规范样例：`xxl-ai-ui/src/modules/framework/system/user/pages/index.vue`
 - API / 类型样例：`xxl-ai-ui/src/modules/framework/system/user/{api,types}/index.ts`
-- 菜单 / 权限注册模板：见上文「菜单 / 权限注册（枚举资源，替代原资源表）」，按 `res()/ResourceTypeEnum` 追加即注册，无需改数据库与路由；内置代码生成器已下线，按模板直生等价代码
+- 菜单 / 权限注册模板：见上文「菜单 / 权限注册（枚举资源，替代原资源表）」，按 `res()/ResourceTypeEnum` 追加即注册，无需改数据库与路由。

@@ -12,6 +12,7 @@ import '@xterm/xterm/css/xterm.css'
 import { api } from '@renderer/api'
 import { useWorkspaceStore } from '@renderer/stores/workspace'
 import { t } from '@renderer/i18n'
+import { ipcErrorMessage } from '@renderer/utils/ipcError'
 import type { TerminalEvent } from '@shared/ipc'
 
 /* 终端运行时入参：均以 getter 传入，跟随组件 props 变化 */
@@ -205,7 +206,8 @@ export function useSessionTerminals(options: SessionTerminalOptions) {
       runtimes.get(dto.id)?.term.focus()
     } catch (error) {
       console.warn('创建终端失败：', error)
-      ElMessage.warning(t('chat.terminalLimit'))
+      /* 区分「单会话上限 / 全局上限 / 其它失败」，直接展示主进程返回的原因 */
+      ElMessage.warning(ipcErrorMessage(error) || t('chat.terminalLimit'))
     }
   }
 

@@ -21,7 +21,7 @@
     "pack": "npm run build && electron-builder --dir",
     "build:mac": "npm run build && electron-builder --mac --arm64",
     "build:win": "npm run build && electron-builder --win --x64 --config.npmRebuild=false",
-    "postinstall": "install-electron && electron-builder install-app-deps && node scripts/fix-node-pty-perms.cjs"
+    "postinstall": "node scripts/fix-node-pty-perms.cjs && install-electron && electron-builder install-app-deps && node scripts/fix-node-pty-perms.cjs"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "1.4.0",
@@ -37,6 +37,7 @@
   },
   "devDependencies": {
     "@element-plus/icons-vue": "2.3.2",
+    "@mdit/plugin-katex": "1.1.4",
     "@types/adm-zip": "0.5.8",
     "@types/better-sqlite3": "9.6.0",
     "@types/node": "26.6.5",
@@ -49,7 +50,10 @@
     "electron-vite": "6.0.0",
     "element-plus": "2.14.7",
     "highlight.js": "11.12.0",
+    "katex": "0.19.1",
     "markdown-it": "15.0.3",
+    "markdown-it-footnote": "4.0.0",
+    "markdown-it-task-lists": "2.1.1",
     "pinia": "4.1.0",
     "sass-embedded": "1.106.1",
     "typescript": "6.0.3",

@@ -1,13 +1,12 @@
 <script setup lang="ts">
 /*
- * 文件查看器：文本编辑（语法高亮 + 行号 + ⌘/Ctrl+S 保存）、Markdown / 图片预览与只读展示。
+ * 文件查看器：文本编辑（语法高亮 + 行号 + ⌘/Ctrl+S 保存）、Markdown / 图片 / 音视频预览与只读展示。
  * @author xuxueli 2026-10-25
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { renderMarkdown } from '@renderer/composables/useMarkdown'
-import { onCodeCopyClick } from '@renderer/composables/useCodeCopy'
-import { onContentLinkClick } from '@renderer/composables/useContentLink'
+import MarkdownBlock from '@renderer/components/MarkdownBlock.vue'
 import { escapeHtml, highlightCode, languageOf } from '@renderer/composables/useHighlight'
+import { toLocalFileUrl } from '@renderer/utils/localFileUrl'
 import { parentDir } from '../../utils/path'
 import { t } from '@renderer/i18n'
 import type { FileContent } from '@shared/ipc'
@@ -23,21 +22,43 @@ const props = defineProps<{
   showPreview: boolean
   isImage: boolean
   isMarkdown: boolean
+  isVideo: boolean
+  isAudio: boolean
   saving: boolean
 }>()
 const draft = defineModel<string>('draft', { required: true })
 const emit = defineEmits<{ save: [] }>()
 
-/* Markdown 预览点击：链接交给系统浏览器，其余交给代码复制事件委托 */
-function onContentClick(event: MouseEvent): void {
-  if (onContentLinkClick(event)) {
-    return
-  }
-  void onCodeCopyClick(event)
-}
-
 /* 编辑区着色长度上限：超过则退化为纯文本，保证大文件编辑流畅 */
 const MAX_EDITOR_HIGHLIGHT = 100000
+/* Markdown 预览渲染上限：超长文档只渲染前段，避免解析/排版阻塞界面 */
+const MAX_MARKDOWN_PREVIEW = 400000
+
+/* 音视频预览地址（经 desk-file 协议流式读取，避免整段文件进内存） */
+const mediaUrl = computed(() => {
+  if (!props.file || (!props.isVideo && !props.isAudio)) {
+    return ''
+  }
+  return toLocalFileUrl(props.file.path)
+})
+
+/* 音视频解码失败提示（切换文件后复位） */
+const mediaError = ref('')
+watch(
+  () => props.file?.path,
+  () => {
+    mediaError.value = ''
+  }
+)
+
+/* Markdown 预览内容：超长文档截断渲染，并给出提示 */
+const markdownPreviewTruncated = computed(
+  () => props.isMarkdown && (props.file?.content.length ?? 0) > MAX_MARKDOWN_PREVIEW
+)
+const markdownPreviewContent = computed(() => {
+  const content = props.file?.content ?? ''
+  return content.length > MAX_MARKDOWN_PREVIEW ? content.slice(0, MAX_MARKDOWN_PREVIEW) : content
+})
 
 /* 文本域 / 行号栏 / 高亮层元素引用（用于滚动同步与按键处理） */
 const editorRef = ref<HTMLTextAreaElement | null>(null)
@@ -141,16 +162,45 @@ function syncGutter(): void {
     <div v-else-if="error" class="viewer-empty error">{{ error }}</div>
     <div v-else-if="!file" class="viewer-empty">{{ t('panel.noSelection') }}</div>
     <template v-else>
-      <div v-if="file.truncated" class="viewer-banner">{{ t('panel.truncated') }}</div>
+      <!-- 文本截断提示：音视频按流读取，不受文本读取上限影响 -->
+      <div v-if="file.truncated && !isVideo && !isAudio" class="viewer-banner">
+        {{ t('panel.truncated') }}
+      </div>
+      <div v-else-if="showPreview && markdownPreviewTruncated" class="viewer-banner">
+        {{ t('panel.previewTruncated') }}
+      </div>
       <div v-if="showPreview && isImage && file.dataUrl" class="viewer-image">
         <img :src="file.dataUrl" :alt="file.name" />
       </div>
-      <div
+      <MarkdownBlock
         v-else-if="showPreview && isMarkdown"
-        class="viewer-markdown markdown-body"
-        @click="onContentClick"
-        v-html="renderMarkdown(file.content, parentDir(file.path))"
-      ></div>
+        class="viewer-markdown"
+        :content="markdownPreviewContent"
+        :base-dir="parentDir(file.path)"
+      />
+      <!-- 视频：浏览器原生播放器，经 desk-file 协议流式加载 -->
+      <div v-else-if="isVideo" class="viewer-media">
+        <video
+          v-if="!mediaError"
+          :src="mediaUrl"
+          controls
+          playsinline
+          preload="metadata"
+          @error="mediaError = t('panel.mediaLoadFail')"
+        ></video>
+        <div v-else class="viewer-empty error">{{ mediaError }}</div>
+      </div>
+      <!-- 音频：浏览器原生播放器 -->
+      <div v-else-if="isAudio" class="viewer-media">
+        <audio
+          v-if="!mediaError"
+          :src="mediaUrl"
+          controls
+          preload="metadata"
+          @error="mediaError = t('panel.mediaLoadFail')"
+        ></audio>
+        <div v-else class="viewer-empty error">{{ mediaError }}</div>
+      </div>
       <div v-else-if="file.binary" class="viewer-empty">{{ t('panel.binary') }}</div>
       <!-- 可编辑：带行号的纯文本编辑器（⌘/Ctrl+S 保存），高亮层置于文本域下方 -->
       <div v-else-if="editable" class="editor">
@@ -347,12 +397,36 @@ function syncGutter(): void {
   box-shadow: inset 0 0 0 1px var(--desk-code-border);
 }
 
-/* Markdown 预览 */
+/* Markdown 预览：显式 min-height 保证长文档在面板内滚动，而不是把面板撑开 */
 .viewer-markdown {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   padding: 16px 20px;
   font-size: 14px;
+}
+
+/* 音视频预览：居中展示，视频自适应容器高度 */
+.viewer-media {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: auto;
+  background: var(--desk-bg-elevated);
+}
+
+.viewer-media video {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--desk-radius-sm);
+  background: #000;
+}
+
+.viewer-media audio {
+  width: min(520px, 100%);
 }
 
 /* 图片预览：居中展示，自适应容器 */

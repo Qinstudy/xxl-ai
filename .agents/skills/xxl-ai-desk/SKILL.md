@@ -66,8 +66,6 @@ xxl-ai-desk/src/
 
 判定：`services` import `agent/worker` 违规；组件里出现 `spawn / 协议 / DB` 违规；反向依赖一律违规。
 
-> 通用分层原则（business / harness）见 `AGENTS.md` §4.3；本节只列 Desk 的三进程映射。
-
 补充：
 
 - **唯一持久化出口**：`getDb()` 只在 `services/*`；`agent/*` 可经 service 读配置，不写业务表。
@@ -107,7 +105,6 @@ xxl-ai-desk/src/
 - **失败隔离**：单个外部服务失败只跳过自身并记录可定位日志，不阻断主流程。
 - **副作用集中**：配置变更后的缓存失效（如 `resetAgents()`）在一个入口统一完成。
 - **官方方案优先**：有官方/上游 SDK 或推荐接入方式时禁止自写协议。例：MCP 使用 `@earendil-works/pi-mcp`；模型/Agent 使用 `@earendil-works/pi-ai`、`pi-agent-core`。
-- **依赖版本锁定**：`package.json` 依赖一律写精确版本（如 `"yaml": "2.9.1"`），禁止 `^` / `~` / `*` / 区间写法；新增或升级依赖同步更新 `package-lock.json`（根 `packages[""]` 也须为精确版本）。上游包的传递依赖浮动由 lock 文件固化，不在此限。
 
 ### 2.3 UI 与样式 [硬]
 
@@ -118,7 +115,7 @@ xxl-ai-desk/src/
 
 ### 2.4 可读性与规模 [软]
 
-- 命名、注释、类型与死代码规范以 `AGENTS.md` §6.1 为准；本节只列 Desk 规模阈值。
+- 命名、注释、类型与死代码规范以 `AGENTS.md`「通用约定」为准；本节只列 Desk 规模阈值。
 - 早返回代替深层嵌套；边界处禁止 `any`，强制转换必须紧邻注释说明原因。
 
 | 对象 | 阈值 | 依据 |
@@ -237,8 +234,8 @@ export const useWidgetStore = defineStore('widget', () => {
 - 能力访问统一 `import { api } from '@renderer/api'`；禁止直接 `window.desk`。
 - 引用优先别名：`@renderer/*`、`@shared/*`；禁止 3 层以上 `../`。
 - `utils/*` 无 Vue 依赖；`composables/*` 含响应式；单模块专用不放公共目录。
-- 组件 PascalCase；文案规范（`t()`、zh/en 成对、`common.*` 复用）以 `AGENTS.md` §6.7 为准。
-- i18n 单一文件 `i18n/locales/{zh,en}.json`；语言由设置驱动，不支持运行时切换。
+- 组件 PascalCase；文案规范（`t()`、zh/en 成对、`common.*` 复用、插值）以 `AGENTS.md`「国际化」为准。
+- i18n 单一文件 `src/renderer/src/i18n/locales/{zh,en}.json`；语言由设置驱动。
 
 ## 5. 界面外壳
 

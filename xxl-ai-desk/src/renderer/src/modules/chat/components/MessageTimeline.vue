@@ -4,9 +4,7 @@
  * @author xuxueli 2026-10-25
  */
 import { computed, ref, watch, type ComponentPublicInstance } from 'vue'
-import { renderMarkdown } from '@renderer/composables/useMarkdown'
-import { onCodeCopyClick } from '@renderer/composables/useCodeCopy'
-import { onContentLinkClick } from '@renderer/composables/useContentLink'
+import MarkdownBlock from '@renderer/components/MarkdownBlock.vue'
 import { toolArgsText, toolView } from '../composables/useToolView'
 import { useNow } from '../composables/useNow'
 import { useChatStore } from '@renderer/stores/chat'
@@ -50,7 +48,7 @@ const turnDuration = computed(() => {
   return formatDuration(endedAt - startedAt)
 })
 
-/* 是否最后一段（流式跟随时，正文用纯文本渲染，避免逐段重解析 Markdown） */
+/* 是否最后一段（用于流式尾段的错误态标记） */
 function isLastPart(index: number): boolean {
   return index === lastIndex.value
 }
@@ -133,14 +131,6 @@ function toolDuration(tool: ToolCallState): string {
   return formatDuration(end - tool.startedAt)
 }
 
-/* 正文点击：链接交给系统浏览器；其余交给代码复制事件委托 */
-function onContentClick(event: MouseEvent): void {
-  if (onContentLinkClick(event)) {
-    return
-  }
-  void onCodeCopyClick(event)
-}
-
 /* 工具结构化结果：格式化 JSON，供展开查看 */
 function toolDetailsText(tool: ToolCallState): string {
   if (tool.details === undefined || tool.details === null) {
@@ -218,14 +208,14 @@ function toolDetailsText(tool: ToolCallState): string {
         </div>
       </div>
 
-      <!-- 正文片段：流式期间即实时渲染 Markdown（节流刷新，避免逐 token 重解析） -->
-      <div
+      <!-- 正文片段：独立渲染块按内容缓存，仅该片段变化时重新解析与消毒 -->
+      <MarkdownBlock
         v-else-if="part.type === 'text'"
-        class="step step-text markdown-body"
+        class="step step-text"
         :class="{ 'is-error': part.error || (message.error && isLastPart(index)) }"
-        @click="onContentClick"
-        v-html="renderMarkdown(part.text, baseDir)"
-      ></div>
+        :content="part.text"
+        :base-dir="baseDir"
+      />
     </template>
 
     <!-- 生成中：尾部常驻活动指示，明确「仍在运行」，避免看似卡住 -->

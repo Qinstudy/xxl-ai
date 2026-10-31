@@ -58,7 +58,7 @@ import {
   resizeTerminal,
   writeTerminal
 } from './services/terminalService'
-import { listDir, readFile, writeFile } from './services/fsService'
+import { listDir, readFile, trashFile, writeFile } from './services/fsService'
 import { initFsWatch, unwatchDir, watchDir } from './services/fsWatchService'
 import { listOpenWithApps, openWith } from './services/openWithService'
 import { abortChat, discardSessionRuns, respondApproval, sendChat } from './services/chatService'
@@ -297,6 +297,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.fsWrite, (_event, root: string, path: string, content: string) =>
     writeFile(root, path, content)
   )
+  ipcMain.handle(IPC.fsTrash, (_event, root: string, path: string) => trashFile(root, path))
   /* 目录监听：本地增删文件后推送变更，渲染层刷新对应目录 */
   initFsWatch((dir) => getWindow()?.webContents.send(IPC.fsChange, dir))
   ipcMain.handle(IPC.fsWatch, (_event, dir: string) => watchDir(dir))

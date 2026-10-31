@@ -15,6 +15,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [entry: FsEntry]
   toggle: [entry: FsEntry]
+  /* 右键文件：携带鼠标视口坐标，由上层定位菜单 */
+  'context-menu': [entry: FsEntry, position: { x: number; y: number }]
 }>()
 
 /* 过滤生效（非空关键字）时：自动展开已加载目录，仅展示命中项及其祖先 */
@@ -50,6 +52,19 @@ function onClick(): void {
     emit('select', props.entry)
   }
 }
+
+/* 右键文件：阻止系统菜单，交给上层按鼠标位置展示操作菜单 */
+function onContextMenu(event: MouseEvent): void {
+  if (props.entry.isDir) {
+    return
+  }
+  emit('context-menu', props.entry, { x: event.clientX, y: event.clientY })
+}
+
+/* 子节点右键事件上抛 */
+function forwardContextMenu(entry: FsEntry, position: { x: number; y: number }): void {
+  emit('context-menu', entry, position)
+}
 </script>
 
 <template>
@@ -61,6 +76,7 @@ function onClick(): void {
       :style="{ paddingLeft: `${8 + depth * 13}px` }"
       :title="entry.name"
       @click="onClick"
+      @contextmenu.prevent.stop="onContextMenu"
     >
       <el-icon v-if="entry.isDir" class="tree-caret" :class="{ open: expanded }">
         <CaretRight />
@@ -89,6 +105,7 @@ function onClick(): void {
         :keyword="keyword"
         @select="emit('select', $event)"
         @toggle="emit('toggle', $event)"
+        @context-menu="forwardContextMenu"
       />
     </div>
   </div>

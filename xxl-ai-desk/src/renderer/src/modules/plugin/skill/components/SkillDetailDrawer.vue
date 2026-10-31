@@ -6,7 +6,7 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSkillStore } from '@renderer/stores/skill'
-import { renderMarkdown } from '@renderer/composables/useMarkdown'
+import MarkdownBlock from '@renderer/components/MarkdownBlock.vue'
 import { ipcErrorMessage } from '@renderer/utils/ipcError'
 import { t } from '@renderer/i18n'
 import type { SkillDetail } from '@shared/ipc'
@@ -27,8 +27,8 @@ const contentTotal = ref(0)
 const contentEof = ref(true)
 const loadingContent = ref(false)
 
-/* 正文渲染（已消毒） */
-const html = computed(() => renderMarkdown(content.value))
+/* 技能目录：解析 SKILL.md 中的相对图片等资源 */
+const skillDir = computed(() => detail.value?.dir ?? '')
 
 /* 文件体积展示 */
 function formatSize(size: number): string {
@@ -165,7 +165,7 @@ async function onReveal(): Promise<void> {
         </div>
 
         <div class="section-title">{{ t('plugin.skillCenter.detailContent') }}</div>
-        <div class="markdown-body" v-html="html" />
+        <MarkdownBlock class="detail-markdown" :content="content" :base-dir="skillDir" />
         <div v-if="!contentEof" class="content-more">
           <el-button text type="primary" :loading="loadingContent" @click="loadMoreContent">
             {{ t('plugin.skillCenter.loadMore') }}
@@ -248,23 +248,12 @@ async function onReveal(): Promise<void> {
   color: var(--desk-text);
 }
 
-.markdown-body {
+/* 详情正文：字号略小以贴合抽屉宽度，代码块与引用样式统一由全局 Markdown 样式提供 */
+.detail-markdown {
   padding: 4px 2px;
   font-size: 13px;
   line-height: 1.7;
   color: var(--desk-text);
-  word-break: break-word;
-}
-
-.markdown-body :deep(pre) {
-  padding: 10px 12px;
-  border-radius: 6px;
-  background: var(--desk-panel-bg);
-  overflow-x: auto;
-}
-
-.markdown-body :deep(code) {
-  font-family: var(--el-font-family-mono, monospace);
 }
 
 .content-more {

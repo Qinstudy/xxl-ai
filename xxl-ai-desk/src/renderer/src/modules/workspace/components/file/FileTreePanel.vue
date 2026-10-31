@@ -11,7 +11,11 @@ import { t } from '@renderer/i18n'
 import type { FsEntry } from '@shared/ipc'
 
 const props = defineProps<{ sessionId: string; root?: string; selectedPath: string }>()
-const emit = defineEmits<{ select: [entry: FsEntry] }>()
+const emit = defineEmits<{
+  select: [entry: FsEntry]
+  /* 右键文件：位置交由文件面板定位菜单 */
+  'context-menu': [entry: FsEntry, position: { x: number; y: number }]
+}>()
 
 /* 会话工作区 store：关键字与目录展开态按会话隔离 */
 const workspace = useWorkspaceStore()
@@ -31,6 +35,11 @@ const expanded = computed({
 
 const { childrenMap, expandedMap, loadingMap, rootChildren, visibleRoot, toggle } =
   useProjectFileTree({ root: () => props.root, keyword, expanded })
+
+/* 右键事件上抛给文件面板（统一处理选中与菜单动作） */
+function onContextMenu(entry: FsEntry, position: { x: number; y: number }): void {
+  emit('context-menu', entry, position)
+}
 </script>
 
 <template>
@@ -55,6 +64,7 @@ const { childrenMap, expandedMap, loadingMap, rootChildren, visibleRoot, toggle 
           :keyword="keyword"
           @select="emit('select', $event)"
           @toggle="toggle"
+          @context-menu="onContextMenu"
         />
         <div v-if="childrenMap[root] && rootChildren.length === 0" class="tree-empty">
           {{ t('panel.emptyTree') }}

@@ -169,6 +169,8 @@ const api: DeskApi = {
     /* 写入文件内容 */
     write: (root: string, path: string, content: string) =>
       ipcRenderer.invoke(IPC.fsWrite, root, path, content),
+    /* 删除文件（移入系统废纸篓） */
+    trash: (root: string, path: string) => ipcRenderer.invoke(IPC.fsTrash, root, path),
     /* 监听目录变更 */
     watch: (dir: string) => ipcRenderer.invoke(IPC.fsWatch, dir),
     /* 取消目录监听 */

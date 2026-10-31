@@ -108,13 +108,15 @@ body.resizing-vertical {
   font-size: 14px;
   line-height: 1.75;
   word-break: break-word;
+  /* 连续无空格的 URL / 长串也能在容器内换行 */
+  overflow-wrap: anywhere;
 }
 
-.markdown-body > :first-child {
+.markdown-body-content > :first-child {
   margin-top: 0;
 }
 
-.markdown-body > :last-child {
+.markdown-body-content > :last-child {
   margin-bottom: 0;
 }
 
@@ -126,16 +128,65 @@ body.resizing-vertical {
 .markdown-body img {
   max-width: 100%;
   height: auto;
-  border-radius: 8px;
+  border-radius: var(--desk-radius-sm);
   vertical-align: middle;
+}
+
+/* 行内小图（段落/列表内）用较小圆角，块级图片保持卡片圆角 */
+.markdown-body p img,
+.markdown-body li img {
+  border-radius: 6px;
+}
+
+/* 可点击放大的正文图片 */
+.markdown-body .md-image {
+  max-height: 420px;
+  object-fit: contain;
+  cursor: zoom-in;
+}
+
+/* 图片加载失败占位 */
+.markdown-body .md-image-fallback {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px dashed var(--desk-border-strong);
+  border-radius: 6px;
+  color: var(--desk-text-tertiary);
+  font-size: 12px;
 }
 
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3,
-.markdown-body h4 {
+.markdown-body h4,
+.markdown-body h5,
+.markdown-body h6 {
   margin: 1em 0 0.5em;
   line-height: 1.4;
+  font-weight: 600;
+}
+
+.markdown-body h1 {
+  font-size: 1.5em;
+}
+
+.markdown-body h2 {
+  font-size: 1.32em;
+}
+
+.markdown-body h3 {
+  font-size: 1.18em;
+}
+
+.markdown-body h4 {
+  font-size: 1.06em;
+}
+
+.markdown-body h5,
+.markdown-body h6 {
+  font-size: 1em;
+  color: var(--desk-text-secondary);
 }
 
 .markdown-body ul,
@@ -144,8 +195,60 @@ body.resizing-vertical {
   margin: 0.5em 0;
 }
 
+/* 嵌套列表按层级区分符号，便于分辨结构 */
+.markdown-body ul {
+  list-style: disc;
+}
+
+.markdown-body ul ul {
+  list-style: circle;
+}
+
+.markdown-body ul ul ul {
+  list-style: square;
+}
+
+.markdown-body ol {
+  list-style: decimal;
+}
+
+.markdown-body ol ol {
+  list-style: lower-alpha;
+}
+
+.markdown-body ol ol ol {
+  list-style: lower-roman;
+}
+
 .markdown-body li {
   margin: 0.25em 0;
+}
+
+.markdown-body li > p {
+  margin: 0.25em 0;
+}
+
+/* 列表内嵌代码块/引用：与父级内容对齐，避免顶格 */
+.markdown-body li > pre,
+.markdown-body li > blockquote {
+  margin: 0.5em 0;
+}
+
+/* 任务列表：只读复选框 + 与文字基线对齐 */
+.markdown-body .contains-task-list {
+  padding-left: 1.1em;
+  list-style: none;
+}
+
+.markdown-body .task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.markdown-body .task-list-item-checkbox {
+  margin-top: 0.42em;
+  accent-color: var(--desk-primary);
 }
 
 .markdown-body a {
@@ -157,8 +260,16 @@ body.resizing-vertical {
   text-decoration: underline;
 }
 
+/* 外链标记：提示将在系统浏览器中打开 */
+.markdown-body a.md-link-external::after {
+  content: '↗';
+  margin-left: 2px;
+  font-size: 0.8em;
+  color: var(--desk-text-tertiary);
+}
+
 .markdown-body code {
-  font-family: 'JetBrains Mono', 'SFMono-Regular', ui-monospace, 'Cascadia Code', Menlo, Consolas,
+  font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, 'Cascadia Code',
     'Liberation Mono', monospace;
   font-size: 0.88em;
   background: var(--desk-code-inline-bg);
@@ -173,9 +284,12 @@ body.resizing-vertical {
   border: 1px solid var(--desk-code-border);
   padding: 14px 16px;
   border-radius: var(--desk-radius-sm);
-  overflow-x: auto;
+  overflow: auto;
   margin: 0.8em 0;
   line-height: 1.65;
+  /* 超长代码块默认限高，由头部「展开」按钮切换 */
+  max-height: 480px;
+  tab-size: 2;
 }
 
 .markdown-body pre code {
@@ -188,22 +302,116 @@ body.resizing-vertical {
 
 .markdown-body blockquote {
   margin: 0.8em 0;
-  padding: 0.2em 1em;
-  border-left: 3px solid var(--desk-border);
+  padding: 0.3em 1em;
+  border-left: 3px solid var(--desk-border-strong);
+  border-radius: 0 var(--desk-radius-sm) var(--desk-radius-sm) 0;
+  background: var(--desk-panel-bg);
   color: var(--desk-text-secondary);
+}
+
+.markdown-body blockquote > :first-child {
+  margin-top: 0.2em;
+}
+
+.markdown-body blockquote > :last-child {
+  margin-bottom: 0.2em;
+}
+
+.markdown-body hr {
+  height: 0;
+  margin: 1.1em 0;
+  border: none;
+  border-top: 1px solid var(--desk-border);
+}
+
+/* 表格：外层横向滚动，宽表不撑破对话区；对齐由 markdown-it 行内样式决定 */
+.markdown-body .md-table-wrap {
+  margin: 0.8em 0;
+  overflow-x: auto;
+  border: 1px solid var(--desk-border);
+  border-radius: var(--desk-radius-sm);
 }
 
 .markdown-body table {
   border-collapse: collapse;
-  margin: 0.8em 0;
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  font-size: 13px;
 }
 
 .markdown-body th,
 .markdown-body td {
   border: 1px solid var(--desk-border);
   padding: 6px 10px;
-  text-align: left;
+  text-align: start;
+}
+
+.markdown-body th {
+  background: var(--desk-panel-bg);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.markdown-body tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--desk-panel-bg) 55%, transparent);
+}
+
+/* 脚注 */
+.markdown-body .footnotes-sep {
+  margin: 1.2em 0 0.6em;
+}
+
+.markdown-body .footnotes {
+  font-size: 12.5px;
+  color: var(--desk-text-secondary);
+}
+
+.markdown-body .footnotes-list {
+  padding-left: 1.2em;
+}
+
+/* 公式：块级公式可横向滚动，避免宽公式溢出 */
+.markdown-body .katex {
+  font-size: 1.05em;
+}
+
+.markdown-body .katex-display {
+  margin: 0.8em 0;
+  padding: 2px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* 行内代码语义标签 */
+.markdown-body kbd {
+  padding: 1px 5px;
+  border: 1px solid var(--desk-border-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--desk-panel-bg);
+  font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+}
+
+.markdown-body mark {
+  padding: 0 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--code-yellow) 30%, transparent);
+  color: inherit;
+}
+
+/* 折叠块：Markdown 原始 HTML 中的 details/summary（已由消毒白名单放行） */
+.markdown-body details {
+  margin: 0.6em 0;
+  padding: 0.4em 0.8em;
+  border: 1px solid var(--desk-border);
+  border-radius: var(--desk-radius-sm);
+}
+
+.markdown-body summary {
+  cursor: pointer;
+  font-weight: 600;
 }
 
 /* --- 代码高亮（GitHub 主题）：聊天代码块与文件编辑器共用同一套 token 配色 --- */
@@ -278,6 +486,20 @@ body.resizing-vertical {
   font-weight: 700;
 }
 
+/* 补充 token：对象属性 / 常量 / 标签 / 转义字符，避免回落为正文色 */
+.hljs-property,
+.hljs-variable.constant_ {
+  color: var(--code-blue);
+}
+
+.hljs-tag {
+  color: var(--code-green);
+}
+
+.hljs-char.escape_ {
+  color: var(--code-orange);
+}
+
 .hljs-bullet {
   color: var(--code-yellow);
 }
@@ -326,7 +548,15 @@ body.resizing-vertical {
   text-transform: lowercase;
 }
 
-.markdown-body .code-copy {
+.markdown-body .code-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.markdown-body .code-copy,
+.markdown-body .code-expand,
+.markdown-body .code-wrap {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -343,7 +573,9 @@ body.resizing-vertical {
     color 0.15s ease;
 }
 
-.markdown-body .code-copy:hover {
+.markdown-body .code-copy:hover,
+.markdown-body .code-expand:hover,
+.markdown-body .code-wrap:hover {
   background: var(--desk-primary-soft);
   color: var(--desk-text);
 }
@@ -358,6 +590,17 @@ body.resizing-vertical {
   border: none;
   border-radius: 0;
   background: transparent;
+}
+
+/* 展开后解除限高，按内容完整展示 */
+.markdown-body .code-block.is-expanded pre {
+  max-height: none;
+}
+
+/* 自动换行：长单行内容按容器宽度折行 */
+.markdown-body .code-block.is-wrapped pre {
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .markdown-body .code-block pre code {

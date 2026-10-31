@@ -229,13 +229,20 @@ export function createTerminal(input: TerminalCreateInput): TerminalDTO {
   const shellLaunch = prepareRuntimeShell(shell)
   Object.assign(env, shellLaunch.env)
 
-  const ptyProcess = pty.spawn(shell, shellLaunch.args, {
-    name: 'xterm-256color',
-    cols,
-    rows,
-    cwd,
-    env
-  })
+  let ptyProcess: IPty
+  try {
+    ptyProcess = pty.spawn(shell, shellLaunch.args, {
+      name: 'xterm-256color',
+      cols,
+      rows,
+      cwd,
+      env
+    })
+  } catch (error) {
+    /* posix_spawnp failed 多由 spawn-helper 缺少可执行权限或 Shell 路径失效导致 */
+    const detail = (error as Error).message || '未知错误'
+    throw new Error(`终端启动失败（${shell}）：${detail}`)
+  }
 
   const session: TerminalSession = {
     id,

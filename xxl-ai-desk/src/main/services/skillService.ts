@@ -219,6 +219,7 @@ export function getSkillDetail(id: string): SkillDetail {
   const dir = getSkillDir(id)
   return {
     ...dto,
+    dir,
     content: readSkillContentChunk(dir),
     files: listSkillFiles(dir)
   }

@@ -2,7 +2,9 @@
 /*
  * 右侧「文件」面板：左为项目目录文件树，右为选中文件内容（可编辑代码 / 预览）。
  * 顶部提供保存、预览切换、打开（左半默认应用打开 / 右半打开方式下拉）与「打开所在文件夹」。
- * 文件树状态由 useProjectFileTree 维护，查看器由 FileViewer 渲染。
+ * 文件树支持右键菜单：默认应用打开 / 打开所在文件夹 / 复制路径 / 删除（移入废纸篓）。
+ * 查看器支持 Markdown / 图片 / 视频 / 音频预览。
+ * 文件树状态由 useProjectFileTree 维护，查看器由 FileViewer 渲染，右键菜单由 FileContextMenu 渲染。
  * @author xuxueli 2026-10-18
  */
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -14,6 +16,7 @@ import { normalizePath, parentDir } from '../../utils/path'
 import FileToolbar from './FileToolbar.vue'
 import FileViewer from './FileViewer.vue'
 import FileTreePanel from './FileTreePanel.vue'
+import FileContextMenu from './FileContextMenu.vue'
 import type { FileContent, FsEntry, OpenWithApp } from '@shared/ipc'
 
 const props = defineProps<{ sessionId: string; root?: string; projectName?: string }>()
@@ -41,6 +44,9 @@ const saving = ref(false)
 
 /* 本机可用「打开方式」应用（macOS 探测常见编辑器） */
 const openApps = ref<OpenWithApp[]>([])
+
+/* 右键菜单：可见态、鼠标位置与目标文件（菜单动作只针对该文件） */
+const contextMenu = ref({ visible: false, x: 0, y: 0, path: '', name: '' })
 
 /* 文件变更监听解绑函数 */
 let offFsChange: (() => void) | null = null
@@ -79,16 +85,26 @@ function extOf(name: string): string {
 
 /* 可预览图片扩展名 */
 const IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']
+/* 可预览视频扩展名（Chromium 原生支持的主流容器） */
+const VIDEO_EXTS = ['.mp4', '.m4v', '.webm', '.ogv', '.mov']
+/* 可预览音频扩展名 */
+const AUDIO_EXTS = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac']
 
 /* 是否为可预览的图片文件 */
 function isImageName(name: string): boolean {
   return IMAGE_EXTS.includes(extOf(name))
 }
 
-/* 当前文件的图片 / Markdown 判定、是否可预览、预览是否生效 */
+/* 当前文件的图片 / Markdown / 音视频判定、是否可预览、预览是否生效 */
 const isImage = computed(() => Boolean(file.value) && isImageName(file.value?.name ?? ''))
 const isMarkdown = computed(
   () => Boolean(file.value) && ['.md', '.markdown'].includes(extOf(file.value?.name ?? ''))
+)
+const isVideo = computed(
+  () => Boolean(file.value) && VIDEO_EXTS.includes(extOf(file.value?.name ?? ''))
+)
+const isAudio = computed(
+  () => Boolean(file.value) && AUDIO_EXTS.includes(extOf(file.value?.name ?? ''))
 )
 const canPreview = computed(() => isImage.value || isMarkdown.value)
 const showPreview = computed(() => preview.value && canPreview.value)
@@ -97,6 +113,17 @@ const showPreview = computed(() => preview.value && canPreview.value)
 const editable = computed(() => Boolean(file.value) && !file.value?.binary && !file.value?.truncated)
 /* 有未保存修改 */
 const dirty = computed(() => editable.value && draft.value !== original.value)
+
+/* 清空当前文件选择与内容（根目录切换 / 文件被删除时） */
+function clearSelection(): void {
+  selected.value = null
+  fileState.value.selectedPath = ''
+  file.value = null
+  fileError.value = ''
+  preview.value = false
+  original.value = ''
+  draft.value = ''
+}
 
 /* 选中的文件在磁盘上变化（或被删除）时回读；编辑中（dirty）不覆盖 */
 async function refreshSelected(): Promise<void> {
@@ -112,20 +139,19 @@ async function refreshSelected(): Promise<void> {
     draft.value = loaded.content
   } catch {
     /* 文件已被删除：清空内容 */
-    selected.value = null
-    fileState.value.selectedPath = ''
-    file.value = null
-    fileError.value = ''
-    original.value = ''
-    draft.value = ''
+    clearSelection()
   }
 }
 
-/* 选中文件并加载内容（有未保存修改时先确认） */
-async function select(entry: FsEntry): Promise<void> {
+/* 选中文件并加载内容（有未保存修改时先确认）；返回是否完成选中 */
+async function select(entry: FsEntry): Promise<boolean> {
   const root = props.root
   if (!root) {
-    return
+    return false
+  }
+  /* 重复选中当前文件：保留编辑内容，不再触发未保存确认 */
+  if (selected.value?.path === entry.path && file.value) {
+    return true
   }
   if (dirty.value) {
     try {
@@ -136,7 +162,7 @@ async function select(entry: FsEntry): Promise<void> {
       })
     } catch {
       /* 取消切换 */
-      return
+      return false
     }
   }
   selected.value = entry
@@ -159,6 +185,7 @@ async function select(entry: FsEntry): Promise<void> {
   } finally {
     fileLoading.value = false
   }
+  return true
 }
 
 /* 保存编辑内容到磁盘 */
@@ -188,13 +215,7 @@ async function save(): Promise<void> {
 watch(
   () => props.root,
   () => {
-    selected.value = null
-    fileState.value.selectedPath = ''
-    file.value = null
-    fileError.value = ''
-    preview.value = false
-    original.value = ''
-    draft.value = ''
+    clearSelection()
   }
 )
 
@@ -221,13 +242,22 @@ function revealFolder(): void {
   }
 }
 
-/* 复制文件绝对路径 */
+/* 复制指定路径到剪贴板（工具栏与右键菜单共用） */
+async function copyToClipboard(path: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(path)
+    ElMessage.success(t('panel.copied'))
+  } catch {
+    ElMessage.error(t('common.copyFailed'))
+  }
+}
+
+/* 复制当前文件绝对路径 */
 async function copyPath(): Promise<void> {
   if (!file.value) {
     return
   }
-  await navigator.clipboard.writeText(file.value.path)
-  ElMessage.success(t('panel.copied'))
+  await copyToClipboard(file.value.path)
 }
 
 /* 直接以系统默认应用打开当前文件（「打开」按钮左半区） */
@@ -251,6 +281,70 @@ function onOpenCommand(command: string): void {
     void copyPath()
   } else if (command.startsWith('app:')) {
     void api.shell.openWith(command.slice(4), file.value.path)
+  }
+}
+
+/* 右键文件：先选中（保留未保存修改确认），再按鼠标位置展示菜单 */
+async function openContextMenu(
+  entry: FsEntry,
+  position: { x: number; y: number }
+): Promise<void> {
+  if (!props.root || entry.isDir) {
+    return
+  }
+  const selectedOk = await select(entry)
+  if (!selectedOk) {
+    return
+  }
+  contextMenu.value = {
+    visible: true,
+    x: position.x,
+    y: position.y,
+    path: entry.path,
+    name: entry.name
+  }
+}
+
+/* 右键菜单：默认应用打开 */
+function menuOpenDefault(): void {
+  void api.shell.openPath(contextMenu.value.path)
+}
+
+/* 右键菜单：在文件管理器中显示 */
+function menuReveal(): void {
+  void api.shell.reveal(contextMenu.value.path)
+}
+
+/* 右键菜单：复制文件路径 */
+async function menuCopyPath(): Promise<void> {
+  await copyToClipboard(contextMenu.value.path)
+}
+
+/* 右键菜单：删除文件（移入系统废纸篓，操作前二次确认） */
+async function menuRemove(): Promise<void> {
+  const root = props.root
+  if (!root) {
+    return
+  }
+  const { path, name } = contextMenu.value
+  try {
+    await ElMessageBox.confirm(t('panel.deleteConfirm', [name]), t('panel.deleteTitle'), {
+      type: 'warning',
+      confirmButtonText: t('common.delete'),
+      cancelButtonText: t('common.cancel')
+    })
+  } catch {
+    return
+  }
+  try {
+    await api.fs.trash(root, path)
+    ElMessage.success(t('common.deleted'))
+    /* 删除的是当前文件：清空查看器，避免残留已删除内容 */
+    if (selected.value?.path === path) {
+      clearSelection()
+    }
+  } catch (error) {
+    ElMessage.error((error as Error).message || t('panel.deleteFail'))
   }
 }
 </script>
@@ -281,6 +375,7 @@ function onOpenCommand(command: string): void {
         :root="root"
         :selected-path="selected?.path ?? ''"
         @select="select"
+        @context-menu="openContextMenu"
       />
 
       <!-- 右：文件内容 -->
@@ -294,10 +389,23 @@ function onOpenCommand(command: string): void {
         :show-preview="showPreview"
         :is-image="isImage"
         :is-markdown="isMarkdown"
+        :is-video="isVideo"
+        :is-audio="isAudio"
         :saving="saving"
         @save="save"
       />
     </div>
+
+    <!-- 右键菜单：定位到鼠标位置，动作针对被右键的文件 -->
+    <FileContextMenu
+      v-model:visible="contextMenu.visible"
+      :x="contextMenu.x"
+      :y="contextMenu.y"
+      @open="menuOpenDefault"
+      @reveal="menuReveal"
+      @copy="menuCopyPath"
+      @remove="menuRemove"
+    />
   </div>
 </template>
 
