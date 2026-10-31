@@ -35,8 +35,8 @@ export type HostEvent =
   | { type: 'done' } /* 本轮完成 */
   | { type: 'error'; message: string } /* 出错（结束） */
 
-/* 越界访问动作类型（文案区分用） */
-export type PathAction = 'read' | 'write'
+/* 越界访问动作类型（文案区分用）：command 表示 shell 命令访问目录外路径 */
+export type PathAction = 'read' | 'write' | 'command'
 
 /* 越界审批结果：允许本次 / 本会话允许 / 拒绝 */
 export type ApprovalChoice = 'once' | 'session' | 'deny'

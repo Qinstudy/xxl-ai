@@ -5,11 +5,14 @@
  *   - 失败：MCP 用 result.isError 表达工具失败，协议/网络错误包装为工具错误；
  *   - 模式：Build 全量注册，Plan 仅注册 readOnlyHint 工具；
  *   - 单服务连接失败仅跳过该服务，不影响本轮对话。
+ *
+ * @author xuxueli 2026-10-31
  */
 
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import log from 'electron-log/main'
 import type { ChatMode, McpRuntimeConfig } from '@shared/ipc'
+import { translate } from '@shared/i18n'
 import {
   ASSEMBLY_CONNECT_TIMEOUT,
   callMcpTool,
@@ -18,6 +21,32 @@ import {
 } from './client'
 import { buildToolName, uniqueToolName } from './naming'
 
+/* 工具结果详情：图片只保留类型与大小，避免 base64 落库膨胀 */
+function buildToolDetails(
+  server: McpRuntimeConfig,
+  toolName: string,
+  result: { isError?: boolean; content?: unknown[]; structuredContent?: unknown }
+): Record<string, unknown> {
+  const blocks = (result.content ?? []).map((block) => {
+    const item = block as { type?: string; mimeType?: string; data?: string }
+    if (item.type === 'image') {
+      return {
+        type: 'image',
+        mimeType: item.mimeType ?? '',
+        bytes: item.data ? Math.floor(item.data.length * 0.75) : 0
+      }
+    }
+    return block
+  })
+  return {
+    server: server.name,
+    tool: toolName,
+    isError: result.isError === true,
+    content: blocks,
+    structuredContent: result.structuredContent
+  }
+}
+
 /*
  * 构建 MCP 工具集合：逐个服务连接并列举工具，失败服务跳过。
  * 复用运行时连接缓存，连接与工具列表在会话间共享。
@@ -25,6 +54,8 @@ import { buildToolName, uniqueToolName } from './naming'
 export async function createMcpTools(options: {
   servers: McpRuntimeConfig[]
   mode: ChatMode
+  /* 应用语言：工具错误文案使用对应语言 */
+  language: 'zh' | 'en'
   runtimePath: string
   /* 会话是否已被终止：创建阶段提前跳出，避免终止后仍等待连接 */
   isAborted?: () => boolean
@@ -98,14 +129,18 @@ export async function createMcpTools(options: {
             /* Pi 推荐：MCP 失败通过 isError 透传，内容统一走 toLlmContent */
             return {
               content: mcp.toLlmContent(result),
-              details: undefined,
+              details: buildToolDetails(server, tool.name, result),
               isError: result.isError === true
             }
           } catch (error) {
             /* 用户终止：给出明确结果，避免被误判为服务异常 */
             const message = signal?.aborted
-              ? `[已终止] MCP 工具调用被用户终止（${server.name}/${tool.name}）`
-              : `MCP 工具调用失败（${server.name}/${tool.name}）：${(error as Error).message}`
+              ? translate(options.language, 'runtime.tool.mcpAborted', [server.name, tool.name])
+              : translate(options.language, 'runtime.tool.mcpFailed', [
+                  server.name,
+                  tool.name,
+                  (error as Error).message
+                ])
             return {
               content: [{ type: 'text' as const, text: message }],
               details: undefined,

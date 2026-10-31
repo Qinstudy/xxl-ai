@@ -1,6 +1,10 @@
 /*
  * 工具调用的展示视图：把底层工具名与原始参数翻译成人话，
  * 让每一步执行都能在时间线上被看懂（做了什么、对谁做）。
+ *
+ * 单一元数据表同时维护标题、图标与参数摘要，新增内置工具只需在此登记一次。
+ *
+ * @author xuxueli 2026-10-31
  */
 
 import { t } from '@renderer/i18n'
@@ -16,48 +20,14 @@ export interface ToolView {
   detail: string
 }
 
-/* 工具名 → 标题文案 key */
-const TOOL_TITLE_KEYS: Record<string, string> = {
-  read_file: 'readFile',
-  write_file: 'writeFile',
-  edit_file: 'editFile',
-  list_directory: 'listDir',
-  glob_files: 'glob',
-  search_files: 'search',
-  run_command: 'command',
-  get_current_time: 'time',
-  open_browser: 'openBrowser',
-  read_browser: 'readBrowser',
-  read_skill: 'readSkill',
-  snapshot_browser: 'snapshotBrowser',
-  click_browser: 'clickBrowser',
-  fill_browser: 'fillBrowser',
-  wait_browser: 'waitBrowser',
-  screenshot_browser: 'screenshotBrowser',
-  inspect_browser: 'inspectBrowser',
-  browser_tabs: 'browserTabs'
-}
+/* 工具参数（模型生成的 JSON 对象） */
+type ToolArgs = Record<string, unknown>
 
-/* 工具名 → 图标组件名 */
-const TOOL_ICONS: Record<string, string> = {
-  read_file: 'Document',
-  write_file: 'DocumentAdd',
-  edit_file: 'EditPen',
-  list_directory: 'Folder',
-  glob_files: 'Search',
-  search_files: 'Search',
-  run_command: 'Monitor',
-  get_current_time: 'Clock',
-  read_skill: 'Reading',
-  open_browser: 'Link',
-  read_browser: 'View',
-  snapshot_browser: 'Document',
-  click_browser: 'SetUp',
-  fill_browser: 'EditPen',
-  wait_browser: 'Clock',
-  screenshot_browser: 'Monitor',
-  inspect_browser: 'WarningFilled',
-  browser_tabs: 'FolderOpened'
+/* 展示元信息：标题文案 key、图标组件名与参数摘要生成器 */
+interface ToolViewMeta {
+  titleKey: string
+  icon: string
+  detail: (args: ToolArgs) => string
 }
 
 /* 参数摘要过长时截断，避免撑破单行 */
@@ -65,76 +35,120 @@ function clip(value: string, max = 72): string {
   return value.length > max ? `${value.slice(0, max)}…` : value
 }
 
-/* 从工具参数中提取最能说明意图的关键字段 */
-function detailOf(name: string, args: unknown): string {
-  if (!args || typeof args !== 'object') {
-    return ''
-  }
-  const record = args as Record<string, unknown>
-  /* 读取字符串格式的参数值，非字符串返回空串 */
-  const pick = (key: string): string => (typeof record[key] === 'string' ? (record[key] as string) : '')
-  switch (name) {
-    case 'read_file':
-    case 'write_file':
-    case 'edit_file':
-    case 'list_directory':
-      return clip(pick('path'))
-    case 'glob_files':
-      return clip(pick('pattern'))
-    case 'search_files': {
-      const pattern = pick('pattern')
-      const include = pick('include')
+/* 读取字符串参数，非字符串返回空串 */
+function pick(args: ToolArgs, key: string): string {
+  return typeof args[key] === 'string' ? (args[key] as string) : ''
+}
+
+/* 路径类参数摘要：优先取主字段，多个字段用箭头连接 */
+function pathDetail(args: ToolArgs, key = 'path'): string {
+  return clip(pick(args, key))
+}
+
+/* 元素定位摘要：ref 优先，selector 兜底 */
+function targetDetail(args: ToolArgs): string {
+  return clip(pick(args, 'ref') || pick(args, 'selector'))
+}
+
+/* 工具名 → 展示元信息（顺序即维护顺序） */
+const TOOL_VIEWS: Record<string, ToolViewMeta> = {
+  read_file: { titleKey: 'readFile', icon: 'Document', detail: (args) => pathDetail(args) },
+  write_file: { titleKey: 'writeFile', icon: 'DocumentAdd', detail: (args) => pathDetail(args) },
+  edit_file: { titleKey: 'editFile', icon: 'EditPen', detail: (args) => pathDetail(args) },
+  delete_file: { titleKey: 'deleteFile', icon: 'Delete', detail: (args) => pathDetail(args) },
+  move_file: {
+    titleKey: 'moveFile',
+    icon: 'FolderOpened',
+    detail: (args) => {
+      const from = pick(args, 'from')
+      const to = pick(args, 'to')
+      return clip(from && to ? `${from} → ${to}` : from || to)
+    }
+  },
+  list_directory: { titleKey: 'listDir', icon: 'Folder', detail: (args) => pathDetail(args) },
+  glob_files: { titleKey: 'glob', icon: 'Search', detail: (args) => clip(pick(args, 'pattern')) },
+  search_files: {
+    titleKey: 'search',
+    icon: 'Search',
+    detail: (args) => {
+      const pattern = pick(args, 'pattern')
+      const include = pick(args, 'include')
       return clip(include ? `${pattern}  (${include})` : pattern)
     }
-    case 'get_current_time':
-      return clip(pick('timezone'))
-    case 'read_skill':
-      return clip(pick('name') + (pick('path') ? ` / ${pick('path')}` : ''))
-    case 'run_command':
-      return clip(pick('command'))
-    case 'open_browser':
-      return clip(pick('url') || pick('action'))
-    case 'read_browser':
-      return clip(pick('selector'))
-    case 'snapshot_browser':
-      return ''
-    case 'click_browser':
-      return clip(pick('ref') || pick('selector'))
-    case 'fill_browser': {
-      const fields = Array.isArray(record.fields) ? record.fields.length : 0
+  },
+  run_command: { titleKey: 'command', icon: 'Monitor', detail: (args) => clip(pick(args, 'command')) },
+  get_current_time: { titleKey: 'time', icon: 'Clock', detail: (args) => clip(pick(args, 'timezone')) },
+  read_skill: {
+    titleKey: 'readSkill',
+    icon: 'Reading',
+    detail: (args) => clip(pick(args, 'name') + (pick(args, 'path') ? ` / ${pick(args, 'path')}` : ''))
+  },
+  open_browser: {
+    titleKey: 'openBrowser',
+    icon: 'Link',
+    detail: (args) => clip(pick(args, 'url') || pick(args, 'action'))
+  },
+  read_browser: { titleKey: 'readBrowser', icon: 'View', detail: (args) => clip(pick(args, 'selector')) },
+  snapshot_browser: { titleKey: 'snapshotBrowser', icon: 'Document', detail: () => '' },
+  click_browser: { titleKey: 'clickBrowser', icon: 'SetUp', detail: targetDetail },
+  fill_browser: {
+    titleKey: 'fillBrowser',
+    icon: 'EditPen',
+    detail: (args) => {
+      const fields = Array.isArray(args.fields) ? args.fields.length : 0
       return fields > 0 ? t('chat.toolFields', [fields]) : ''
     }
-    case 'wait_browser':
-      return clip(pick('selector') || pick('text') || pick('url'))
-    case 'screenshot_browser':
-      return ''
-    case 'inspect_browser':
-      return ''
-    case 'browser_tabs':
-      return clip(pick('operation') === 'list' ? 'list' : `${pick('operation')} ${pick('tab_id')}`)
-    default:
-      return ''
+  },
+  hover_browser: { titleKey: 'hoverBrowser', icon: 'View', detail: targetDetail },
+  press_browser: { titleKey: 'pressBrowser', icon: 'EditPen', detail: (args) => clip(pick(args, 'key')) },
+  select_browser: {
+    titleKey: 'selectBrowser',
+    icon: 'Finished',
+    detail: (args) => {
+      const target = pick(args, 'ref') || pick(args, 'selector')
+      const value = pick(args, 'value')
+      return clip(value ? `${target} = ${value}` : target)
+    }
+  },
+  scroll_browser: {
+    titleKey: 'scrollBrowser',
+    icon: 'ArrowDown',
+    detail: (args) => clip(pick(args, 'direction'))
+  },
+  wait_browser: {
+    titleKey: 'waitBrowser',
+    icon: 'Clock',
+    detail: (args) => clip(pick(args, 'selector') || pick(args, 'text') || pick(args, 'url'))
+  },
+  screenshot_browser: { titleKey: 'screenshotBrowser', icon: 'Monitor', detail: () => '' },
+  inspect_browser: { titleKey: 'inspectBrowser', icon: 'WarningFilled', detail: () => '' },
+  browser_tabs: {
+    titleKey: 'browserTabs',
+    icon: 'FolderOpened',
+    detail: (args) => {
+      const operation = pick(args, 'operation')
+      return clip(operation === 'list' ? 'list' : `${operation} ${pick(args, 'tab_id')}`)
+    }
   }
 }
 
 /* 生成工具调用的展示视图 */
 export function toolView(tool: ToolCallState): ToolView {
-  const key = TOOL_TITLE_KEYS[tool.name]
+  const meta = TOOL_VIEWS[tool.name]
   /* MCP 工具：展示「MCP 工具」标题，详情给出原始工具标识 */
-  if (!key && tool.name.startsWith('mcp_')) {
+  if (!meta && tool.name.startsWith('mcp_')) {
     return {
-      icon: TOOL_ICONS[tool.name] ?? 'Connection',
+      icon: 'Connection',
       title: t('chat.tool.mcp'),
       detail: clip(tool.name.slice(4).replace(/_/g, ' / '))
     }
   }
+  const args = (tool.args ?? {}) as ToolArgs
   /* 未知工具回退为原始工具名，再回退通用标题 */
-  const title = key ? t(`chat.tool.${key}`) : tool.name || t('chat.tool.generic')
   return {
-    /* 未知工具使用通用图标 */
-    icon: TOOL_ICONS[tool.name] ?? 'Tools',
-    title,
-    detail: detailOf(tool.name, tool.args)
+    icon: meta?.icon ?? 'Tools',
+    title: meta ? t(`chat.tool.${meta.titleKey}`) : tool.name || t('chat.tool.generic'),
+    detail: meta ? meta.detail(args) : ''
   }
 }
 

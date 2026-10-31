@@ -24,6 +24,8 @@ export interface AgentRuntimeOptions {
   /* 对话模式（plan 只读 / build 读写）与项目根目录（文件沙箱边界） */
   mode: ChatMode
   rootDir: string
+  /* 应用语言：工具错误与摘要文案使用对应语言 */
+  language: AppLanguage
   /* 运行时 PATH（MCP stdio 与 run_command 共用） */
   runtimePath: string
   /* 已生效的 MCP 服务配置 */
@@ -161,6 +163,7 @@ async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
     mode: options.mode,
     rootDir: options.rootDir,
     sessionId: options.sessionId,
+    language: options.language,
     skills: options.skills,
     browserToolsEnabled: options.browserToolsEnabled,
     generalToolsEnabled: options.generalToolsEnabled
@@ -170,6 +173,7 @@ async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
   const mcpTask = createMcpTools({
     servers: options.mcpServers,
     mode: options.mode,
+    language: options.language,
     runtimePath: options.runtimePath,
     isAborted: options.isAborted
   })

@@ -3,7 +3,7 @@
  *   - 目录内：直接放行；
  *   - 软件数据目录下的 SKILL 内容：只读放行（技能是用户主动安装的可信资料，不打断会话）；
  *   - 目录外：拦截并转交主进程弹应用内对话框人工确认（允许本次 / 本会话允许 / 拒绝），
- *     「本会话允许」记入会话级白名单，后续同路径不再重复询问。
+ *     「本会话允许」记入会话级信任，本会话内后续越界访问不再重复询问。
  * 路径解析对符号链接做归一化，避免用软链接绕过目录限制。
  *
  * 本模块运行在 Agent 运行时进程（utilityProcess）内，不直接依赖 Electron：
@@ -12,6 +12,7 @@
 
 import { canonicalize, isWithinRoot, resolveTarget } from '../../utils/pathGuard'
 import type { ApprovalChoice, ApprovalRequest, PathAction } from '@shared/agentProtocol'
+import { translate } from '@shared/i18n'
 
 /* 越界访问的动作类型（文案区分用） */
 export type { PathAction }
@@ -25,12 +26,12 @@ export function setApprovalRequester(requester: ApprovalRequester | null): void 
   approvalRequester = requester
 }
 
-/* 会话级越界白名单：sessionId → 已允许的规范化绝对路径集合 */
-const sessionAllowed = new Map<string, Set<string>>()
+/* 会话级越界放行：用户在弹窗选择「本会话允许」后，该会话内所有越界访问不再询问 */
+const sessionTrusted = new Set<string>()
 
-/* 清理会话的越界白名单（删除/清空会话时调用） */
+/* 清理会话的越界放行状态（删除/清空会话时调用） */
 export function clearSessionPermissions(sessionId: string): void {
-  sessionAllowed.delete(sessionId)
+  sessionTrusted.delete(sessionId)
 }
 
 /* 请求越界审批：转交主进程弹原生对话框；未注册或异常时按拒绝处理 */
@@ -45,6 +46,13 @@ async function requestApproval(request: ApprovalRequest): Promise<ApprovalChoice
   }
 }
 
+/* 判断目标是否越界：越界返回规范化绝对路径，目录内返回 null（供 shell 等自定义路径识别复用） */
+export function outsidePath(rootDir: string, target: string): string | null {
+  const root = canonicalize(rootDir)
+  const abs = canonicalize(target)
+  return isWithinRoot(root, abs) ? null : abs
+}
+
 /*
  * 目录内直接放行的判定与越界确认：
  *   返回 allowed=false 时，reason 为可直接回填给模型的拦截说明。
@@ -55,6 +63,8 @@ export async function guardPath(options: {
   target?: string
   action: PathAction
   tool: string
+  /* 应用语言：拦截文案使用对应语言 */
+  language?: string
   /* 只读放行目录（如已启用技能目录）：读取越界到这些目录时直接放行 */
   readRoots?: string[]
 }): Promise<{ allowed: boolean; abs: string; reason?: string }> {
@@ -70,8 +80,8 @@ export async function guardPath(options: {
   ) {
     return { allowed: true, abs }
   }
-  /* 会话级白名单命中：不再重复询问 */
-  if (sessionAllowed.get(options.sessionId)?.has(abs)) {
+  /* 会话已授权全部越界访问：不再重复询问 */
+  if (sessionTrusted.has(options.sessionId)) {
     return { allowed: true, abs }
   }
   const choice = await requestApproval({
@@ -82,9 +92,7 @@ export async function guardPath(options: {
     root: options.rootDir
   })
   if (choice === 'session') {
-    const set = sessionAllowed.get(options.sessionId) ?? new Set<string>()
-    set.add(abs)
-    sessionAllowed.set(options.sessionId, set)
+    sessionTrusted.add(options.sessionId)
     return { allowed: true, abs }
   }
   if (choice === 'once') {
@@ -93,6 +101,14 @@ export async function guardPath(options: {
   return {
     allowed: false,
     abs,
-    reason: `已拦截：路径「${abs}」超出项目目录「${options.rootDir}」，用户拒绝本次${options.action === 'write' ? '写入' : '读取'}操作。`
+    reason: translate(options.language ?? 'zh', 'runtime.tool.pathDenied', [
+      abs,
+      options.rootDir,
+      options.action === 'write'
+        ? translate(options.language ?? 'zh', 'runtime.tool.actionWrite')
+        : options.action === 'command'
+          ? translate(options.language ?? 'zh', 'runtime.tool.actionCommand')
+          : translate(options.language ?? 'zh', 'runtime.tool.actionRead')
+    ])
   }
 }

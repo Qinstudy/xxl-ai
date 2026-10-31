@@ -7,21 +7,29 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { promises as fs } from 'fs'
 import { isAbsolute, relative, resolve } from 'path'
-import { ALL_MODES, describe, text, toolError, type ToolContext, type ToolEntry } from './shared'
+import { ALL_MODES, describe, text, toolError, tr, type ToolContext, type ToolEntry } from './shared'
 import type { SkillRuntimeConfig } from '@shared/ipc'
+import { translate } from '@shared/i18n'
 
 /* 解析技能文件：归一化真实路径并限制在技能目录内 */
-async function resolveSkillFile(skill: SkillRuntimeConfig, relativePath: string): Promise<string> {
+async function resolveSkillFile(
+  skill: SkillRuntimeConfig,
+  relativePath: string,
+  language: string
+): Promise<string> {
+  const deny = (): never => {
+    throw new Error(translate(language, 'runtime.tool.skillPathDenied'))
+  }
   const root = await fs.realpath(skill.dir)
   const target = resolve(root, relativePath)
   const rel = relative(root, target)
   if (!rel || rel.startsWith('..') || isAbsolute(rel)) {
-    throw new Error('仅可读取当前技能目录内的文件')
+    deny()
   }
   const real = await fs.realpath(target)
   const realRel = relative(root, real)
   if (realRel.startsWith('..') || isAbsolute(realRel)) {
-    throw new Error('仅可读取当前技能目录内的文件')
+    deny()
   }
   return real
 }
@@ -61,15 +69,15 @@ export async function createSkillTools(context: ToolContext): Promise<ToolEntry[
       const skill = findSkill(name)
       if (!skill) {
         const available = skills.map((item) => item.name).join('、')
-        return toolError(`未找到技能「${name}」。当前可用技能：${available || '无'}`)
+        return toolError(tr(context, 'runtime.tool.skillNotFound', [name, available || '-']))
       }
       const relativePath = (path ?? '').trim() || 'SKILL.md'
       try {
-        const file = await resolveSkillFile(skill, relativePath)
+        const file = await resolveSkillFile(skill, relativePath, context.language)
         const buffer = await fs.readFile(file)
         /* 含 NUL 视为二进制，避免把乱码写入上下文 */
         if (buffer.includes(0)) {
-          return toolError(`技能文件「${relativePath}」为二进制文件，无法读取`)
+          return toolError(tr(context, 'runtime.tool.skillBinary', [relativePath]))
         }
         const content = buffer.toString('utf-8')
         return text(
@@ -77,7 +85,7 @@ export async function createSkillTools(context: ToolContext): Promise<ToolEntry[
           { skill: skill.id, path: relativePath }
         )
       } catch (error) {
-        return toolError(`读取技能文件失败：${(error as Error).message}`)
+        return toolError(tr(context, 'runtime.tool.skillReadFailed', [(error as Error).message]))
       }
     }
   }

@@ -9,8 +9,12 @@ import { t } from '@renderer/i18n'
 import {
   buildClickScript,
   buildFillScript,
+  buildHoverScript,
+  buildPressScript,
   buildProbeScript,
   buildReadScript,
+  buildScrollScript,
+  buildSelectScript,
   buildSnapshotScript
 } from '../utils/browserScripts'
 import {
@@ -239,6 +243,138 @@ export async function fillActiveTab(
     }
   } catch (error) {
     return { ok: false, error: t('chat.browser.fillFailedDetail', [(error as Error).message]) }
+  }
+}
+
+/* 交互动作执行器：统一页面解析与异常包装，具体结果由调用方构造 */
+async function runInteraction<T>(
+  sessionId: string,
+  script: string,
+  errorKey: string
+): Promise<
+  | { ok: true; tab: { id: string; title: string; currentUrl: string }; raw: T }
+  | { ok: false; result: BrowserActionResult }
+> {
+  const page = await resolveActivePage(sessionId)
+  if ('ok' in page) {
+    return { ok: false, result: page }
+  }
+  try {
+    const raw = (await page.view.executeJavaScript(script)) as T
+    return { ok: true, tab: page.tab, raw }
+  } catch (error) {
+    return {
+      ok: false,
+      result: { ok: false, error: t(errorKey, [(error as Error).message]) }
+    }
+  }
+}
+
+/* 悬停元素：派发鼠标移入事件，用于展开悬停菜单 */
+export async function hoverActiveTab(
+  sessionId: string,
+  action: { ref?: string; selector?: string }
+): Promise<BrowserActionResult> {
+  const run = await runInteraction<{ ok?: boolean; error?: string }>(
+    sessionId,
+    buildHoverScript({ ref: action.ref, selector: action.selector }),
+    'chat.browser.hoverFailedDetail'
+  )
+  if (!run.ok) {
+    return run.result
+  }
+  if (!run.raw?.ok) {
+    return {
+      ok: false,
+      error: run.raw?.error === 'missing' ? t('chat.browser.targetMissing') : t('chat.browser.hoverFailed')
+    }
+  }
+  await settlePage(sessionId, run.tab.id, 150)
+  return {
+    ok: true,
+    title: run.tab.title,
+    url: run.tab.currentUrl,
+    summary: t('chat.browser.hovered', [action.ref || action.selector || t('chat.browser.target')])
+  }
+}
+
+/* 按键：向目标元素或当前焦点发送键盘事件 */
+export async function pressActiveTab(
+  sessionId: string,
+  action: { key: string; ref?: string; selector?: string }
+): Promise<BrowserActionResult> {
+  const run = await runInteraction<{ ok?: boolean }>(
+    sessionId,
+    buildPressScript({ key: action.key, ref: action.ref, selector: action.selector }),
+    'chat.browser.pressFailed'
+  )
+  if (!run.ok) {
+    return run.result
+  }
+  if (!run.raw?.ok) {
+    return { ok: false, error: t('chat.browser.targetMissing') }
+  }
+  await settlePage(sessionId, run.tab.id, 150)
+  return {
+    ok: true,
+    title: run.tab.title,
+    url: run.tab.currentUrl,
+    summary: t('chat.browser.pressed', [action.key])
+  }
+}
+
+/* 下拉选择：按 value 或可见文本选中 option */
+export async function selectActiveTab(
+  sessionId: string,
+  action: { ref?: string; selector?: string; value: string }
+): Promise<BrowserActionResult> {
+  const run = await runInteraction<{ ok?: boolean; error?: string; text?: string }>(
+    sessionId,
+    buildSelectScript({ ref: action.ref, selector: action.selector, value: action.value }),
+    'chat.browser.selectFailed'
+  )
+  if (!run.ok) {
+    return run.result
+  }
+  if (!run.raw?.ok) {
+    return {
+      ok: false,
+      error:
+        run.raw?.error === 'option'
+          ? t('chat.browser.optionMissing', [action.value])
+          : t('chat.browser.targetMissing')
+    }
+  }
+  await settlePage(sessionId, run.tab.id, 150)
+  return {
+    ok: true,
+    title: run.tab.title,
+    url: run.tab.currentUrl,
+    summary: t('chat.browser.selected', [run.raw.text || action.value])
+  }
+}
+
+/* 滚动页面：up / down / top / bottom */
+export async function scrollActiveTab(
+  sessionId: string,
+  action: { direction: 'up' | 'down' | 'top' | 'bottom'; amount?: number }
+): Promise<BrowserActionResult> {
+  const run = await runInteraction<{ ok?: boolean; scrollY?: number }>(
+    sessionId,
+    buildScrollScript({ direction: action.direction, amount: action.amount }),
+    'chat.browser.scrollFailedDetail'
+  )
+  if (!run.ok) {
+    return run.result
+  }
+  if (!run.raw?.ok) {
+    return { ok: false, error: t('chat.browser.scrollFailed') }
+  }
+  return {
+    ok: true,
+    title: run.tab.title,
+    url: run.tab.currentUrl,
+    summary: t('chat.browser.scrolled', [String(run.raw.scrollY ?? 0)])
   }
 }
 

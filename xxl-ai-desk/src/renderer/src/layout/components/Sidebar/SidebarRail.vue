@@ -108,7 +108,7 @@ function go(key: SectionKey): void {
 }
 
 .rail-btn.active {
-  background: var(--desk-primary-soft);
-  color: var(--desk-text-secondary);
+  background: var(--desk-selected-bg);
+  color: var(--desk-text);
 }
 </style>

@@ -121,6 +121,22 @@ export const BUILTIN_TOOL_CATALOG: BuiltinToolCatalogItem[] = [
     modes: BUILD_ONLY
   },
   {
+    name: 'delete_file',
+    category: 'fs',
+    titleKey: 'chat.tool.deleteFile',
+    descriptionKey: 'plugin.builtinTool.desc.deleteFile',
+    readOnly: false,
+    modes: BUILD_ONLY
+  },
+  {
+    name: 'move_file',
+    category: 'fs',
+    titleKey: 'chat.tool.moveFile',
+    descriptionKey: 'plugin.builtinTool.desc.moveFile',
+    readOnly: false,
+    modes: BUILD_ONLY
+  },
+  {
     name: 'run_command',
     category: 'shell',
     titleKey: 'chat.tool.command',
@@ -167,6 +183,38 @@ export const BUILTIN_TOOL_CATALOG: BuiltinToolCatalogItem[] = [
     descriptionKey: 'plugin.builtinTool.desc.fillBrowser',
     readOnly: false,
     modes: BUILD_ONLY
+  },
+  {
+    name: 'hover_browser',
+    category: 'browser',
+    titleKey: 'chat.tool.hoverBrowser',
+    descriptionKey: 'plugin.builtinTool.desc.hoverBrowser',
+    readOnly: true,
+    modes: ALL_MODES
+  },
+  {
+    name: 'press_browser',
+    category: 'browser',
+    titleKey: 'chat.tool.pressBrowser',
+    descriptionKey: 'plugin.builtinTool.desc.pressBrowser',
+    readOnly: false,
+    modes: BUILD_ONLY
+  },
+  {
+    name: 'select_browser',
+    category: 'browser',
+    titleKey: 'chat.tool.selectBrowser',
+    descriptionKey: 'plugin.builtinTool.desc.selectBrowser',
+    readOnly: false,
+    modes: BUILD_ONLY
+  },
+  {
+    name: 'scroll_browser',
+    category: 'browser',
+    titleKey: 'chat.tool.scrollBrowser',
+    descriptionKey: 'plugin.builtinTool.desc.scrollBrowser',
+    readOnly: true,
+    modes: ALL_MODES
   },
   {
     name: 'wait_browser',

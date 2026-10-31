@@ -64,7 +64,7 @@ function goHome(): void {
   <header class="desk-topbar" :class="{ mac: settings.platform === 'darwin' }">
     <div class="desk-topbar-left">
       <!-- 首页入口：回到对话模块新建对话页（软件名称左侧） -->
-      <button class="icon-button" :title="t('chat.newChatAction')" @click="goHome">
+      <button class="icon-button home-button" :title="t('chat.newChatAction')" @click="goHome">
         <el-icon><HomeFilled /></el-icon>
       </button>
       <!-- 软件名称：原导航按钮位置 -->
@@ -133,6 +133,11 @@ function goHome(): void {
 /* 首页入口与软件名称：按钮内含内边距，用负外边距收紧至视觉约 9px */
 .desk-topbar-left > .icon-button {
   margin-right: -6px;
+}
+
+/* 首页入口：默认即取深色（与悬浮一致），强化固定入口的视觉权重 */
+.home-button {
+  color: var(--desk-text);
 }
 
 /* 软件名称：顶栏视觉重点，使用主色 + 加粗 */

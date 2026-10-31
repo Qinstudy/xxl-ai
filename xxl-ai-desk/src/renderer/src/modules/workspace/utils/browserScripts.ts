@@ -193,3 +193,111 @@ export function buildProbeScript(input: { selector?: string; text?: string }): s
     return { matched: Boolean(matched), title: document.title, url: location.href };
   })()`
 }
+
+/* 悬停元素：派发鼠标移入事件，触发悬停菜单 / 提示 */
+export function buildHoverScript(input: { ref?: string; selector?: string }): string {
+  const ref = input.ref ? JSON.stringify(input.ref) : 'null'
+  const selector = input.selector ? JSON.stringify(input.selector) : 'null'
+  return `(() => {
+    const store = window.__deskAgentSnapshot;
+    const ref = ${ref};
+    const selector = ${selector};
+    const el = ref ? store?.refs.get(ref) : selector ? document.querySelector(selector) : null;
+    if (!el) return { ok: false, error: 'missing' };
+    el.scrollIntoView({ block: 'center', inline: 'center' });
+    const rect = el.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    for (const type of ['pointerover', 'mouseover', 'mousemove', 'pointerenter', 'mouseenter']) {
+      el.dispatchEvent(new MouseEvent(type, {
+        bubbles: type !== 'mouseenter' && type !== 'pointerenter',
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+        view: window
+      }));
+    }
+    return { ok: true };
+  })()`
+}
+
+/* 按键：向目标元素或当前焦点发送 keydown / keypress / keyup */
+export function buildPressScript(input: {
+  key: string
+  ref?: string
+  selector?: string
+}): string {
+  const key = JSON.stringify(input.key)
+  const ref = input.ref ? JSON.stringify(input.ref) : 'null'
+  const selector = input.selector ? JSON.stringify(input.selector) : 'null'
+  return `(() => {
+    const store = window.__deskAgentSnapshot;
+    const key = ${key};
+    const ref = ${ref};
+    const selector = ${selector};
+    const el = ref ? store?.refs.get(ref) : selector ? document.querySelector(selector) : document.activeElement;
+    if (!el) return { ok: false, error: 'missing' };
+    if (typeof el.focus === 'function') el.focus();
+    const init = { key, code: key, bubbles: true, cancelable: true, view: window };
+    el.dispatchEvent(new KeyboardEvent('keydown', init));
+    el.dispatchEvent(new KeyboardEvent('keypress', init));
+    el.dispatchEvent(new KeyboardEvent('keyup', init));
+    return { ok: true, active: el.tagName ? el.tagName.toLowerCase() : '' };
+  })()`
+}
+
+/* 选择下拉选项：value 匹配 option 的 value 或可见文本 */
+export function buildSelectScript(input: {
+  ref?: string
+  selector?: string
+  value: string
+}): string {
+  const value = JSON.stringify(input.value)
+  const ref = input.ref ? JSON.stringify(input.ref) : 'null'
+  const selector = input.selector ? JSON.stringify(input.selector) : 'null'
+  return `(() => {
+    const store = window.__deskAgentSnapshot;
+    const value = ${value};
+    const ref = ${ref};
+    const selector = ${selector};
+    const el = ref ? store?.refs.get(ref) : selector ? document.querySelector(selector) : null;
+    if (!el) return { ok: false, error: 'missing' };
+    const fire = (node) => {
+      node.dispatchEvent(new Event('input', { bubbles: true }));
+      node.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+    if (el.tagName && el.tagName.toLowerCase() === 'select') {
+      const option = Array.from(el.options).find(
+        (item) => item.value === value || (item.textContent || '').trim() === value
+      );
+      if (!option) return { ok: false, error: 'option', text: '' };
+      el.value = option.value;
+      fire(el);
+      return { ok: true, text: (option.textContent || '').trim() };
+    }
+    el.value = value;
+    fire(el);
+    return { ok: true, text: value };
+  })()`
+}
+
+/* 滚动页面：up / down 按像素滚动，top / bottom 直达两端 */
+export function buildScrollScript(input: {
+  direction: 'up' | 'down' | 'top' | 'bottom'
+  amount?: number
+}): string {
+  const direction = JSON.stringify(input.direction)
+  const amount = Number.isFinite(input.amount) ? Number(input.amount) : 0
+  return `(() => {
+    const direction = ${direction};
+    const amount = ${amount} > 0 ? ${amount} : Math.round(window.innerHeight * 0.8);
+    if (direction === 'top') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (direction === 'bottom') {
+      window.scrollTo({ top: document.body ? document.body.scrollHeight : document.documentElement.scrollHeight, behavior: 'smooth' });
+    } else {
+      window.scrollBy({ top: direction === 'up' ? -amount : amount, behavior: 'smooth' });
+    }
+    return { ok: true, scrollY: Math.round(window.scrollY) };
+  })()`
+}

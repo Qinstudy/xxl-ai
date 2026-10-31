@@ -18,6 +18,8 @@
   --desk-primary: #0d0d0d;
   --desk-primary-hover: #2f2f2f;
   --desk-primary-soft: rgba(13, 13, 13, 0.06);
+  /* 选中态：比悬浮底色略深，用于左侧图标栏与顶栏工具栏按钮 */
+  --desk-selected-bg: rgba(13, 13, 13, 0.1);
   /* 主色背景上的对比文字（黑白灰体系下浅色主题用白） */
   --desk-primary-contrast: #ffffff;
   --desk-bubble-user: #f4f4f4;
@@ -108,6 +110,8 @@
   --desk-primary: #e8e8e8;
   --desk-primary-hover: #ffffff;
   --desk-primary-soft: rgba(255, 255, 255, 0.08);
+  /* 选中态：比悬浮底色略深，用于左侧图标栏与顶栏工具栏按钮 */
+  --desk-selected-bg: rgba(255, 255, 255, 0.14);
   --desk-primary-contrast: #141414;
   --desk-bubble-user: #303030;
   --desk-bubble-user-text: #ececec;

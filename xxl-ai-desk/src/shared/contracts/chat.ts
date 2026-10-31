@@ -45,8 +45,8 @@ export interface ChatApprovalPrompt {
   requestId: string
   /* 触发审批的工具名 */
   tool: string
-  /* 动作类型：read 读 / write 写 */
-  action: 'read' | 'write'
+  /* 动作类型：read 读 / write 写 / command 命令 */
+  action: 'read' | 'write' | 'command'
   /* 越界目标的绝对路径 */
   abs: string
   /* 沙箱根目录（通常为项目目录） */

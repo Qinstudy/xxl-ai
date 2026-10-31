@@ -3,7 +3,7 @@
  * 越界访问审批：监听主进程推送的越界请求，以应用内对话框收集用户选择
  * （允许本次 / 本会话允许 / 拒绝），选择后回传主进程。
  */
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { t } from '@renderer/i18n'
 import { api } from '@renderer/api'
 import type { ChatApprovalChoice, ChatApprovalPrompt } from '@shared/ipc'
@@ -12,6 +12,18 @@ const prompt = ref<ChatApprovalPrompt | null>(null)
 /* 审批队列：并发会话同时越界时依次展示，避免后到请求覆盖前一个导致其永久挂起 */
 const queue: ChatApprovalPrompt[] = []
 let unsubscribe: (() => void) | null = null
+
+/* 动作类型文案：读取 / 写入 / 执行命令 */
+const actionText = computed(() => {
+  const action = prompt.value?.action
+  if (action === 'write') {
+    return t('chat.approvalWrite')
+  }
+  if (action === 'command') {
+    return t('chat.approvalCommand')
+  }
+  return t('chat.approvalRead')
+})
 
 /* 回传用户选择并展示下一个待审批请求 */
 function respond(choice: ChatApprovalChoice): void {
@@ -62,10 +74,9 @@ onBeforeUnmount(() => {
     <div class="approval-body">
       <p class="approval-message">
         {{
-          t('chat.approvalMessage', [
-            prompt?.tool ?? '',
-            prompt?.action === 'write' ? t('chat.approvalWrite') : t('chat.approvalRead')
-          ])
+          prompt?.action === 'command'
+            ? t('chat.approvalMessageCommand', [prompt?.tool ?? ''])
+            : t('chat.approvalMessage', [prompt?.tool ?? '', actionText])
         }}
       </p>
       <div class="approval-field">

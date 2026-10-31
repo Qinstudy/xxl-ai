@@ -37,8 +37,12 @@ import {
   diagnosticsActiveTab,
   fillActiveTab,
   historyActiveTab,
+  hoverActiveTab,
+  pressActiveTab,
   readActiveTab,
   screenshotActiveTab,
+  scrollActiveTab,
+  selectActiveTab,
   snapshotActiveTab,
   tabLabel,
   waitActiveTab
@@ -372,6 +376,14 @@ async function runBrowserAction(
       return clickActiveTab(sessionId, action)
     case 'fill':
       return fillActiveTab(sessionId, action)
+    case 'hover':
+      return hoverActiveTab(sessionId, action)
+    case 'press':
+      return pressActiveTab(sessionId, action)
+    case 'select':
+      return selectActiveTab(sessionId, action)
+    case 'scroll':
+      return scrollActiveTab(sessionId, action)
     case 'wait':
       return waitActiveTab(sessionId, action)
     case 'screenshot':

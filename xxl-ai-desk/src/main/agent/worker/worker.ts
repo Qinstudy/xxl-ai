@@ -144,6 +144,7 @@ async function handleRun(input: RunAgentInput): Promise<void> {
       messages: input.messages,
       mode: input.mode,
       rootDir: input.rootDir,
+      language: input.language,
       runtimePath: input.runtimePath,
       mcpServers: input.mcpServers ?? [],
       skills: input.skills ?? [],

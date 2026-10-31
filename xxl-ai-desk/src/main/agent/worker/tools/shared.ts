@@ -10,6 +10,7 @@ import type { Dirent } from 'fs'
 import { basename, relative, resolve, sep } from 'path'
 import type { ChatMode } from '@shared/ipc'
 import type { SkillRuntimeConfig } from '@shared/ipc'
+import { translate, type AppLanguage } from '@shared/i18n'
 import { guardPath, type PathAction } from '../sandbox'
 
 /* 工具装配上下文 */
@@ -17,6 +18,8 @@ export interface ToolContext {
   mode: ChatMode
   rootDir: string
   sessionId: string
+  /* 应用语言：工具错误与摘要文案使用对应语言 */
+  language: AppLanguage
   /* 已启用的技能索引（正文由 read_skill 按需读取） */
   skills?: SkillRuntimeConfig[]
   /* 浏览器类内置工具是否启用（关闭时浏览器工具工厂直接返回空集） */
@@ -59,6 +62,15 @@ export const BUILD_ONLY: ChatMode[] = ['build']
 /* 中英文工具描述：模型对两种语言均友好，保留中文可读性同时兼顾英文模型 */
 export function describe(zh: string, en: string): string {
   return `${zh}\n${en}`
+}
+
+/* 工具运行期文案：按会话语言取词，供错误与摘要复用 */
+export function tr(
+  context: ToolContext,
+  key: string,
+  params?: Array<string | number> | Record<string, string | number>
+): string {
+  return translate(context.language, key, params)
 }
 
 /* 文本结果（details 供 UI / 落库展示结构化信息；长度裁剪由注册表按 maxOutput 统一执行） */
@@ -116,10 +128,14 @@ export function createGuard(context: ToolContext) {
       target,
       action,
       tool,
+      language: context.language,
       readRoots
     })
     if (!outcome.allowed) {
-      return { ok: false, result: toolError(outcome.reason ?? '已拦截：超出项目目录') }
+      return {
+        ok: false,
+        result: toolError(outcome.reason ?? tr(context, 'runtime.tool.pathBlocked'))
+      }
     }
     return { ok: true, abs: outcome.abs }
   }

@@ -42,7 +42,7 @@ function toggleToolPanel(): void {
 <style scoped lang="scss">
 /* 面板开关激活态：高亮当前已展开的面板 */
 .icon-button.active {
-  background: var(--desk-primary-soft);
+  background: var(--desk-selected-bg);
   color: var(--desk-text);
 }
 

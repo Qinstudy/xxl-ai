@@ -28,6 +28,10 @@ export type BrowserAction =
       clickCount?: number
     } /* 点击元素 */
   | { type: 'fill'; fields: BrowserFillField[]; submit?: boolean } /* 填写表单 */
+  | { type: 'hover'; ref?: string; selector?: string } /* 悬停元素 */
+  | { type: 'press'; key: string; ref?: string; selector?: string } /* 按键 */
+  | { type: 'select'; ref?: string; selector?: string; value: string } /* 选择下拉选项 */
+  | { type: 'scroll'; direction: 'up' | 'down' | 'top' | 'bottom'; amount?: number } /* 滚轮滚动 */
   | { type: 'wait'; selector?: string; text?: string; url?: string; timeoutMs?: number } /* 等待条件 */
   | { type: 'screenshot' } /* 页面截图 */
   | { type: 'diagnostics' } /* 控制台与加载诊断 */

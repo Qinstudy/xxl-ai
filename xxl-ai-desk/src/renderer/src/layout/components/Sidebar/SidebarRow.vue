@@ -62,7 +62,7 @@ const emit = defineEmits<{ click: [] }>()
 }
 
 .sidebar-row.active {
-  background: var(--desk-primary-soft);
+  background: var(--desk-selected-bg);
   color: var(--desk-text-secondary);
   font-weight: 500;
 }
