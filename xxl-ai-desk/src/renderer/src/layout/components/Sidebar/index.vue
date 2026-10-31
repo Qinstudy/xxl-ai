@@ -58,7 +58,7 @@ const { sidebarWidth, resetSidebarWidth } = usePanelWidths(() => workspaceKey.va
   position: relative;
   display: flex;
   flex-direction: row;
-  background: var(--desk-panel-bg);
+  background: var(--desk-surface-sidebar);
   overflow: hidden;
   transition: width 0.2s ease;
 }

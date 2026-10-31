@@ -119,22 +119,22 @@ function onClick(): void {
 
 .status-modified,
 .status-typechange {
-  color: #bf8700;
+  color: var(--desk-warning);
 }
 
 .status-added,
 .status-untracked {
-  color: #1a7f37;
+  color: var(--desk-success);
 }
 
 .status-deleted,
 .status-conflicted {
-  color: #cf222e;
+  color: var(--desk-danger);
 }
 
 .status-renamed,
 .status-copied {
-  color: #0969da;
+  color: var(--desk-info);
 }
 
 .tree-name {

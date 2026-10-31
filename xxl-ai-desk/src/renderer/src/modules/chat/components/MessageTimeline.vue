@@ -326,7 +326,7 @@ function toolDetailsText(tool: ToolCallState): string {
 }
 
 .step-tool.done .tool-state {
-  color: #3a9d5d;
+  color: var(--desk-success);
 }
 
 .step-tool.error .tool-state {

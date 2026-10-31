@@ -173,13 +173,13 @@ const lines = computed(() => (props.diff ? parseDiff(props.diff) : []))
 }
 
 .diff-line.add {
-  background: rgba(46, 160, 67, 0.12);
-  color: #1a7f37;
+  background: color-mix(in srgb, var(--desk-success) 14%, transparent);
+  color: var(--desk-success);
 }
 
 .diff-line.del {
-  background: rgba(248, 81, 73, 0.12);
-  color: #cf222e;
+  background: color-mix(in srgb, var(--desk-danger) 14%, transparent);
+  color: var(--desk-danger);
 }
 
 .diff-line.gap {

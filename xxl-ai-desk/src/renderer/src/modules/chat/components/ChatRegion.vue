@@ -260,6 +260,7 @@ async function onRemoveMessage(message: { id: string }): Promise<void> {
   height: 100%;
   display: flex;
   flex-direction: column;
+  background: var(--desk-surface-content);
 }
 
 /* 空态：标题/项目选择、输入框与示例作为一组整体垂直居中（整体略上移） */

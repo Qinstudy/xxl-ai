@@ -481,7 +481,7 @@ watch(visible, (value) => {
 }
 
 .test-result.failed {
-  background: rgba(245, 108, 108, 0.12);
+  background: color-mix(in srgb, var(--desk-danger) 12%, transparent);
 }
 
 .test-title {

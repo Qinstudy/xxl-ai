@@ -194,8 +194,8 @@ function toggleFocus(): void {
 }
 
 .tool-tab.active {
-  background: var(--desk-primary-soft);
-  color: var(--desk-text);
+  background: var(--desk-selected-bg);
+  color: var(--desk-primary);
   font-weight: 600;
 }
 

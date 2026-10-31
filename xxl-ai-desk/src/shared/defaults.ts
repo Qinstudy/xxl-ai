@@ -5,7 +5,7 @@
  * @author xuxueli 2026-10-25
  */
 
-import { DEFAULT_SHORTCUTS, type AppSettings } from './contracts/app'
+import { DEFAULT_SHORTCUTS, THEME_PRESETS, type AppSettings } from './contracts/app'
 import { translate } from './i18n'
 
 /* 新建会话的占位标题：空串表示「尚未由首条提问命名」 */
@@ -13,7 +13,9 @@ export const NEW_CHAT_TITLE = ''
 
 /* 默认应用设置（主进程与渲染进程共用） */
 export const DEFAULT_APP_SETTINGS: AppSettings = {
-  theme: 'light',
+  appearance: 'light',
+  /* 默认主题 = 预设列表第一项（经典黑白），保证排序与默认值单一来源 */
+  themePreset: THEME_PRESETS[0],
   language: 'zh',
   providerId: '',
   modelId: '',

@@ -41,13 +41,29 @@ export const useSettingsStore = defineStore('settings', () => {
 
   /* 已启用的供应商 */
   const enabledProviders = computed(() => providers.value.filter((item) => item.enabled))
-  /* 应用主题到 DOM（Element Plus 深色模式依赖 html.dark） */
-  function applyTheme(): void {
+  /* 应用外观与主题预设到 DOM（Element Plus 深色模式依赖 html.dark） */
+  function applyAppearance(): void {
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-    const dark =
-      settings.value.theme === 'dark' || (settings.value.theme === 'system' && prefersDark)
+    const appearance = settings.value.appearance
+    const dark = appearance === 'dark' || (appearance === 'system' && prefersDark)
     document.documentElement.classList.toggle('dark', dark)
+    /* data-theme 保留给既有样式 / 调试；data-palette 驱动主题预设 */
     document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+    document.documentElement.dataset.palette = settings.value.themePreset
+  }
+
+  /* 系统外观监听：仅在「跟随系统」时生效，注册一次 */
+  let systemAppearanceBound = false
+  function bindSystemAppearance(): void {
+    if (systemAppearanceBound) {
+      return
+    }
+    systemAppearanceBound = true
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      if (settings.value.appearance === 'system') {
+        applyAppearance()
+      }
+    })
   }
 
   /* 首次加载设置与供应商 */
@@ -61,7 +77,8 @@ export const useSettingsStore = defineStore('settings', () => {
     dbFile.value = info.dbFile
     platform.value = info.platform
     setLanguage(settings.value.language)
-    applyTheme()
+    bindSystemAppearance()
+    applyAppearance()
     loaded.value = true
   }
 
@@ -73,7 +90,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (patch.language) {
       setLanguage(patch.language)
     }
-    applyTheme()
+    applyAppearance()
   }
 
   /* 保存供应商并刷新列表 */
@@ -205,6 +222,6 @@ export const useSettingsStore = defineStore('settings', () => {
     openUpdate,
     dismissUpdate,
     selectProvider,
-    applyTheme
+    applyAppearance
   }
 })

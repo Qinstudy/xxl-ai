@@ -1,39 +1,97 @@
-/* 设计令牌：默认浅色（参考 ChatGPT 黑白灰配色），并保留深色主题 */
+/*
+ * 设计令牌（语义层）
+ *
+ * 颜色种子见 theme-presets.scss；本文件负责：
+ *   1. 由 --theme-* 推导语义 token（区域 surface、边框、文本、主色、气泡、控件）；
+ *   2. 代码块 / 阴影 / 遮罩等与预设无关的外观变量；
+ *   3. 尺寸、字体与 Element Plus 基础变量。
+ *
+ * 组件只使用 --desk-*，禁止写死颜色；新增主题只需改 theme-presets.scss。
+ *
+ * 区域语义：
+ *   chrome   顶栏 + 左侧图标栏
+ *   sidebar  左侧子菜单 / 会话列表
+ *   panel    右侧工具面板
+ *   content  会话正文区
+ *   elevated 输入框 / 卡片 / 悬浮件
+ *
+ * @author xuxueli 2026-10-31
+ */
+
+/* 语义色映射：各主题共用，只依赖主题种子 */
+@mixin desk-color-tokens {
+  /* 区域表面 */
+  --desk-surface-chrome: var(--theme-chrome);
+  --desk-surface-sidebar: var(--theme-sidebar);
+  --desk-surface-panel: var(--theme-panel);
+  --desk-surface-content: var(--theme-content);
+  --desk-surface-elevated: var(--theme-elevated);
+  /* 兼容既有语义 token（组件逐步迁移到 surface-*） */
+  --desk-bg: var(--desk-surface-content);
+  --desk-bg-elevated: var(--desk-surface-elevated);
+  --desk-sidebar: var(--desk-surface-sidebar);
+  --desk-chrome-bg: var(--desk-surface-chrome);
+  --desk-panel-bg: var(--desk-surface-panel);
+
+  /* 边框 */
+  --desk-border: var(--theme-border);
+  --desk-border-strong: color-mix(in srgb, var(--theme-border) 42%, var(--theme-text-tertiary));
+  --desk-border-soft: color-mix(in srgb, var(--theme-border) 55%, transparent);
+
+  /* 文本 */
+  --desk-text: var(--theme-text);
+  --desk-text-secondary: var(--theme-text-secondary);
+  --desk-text-submenu: color-mix(in srgb, var(--theme-text) 72%, var(--theme-text-secondary));
+  --desk-text-tertiary: var(--theme-text-tertiary);
+
+  /* 品牌色 */
+  --desk-primary: var(--theme-brand);
+  --desk-primary-hover: var(--theme-brand-strong);
+  --desk-primary-soft: color-mix(in srgb, var(--theme-brand) 9%, transparent);
+  --desk-selected-bg: color-mix(in srgb, var(--theme-brand) 15%, transparent);
+  --desk-primary-contrast: var(--theme-brand-contrast);
+  --desk-focus-ring: 0 0 0 3px color-mix(in srgb, var(--theme-brand) 20%, transparent);
+
+  /* 功能色 */
+  --desk-success: var(--theme-success);
+  --desk-warning: var(--theme-warning);
+  --desk-danger: var(--theme-danger);
+  --desk-info: var(--theme-info);
+
+  /* 气泡与选区 */
+  --desk-bubble-user: color-mix(in srgb, var(--theme-brand) 9%, var(--theme-content));
+  --desk-bubble-user-text: var(--theme-text);
+  --desk-bubble-assistant: var(--theme-elevated);
+  --desk-selection: color-mix(in srgb, var(--theme-brand) 24%, transparent);
+  --desk-code-inline-bg: color-mix(in srgb, var(--theme-text) 7%, transparent);
+
+  /* 分段控件 / 按钮 / 开关 */
+  --desk-segment-bg: color-mix(in srgb, var(--theme-brand) 12%, var(--theme-content));
+  --desk-segment-text: var(--theme-brand-strong);
+  --desk-segment-border: color-mix(in srgb, var(--theme-brand) 22%, var(--theme-content));
+  --desk-btn-bg: color-mix(in srgb, var(--theme-brand) 10%, var(--theme-content));
+  --desk-btn-bg-hover: color-mix(in srgb, var(--theme-brand) 16%, var(--theme-content));
+  --desk-btn-text: var(--theme-brand-strong);
+  --desk-switch-on: var(--theme-brand);
+
+  /* Element Plus 主色族：浅色向白混合，深色向黑混合 */
+  --el-color-primary: var(--theme-brand);
+  --el-color-primary-light-3: color-mix(in srgb, var(--theme-brand) 72%, var(--theme-mix-base));
+  --el-color-primary-light-5: color-mix(in srgb, var(--theme-brand) 54%, var(--theme-mix-base));
+  --el-color-primary-light-7: color-mix(in srgb, var(--theme-brand) 36%, var(--theme-mix-base));
+  --el-color-primary-light-8: color-mix(in srgb, var(--theme-brand) 26%, var(--theme-mix-base));
+  --el-color-primary-light-9: color-mix(in srgb, var(--theme-brand) 12%, var(--theme-mix-base));
+  --el-color-primary-dark-2: color-mix(in srgb, var(--theme-brand) 78%, var(--theme-mix-strong));
+}
+
 :root {
-  /* XXL-AI-Desk 自绘组件变量 */
-  --desk-bg: #ffffff;
-  --desk-bg-elevated: #f7f7f8;
-  --desk-sidebar: #f9f9f9;
-  /* 左侧图标栏 + 顶部栏：同色且最深；展开的列表面板：略浅 */
-  --desk-chrome-bg: #ececec;
-  --desk-panel-bg: #f6f6f6;
-  --desk-border: #ececec;
-  /* 选中/悬浮边框：比常规边框稍强，但避免纯黑 */
-  --desk-border-strong: #d4d4d4;
-  --desk-border-soft: rgba(0, 0, 0, 0.06);
-  --desk-text: #0d0d0d;
-  --desk-text-secondary: #5d5d5d;
-  --desk-text-submenu: #3f3f3f;
-  --desk-text-tertiary: #8e8e8e;
-  --desk-primary: #0d0d0d;
-  --desk-primary-hover: #2f2f2f;
-  --desk-primary-soft: rgba(13, 13, 13, 0.06);
-  /* 选中态：比悬浮底色略深，用于左侧图标栏与顶栏工具栏按钮 */
-  --desk-selected-bg: rgba(13, 13, 13, 0.1);
-  /* 主色背景上的对比文字（黑白灰体系下浅色主题用白） */
-  --desk-primary-contrast: #ffffff;
-  --desk-bubble-user: #f4f4f4;
-  --desk-bubble-user-text: #0d0d0d;
-  --desk-bubble-assistant: #f4f4f4;
-  --desk-danger: #d93025;
-  /* 代码块：浅色主题用浅灰底 + 深色字（参考 GitHub Light） */
+  @include desk-color-tokens;
+
+  /* 代码块（GitHub Light） */
   --desk-code-bg: #f6f8fa;
   --desk-code-text: #1f2328;
   --desk-code-border: #d0d7de;
-  --desk-code-inline-bg: rgba(27, 31, 36, 0.06);
-  /* 文本选区（GitHub 浅色） */
-  --desk-selection: rgba(84, 174, 255, 0.4);
-  /* 语法高亮 token 色（参考 GitHub Light） */
+  /* 语法高亮 token 色（GitHub Light） */
   --code-red: #cf222e;
   --code-purple: #8250df;
   --code-blue: #0550ae;
@@ -43,48 +101,30 @@
   --code-green: #116329;
   --code-yellow: #735c0f;
   --code-subst: #1f2328;
-  /* 顶部栏高度（左侧 Logo 顶部与之下的正文区顶部对齐） */
+
+  --desk-shadow: 0 10px 30px color-mix(in srgb, var(--theme-shadow) 8%, transparent);
+  --desk-overlay: rgba(23, 32, 58, 0.38);
+
+  /* 尺寸与字体 */
   --desk-header-height: 38px;
-  /* 左侧常驻图标栏（活动栏）宽度：与顶栏高度保持一致 */
   --desk-rail-width: var(--desk-header-height);
-  /* 左侧子菜单栏默认宽度（实际宽度由布局 store 持久化） */
   --desk-sidebar-width: 240px;
-  /* 工具面板 / 终端标签栏高度 */
   --desk-panel-header-height: 40px;
   --desk-radius-sm: 10px;
   --desk-radius: 16px;
   --desk-radius-lg: 22px;
-  --desk-shadow: 0 4px 18px rgba(0, 0, 0, 0.06);
-  /* 分段选中态（主题/语言）与浅色主按钮（弱化黑色，观感柔和） */
-  --desk-segment-bg: #e6e6e6;
-  --desk-segment-text: #1a1a1a;
-  --desk-segment-border: #d8d8d8;
-  --desk-btn-bg: #e6e6e6;
-  --desk-btn-bg-hover: #d8d8d8;
-  --desk-btn-text: #1a1a1a;
-  /* 开关激活色：柔和中性灰，避免纯黑且与关闭态有区分 */
-  --desk-switch-on: #9a9a9a;
-  /* 字体层级：xs=辅助说明 / sm=紧凑控件 / base=常规 UI / md=正文 / lg=栏目标题 / xl=展示标题 */
   --desk-font-xs: 12px;
   --desk-font-sm: 13px;
   --desk-font-base: 14px;
   --desk-font-md: 15px;
   --desk-font-lg: 18px;
   --desk-font-xl: 22px;
-  /* 图标字号：仅用于 el-icon / 自绘图标，不属于文字层级 */
   --desk-icon-xs: 12px;
   --desk-icon-sm: 14px;
   --desk-icon-md: 16px;
   --desk-icon-lg: 18px;
 
-  /* Element Plus 主题对齐（黑白灰） */
-  --el-color-primary: #0d0d0d;
-  --el-color-primary-light-3: #3d3d3d;
-  --el-color-primary-light-5: #6b6b6b;
-  --el-color-primary-light-7: #a3a3a3;
-  --el-color-primary-light-8: #c7c7c7;
-  --el-color-primary-light-9: #f0f0f0;
-  --el-color-primary-dark-2: #000000;
+  /* Element Plus 基础尺寸 */
   --el-font-size-extra-small: var(--desk-font-xs);
   --el-font-size-small: var(--desk-font-sm);
   --el-font-size-base: var(--desk-font-md);
@@ -92,39 +132,11 @@
 }
 
 :root.dark {
-  --desk-bg: #1e1e1e;
-  --desk-bg-elevated: #262626;
-  --desk-sidebar: #171717;
-  /* 左侧图标栏 + 顶部栏：同色且最深；展开的列表面板：略浅 */
-  --desk-chrome-bg: #101010;
-  --desk-panel-bg: #191919;
-  --desk-border: #333333;
-  /* 选中/悬浮边框：比常规边框稍强，但避免纯黑 */
-  --desk-border-strong: #4a4a4a;
-  --desk-border-soft: rgba(255, 255, 255, 0.09);
-  --desk-text: #ececec;
-  --desk-text-secondary: #b0b0b0;
-  --desk-text-submenu: #c6c6c6;
-  --desk-text-tertiary: #8a8a8a;
-  /* 深色主题沿用黑白灰：主色取浅灰，主色背景用深色文字保证对比度 */
-  --desk-primary: #e8e8e8;
-  --desk-primary-hover: #ffffff;
-  --desk-primary-soft: rgba(255, 255, 255, 0.08);
-  /* 选中态：比悬浮底色略深，用于左侧图标栏与顶栏工具栏按钮 */
-  --desk-selected-bg: rgba(255, 255, 255, 0.14);
-  --desk-primary-contrast: #141414;
-  --desk-bubble-user: #303030;
-  --desk-bubble-user-text: #ececec;
-  --desk-bubble-assistant: #262626;
-  --desk-danger: #f2555a;
-  /* 代码块：深色主题用深灰底 + 浅色字（参考 GitHub Dark） */
+  /* 代码块（GitHub Dark） */
   --desk-code-bg: #161b22;
   --desk-code-text: #e6edf3;
   --desk-code-border: #30363d;
-  --desk-code-inline-bg: rgba(110, 118, 129, 0.4);
-  /* 文本选区（GitHub 深色） */
-  --desk-selection: rgba(56, 139, 253, 0.4);
-  /* 语法高亮 token 色（参考 GitHub Dark） */
+  /* 语法高亮 token 色（GitHub Dark） */
   --code-red: #ff7b72;
   --code-purple: #d2a8ff;
   --code-blue: #79c0ff;
@@ -134,21 +146,7 @@
   --code-green: #7ee787;
   --code-yellow: #f2cc60;
   --code-subst: #e6edf3;
-  --desk-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
-  /* 深色主题：选中态/主按钮取中灰底 + 浅色字，保证与未选中有区分度 */
-  --desk-segment-bg: #3a3a3a;
-  --desk-segment-text: #ffffff;
-  --desk-segment-border: #4a4a4a;
-  --desk-btn-bg: #3a3a3a;
-  --desk-btn-bg-hover: #484848;
-  --desk-btn-text: #f2f2f2;
-  --desk-switch-on: #a8a8a8;
 
-  --el-color-primary: #e8e8e8;
-  --el-color-primary-light-3: #f4f4f4;
-  --el-color-primary-light-5: #c4c4c4;
-  --el-color-primary-light-7: #6f6f6f;
-  --el-color-primary-light-8: #474747;
-  --el-color-primary-light-9: #2c2c2c;
-  --el-color-primary-dark-2: #cfcfcf;
+  --desk-shadow: 0 12px 32px color-mix(in srgb, var(--theme-shadow) 55%, transparent);
+  --desk-overlay: rgba(0, 0, 0, 0.55);
 }

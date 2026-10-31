@@ -22,7 +22,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: var(--desk-bg);
+  background: var(--desk-surface-content);
 }
 
 /* 页面容器：占满主内容区 */

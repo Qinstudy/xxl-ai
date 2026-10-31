@@ -145,7 +145,7 @@ function onQuickAction(action: QuickAction): void {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--desk-overlay);
 }
 
 .palette {
@@ -157,7 +157,7 @@ function onQuickAction(action: QuickAction): void {
   background: var(--desk-bg);
   border: 1px solid var(--desk-border);
   border-radius: var(--desk-radius-sm);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22);
+  box-shadow: var(--desk-shadow);
   overflow: hidden;
 }
 

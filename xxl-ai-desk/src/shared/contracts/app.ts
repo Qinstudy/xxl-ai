@@ -18,10 +18,20 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
   browser: 'mod+b'
 }
 
+/* 外观：浅色 / 深色 / 跟随系统 */
+export const APPEARANCES = ['light', 'dark', 'system'] as const
+export type Appearance = (typeof APPEARANCES)[number]
+
+/* 主题配色预设（顺序即设置页展示顺序，第一套为安装默认） */
+export const THEME_PRESETS = ['classic', 'indigo', 'mint', 'sunset', 'violet'] as const
+export type ThemePreset = (typeof THEME_PRESETS)[number]
+
 /* 应用设置 */
 export interface AppSettings {
-  /* 主题 */
-  theme: 'light' | 'dark' | 'system'
+  /* 外观：浅色 / 深色 / 跟随系统 */
+  appearance: Appearance
+  /* 主题配色预设 */
+  themePreset: ThemePreset
   /* 界面语言（不支持运行时切换，需重启生效） */
   language: 'zh' | 'en'
   /* 当前供应商主键 */

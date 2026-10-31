@@ -72,7 +72,7 @@ function go(key: SectionKey): void {
   justify-content: space-between;
   align-items: center;
   padding: 8px 0;
-  background: var(--desk-chrome-bg);
+  background: var(--desk-surface-chrome);
 }
 
 .rail-group {
@@ -104,11 +104,11 @@ function go(key: SectionKey): void {
 
 .rail-btn:hover {
   background: var(--desk-primary-soft);
-  color: var(--desk-text-secondary);
+  color: var(--desk-text);
 }
 
 .rail-btn.active {
   background: var(--desk-selected-bg);
-  color: var(--desk-text);
+  color: var(--desk-primary);
 }
 </style>

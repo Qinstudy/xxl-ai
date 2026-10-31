@@ -352,7 +352,7 @@ onUnmounted(() => {
 
 .discover-card:hover {
   border-color: var(--desk-border-strong);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--desk-shadow);
 }
 
 .card-head {
@@ -419,7 +419,7 @@ onUnmounted(() => {
 .card-star-icon {
   width: 12px;
   height: 12px;
-  fill: #f5a623;
+  fill: var(--desk-warning);
   stroke: none;
 }
 

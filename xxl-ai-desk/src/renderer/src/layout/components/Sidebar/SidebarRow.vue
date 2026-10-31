@@ -58,13 +58,13 @@ const emit = defineEmits<{ click: [] }>()
 
 .sidebar-row:hover {
   background: var(--desk-primary-soft);
-  color: var(--desk-text-secondary);
+  color: var(--desk-text);
 }
 
 .sidebar-row.active {
   background: var(--desk-selected-bg);
-  color: var(--desk-text-secondary);
-  font-weight: 500;
+  color: var(--desk-primary);
+  font-weight: 600;
 }
 
 .sidebar-row-label {

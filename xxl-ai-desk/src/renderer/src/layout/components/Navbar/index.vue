@@ -98,7 +98,9 @@ function goHome(): void {
   justify-content: space-between;
   gap: 16px;
   padding: 0 12px;
-  background: var(--desk-chrome-bg);
+  background: var(--desk-surface-chrome);
+  /* 与子菜单 / 正文之间用极轻分隔线收口，避免整块色面糊在一起 */
+  box-shadow: inset 0 -1px 0 var(--desk-border-soft);
   -webkit-app-region: drag;
 }
 
@@ -130,9 +132,9 @@ function goHome(): void {
   -webkit-app-region: no-drag;
 }
 
-/* 首页入口与软件名称：按钮内含内边距，用负外边距收紧至视觉约 9px */
+/* 首页入口与软件名称：按钮内含内边距，用负外边距收紧至视觉约 6px */
 .desk-topbar-left > .icon-button {
-  margin-right: -6px;
+  margin-right: -9px;
 }
 
 /* 首页入口：默认即取深色（与悬浮一致），强化固定入口的视觉权重 */

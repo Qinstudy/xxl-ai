@@ -90,7 +90,7 @@ const { toolPanel, focused, toolWidth, resetToolWidth } = usePanelWidths(
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--desk-border);
-  background: var(--desk-sidebar);
+  background: var(--desk-surface-panel);
 }
 
 .workspace-tool-panel.focused {

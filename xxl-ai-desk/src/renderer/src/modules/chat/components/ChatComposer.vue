@@ -209,10 +209,19 @@ function onKeydown(event: KeyboardEvent): void {
   max-width: 880px;
   margin: 0 auto;
   padding: 10px 10px 10px 16px;
-  background: var(--desk-bg-elevated);
+  background: var(--desk-surface-elevated);
   border: 1px solid var(--desk-border);
   border-radius: var(--desk-radius);
   box-shadow: var(--desk-shadow);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+/* 聚焦态：品牌色描边 + 柔和光晕，突出当前输入 */
+.composer-box:focus-within {
+  border-color: color-mix(in srgb, var(--desk-primary) 45%, var(--desk-border));
+  box-shadow: var(--desk-shadow), var(--desk-focus-ring);
 }
 
 .composer-box :deep(.el-textarea__inner) {

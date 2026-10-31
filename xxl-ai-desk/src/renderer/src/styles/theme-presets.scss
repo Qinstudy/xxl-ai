@@ -1,0 +1,250 @@
+/*
+ * 主题预设（换肤配置单一来源）
+ *
+ * 顺序即设置页展示顺序，第一套为安装默认（经典黑白）。
+ * 每套预设只定义颜色种子；语义 token 由 tokens.scss 的 mixin 统一推导。
+ * 新增主题：在此追加浅色 / 深色两组种子，并在 contracts/app.ts 的 THEME_PRESETS 登记。
+ *
+ * @author xuxueli 2026-10-31
+ */
+
+/* ============================================================
+ * 主题 1：经典黑白（默认）
+ * ============================================================ */
+:root,
+:root[data-palette='classic'] {
+  --theme-brand: #0d0d0d;
+  --theme-brand-strong: #2f2f2f;
+  --theme-brand-contrast: #ffffff;
+  --theme-chrome: #ececec;
+  --theme-sidebar: #f9f9f9;
+  --theme-panel: #f6f6f6;
+  --theme-content: #ffffff;
+  --theme-elevated: #f7f7f8;
+  --theme-border: #ececec;
+  --theme-text: #0d0d0d;
+  --theme-text-secondary: #5d5d5d;
+  --theme-text-tertiary: #8e8e8e;
+  --theme-success: #1f7a4d;
+  --theme-warning: #8a6a16;
+  --theme-danger: #d93025;
+  --theme-info: #3f5f8a;
+  --theme-mix-base: #ffffff;
+  --theme-mix-strong: #000000;
+  --theme-shadow: #000000;
+}
+
+/* ============================================================
+ * 主题 2：清爽靛蓝（冷调浅底 + 靛蓝品牌色）
+ * ============================================================ */
+:root[data-palette='indigo'] {
+  --theme-brand: #4f6af0;
+  --theme-brand-strong: #3b54d0;
+  --theme-brand-contrast: #ffffff;
+  --theme-chrome: #ebf0f9;
+  --theme-sidebar: #f6f9fe;
+  --theme-panel: #f2f6fc;
+  --theme-content: #ffffff;
+  --theme-elevated: #f4f7fd;
+  --theme-border: #e2e8f3;
+  --theme-text: #17203a;
+  --theme-text-secondary: #5a6784;
+  --theme-text-tertiary: #8d99b0;
+  --theme-success: #1f9d6b;
+  --theme-warning: #c98518;
+  --theme-danger: #e04b4f;
+  --theme-info: #3b82f6;
+  --theme-mix-base: #ffffff;
+  --theme-mix-strong: #0b1020;
+  --theme-shadow: #17203a;
+}
+
+/* ============================================================
+ * 主题 3：薄荷青（清新绿松石）
+ * ============================================================ */
+:root[data-palette='mint'] {
+  --theme-brand: #0e9f8a;
+  --theme-brand-strong: #0b7f6e;
+  --theme-brand-contrast: #ffffff;
+  --theme-chrome: #e8f5f3;
+  --theme-sidebar: #f3faf8;
+  --theme-panel: #eff8f6;
+  --theme-content: #ffffff;
+  --theme-elevated: #f2faf8;
+  --theme-border: #dbece7;
+  --theme-text: #102a28;
+  --theme-text-secondary: #4f6f6b;
+  --theme-text-tertiary: #86a29e;
+  --theme-success: #0e9f6e;
+  --theme-warning: #c98518;
+  --theme-danger: #e04b4f;
+  --theme-info: #0f8fb3;
+  --theme-mix-base: #ffffff;
+  --theme-mix-strong: #05201c;
+  --theme-shadow: #0b2b27;
+}
+
+/* ============================================================
+ * 主题 4：暖霞橙（柔和珊瑚暖调）
+ * ============================================================ */
+:root[data-palette='sunset'] {
+  --theme-brand: #e0643c;
+  --theme-brand-strong: #c24e2a;
+  --theme-brand-contrast: #ffffff;
+  --theme-chrome: #fbede7;
+  --theme-sidebar: #fdf6f2;
+  --theme-panel: #fdf3ee;
+  --theme-content: #ffffff;
+  --theme-elevated: #fcf4f0;
+  --theme-border: #f2e1d9;
+  --theme-text: #2e1d16;
+  --theme-text-secondary: #7a5a4c;
+  --theme-text-tertiary: #a88b7d;
+  --theme-success: #2f8f5b;
+  --theme-warning: #c98518;
+  --theme-danger: #d64545;
+  --theme-info: #3b82f6;
+  --theme-mix-base: #ffffff;
+  --theme-mix-strong: #2a120a;
+  --theme-shadow: #3a1e14;
+}
+
+/* ============================================================
+ * 主题 5：紫罗兰（柔和紫调）
+ * ============================================================ */
+:root[data-palette='violet'] {
+  --theme-brand: #7a5af8;
+  --theme-brand-strong: #6242da;
+  --theme-brand-contrast: #ffffff;
+  --theme-chrome: #f0edfc;
+  --theme-sidebar: #f8f6fe;
+  --theme-panel: #f5f2fd;
+  --theme-content: #ffffff;
+  --theme-elevated: #f6f4fd;
+  --theme-border: #e6e0f5;
+  --theme-text: #211a3a;
+  --theme-text-secondary: #665c84;
+  --theme-text-tertiary: #968db0;
+  --theme-success: #1f9d6b;
+  --theme-warning: #c98518;
+  --theme-danger: #e04b4f;
+  --theme-info: #3b82f6;
+  --theme-mix-base: #ffffff;
+  --theme-mix-strong: #170f30;
+  --theme-shadow: #241a45;
+}
+
+/* ============================================================
+ * 深色外观：默认经典黑白 + 各主题暗色种子
+ * 放在浅色主题之后，保证深色规则覆盖同名浅色种子
+ * ============================================================ */
+:root.dark,
+:root.dark[data-palette='classic'] {
+  --theme-brand: #e8e8e8;
+  --theme-brand-strong: #ffffff;
+  --theme-brand-contrast: #141414;
+  --theme-chrome: #101010;
+  --theme-sidebar: #171717;
+  --theme-panel: #191919;
+  --theme-content: #1e1e1e;
+  --theme-elevated: #262626;
+  --theme-border: #333333;
+  --theme-text: #ececec;
+  --theme-text-secondary: #b0b0b0;
+  --theme-text-tertiary: #8a8a8a;
+  --theme-success: #4cc38a;
+  --theme-warning: #e5a54a;
+  --theme-danger: #f2555a;
+  --theme-info: #6ea8ff;
+  --theme-mix-base: #000000;
+  --theme-mix-strong: #ffffff;
+  --theme-shadow: #000000;
+}
+
+:root.dark[data-palette='indigo'] {
+  --theme-brand: #8ea0ff;
+  --theme-brand-strong: #aebcff;
+  --theme-brand-contrast: #0b1020;
+  --theme-chrome: #090d14;
+  --theme-sidebar: #101620;
+  --theme-panel: #0d131c;
+  --theme-content: #0b0f16;
+  --theme-elevated: #161e2a;
+  --theme-border: #232e40;
+  --theme-text: #e8edf7;
+  --theme-text-secondary: #a6b2c8;
+  --theme-text-tertiary: #6f7d95;
+  --theme-success: #4cc38a;
+  --theme-warning: #e5a54a;
+  --theme-danger: #f0656a;
+  --theme-info: #6ea8ff;
+  --theme-mix-base: #000000;
+  --theme-mix-strong: #ffffff;
+  --theme-shadow: #000000;
+}
+
+:root.dark[data-palette='mint'] {
+  --theme-brand: #5fd3c0;
+  --theme-brand-strong: #86e6d6;
+  --theme-brand-contrast: #06201c;
+  --theme-chrome: #07110f;
+  --theme-sidebar: #0e1a18;
+  --theme-panel: #0b1715;
+  --theme-content: #091412;
+  --theme-elevated: #12201d;
+  --theme-border: #1f3733;
+  --theme-text: #e4f4f1;
+  --theme-text-secondary: #a3c4bf;
+  --theme-text-tertiary: #6e8f8a;
+  --theme-success: #4cc38a;
+  --theme-warning: #e5a54a;
+  --theme-danger: #f0656a;
+  --theme-info: #66c7e0;
+  --theme-mix-base: #000000;
+  --theme-mix-strong: #ffffff;
+  --theme-shadow: #000000;
+}
+
+:root.dark[data-palette='sunset'] {
+  --theme-brand: #f49a72;
+  --theme-brand-strong: #ffb694;
+  --theme-brand-contrast: #2a120a;
+  --theme-chrome: #120c09;
+  --theme-sidebar: #1a120e;
+  --theme-panel: #160f0b;
+  --theme-content: #140d0a;
+  --theme-elevated: #211712;
+  --theme-border: #3a2821;
+  --theme-text: #f6e9e2;
+  --theme-text-secondary: #c9afa2;
+  --theme-text-tertiary: #94786b;
+  --theme-success: #4cc38a;
+  --theme-warning: #e5a54a;
+  --theme-danger: #f0656a;
+  --theme-info: #6ea8ff;
+  --theme-mix-base: #000000;
+  --theme-mix-strong: #ffffff;
+  --theme-shadow: #000000;
+}
+
+:root.dark[data-palette='violet'] {
+  --theme-brand: #b4a2ff;
+  --theme-brand-strong: #cdbfff;
+  --theme-brand-contrast: #170f30;
+  --theme-chrome: #0b0914;
+  --theme-sidebar: #12101f;
+  --theme-panel: #0f0d1a;
+  --theme-content: #0d0b16;
+  --theme-elevated: #191628;
+  --theme-border: #2c2740;
+  --theme-text: #ede9fa;
+  --theme-text-secondary: #b3a9ce;
+  --theme-text-tertiary: #7e7399;
+  --theme-success: #4cc38a;
+  --theme-warning: #e5a54a;
+  --theme-danger: #f0656a;
+  --theme-info: #6ea8ff;
+  --theme-mix-base: #000000;
+  --theme-mix-strong: #ffffff;
+  --theme-shadow: #000000;
+}
