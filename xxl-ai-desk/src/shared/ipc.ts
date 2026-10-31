@@ -16,6 +16,7 @@ export * from './contracts/shell'
 export * from './contracts/mcp'
 export * from './contracts/skill'
 export * from './contracts/browser'
+export * from './contracts/agent'
 export * from './defaults'
 export * from './history'
 
@@ -56,6 +57,7 @@ import type {
   BrowserActionRequest,
   BrowserOpenTabRequest
 } from './contracts/browser'
+import type { AgentMemoryDTO, AgentMemorySaveInput } from './contracts/agent'
 import type {
   McpCategory,
   McpDiscoverDetail,
@@ -112,6 +114,15 @@ export interface DeskApi {
     get(): Promise<AppSettings>
     /* 保存设置片段并返回完整设置 */
     save(patch: Partial<AppSettings>): Promise<AppSettings>
+  }
+  /* Agent 记忆（按项目维度维护） */
+  agentMemory: {
+    /* 项目记忆列表（无记忆的项目 content 为空） */
+    list(): Promise<AgentMemoryDTO[]>
+    /* 保存项目记忆（手动编辑） */
+    save(input: AgentMemorySaveInput): Promise<AgentMemoryDTO>
+    /* 删除项目记忆（仅清记忆，不删项目） */
+    remove(projectId: string): Promise<void>
   }
   /* 供应商（OpenAI 兼容端点）管理 */
   provider: {
@@ -317,6 +328,10 @@ export const IPC = {
   /* 应用设置 */
   settingsGet: 'desk:settings:get',
   settingsSave: 'desk:settings:save',
+  /* Agent 记忆 */
+  agentMemoryList: 'desk:agent-memory:list',
+  agentMemorySave: 'desk:agent-memory:save',
+  agentMemoryRemove: 'desk:agent-memory:remove',
   /* 供应商 */
   providerList: 'desk:provider:list',
   providerSave: 'desk:provider:save',

@@ -23,6 +23,7 @@ import {
   testMcpServer
 } from './mcp/client'
 import { clearSessionPermissions } from './sandbox'
+import { generateMemoryContent } from './memory'
 import {
   cancelAllInteractions,
   cancelSessionInteractions,
@@ -198,6 +199,21 @@ async function handleRun(input: RunAgentInput): Promise<void> {
   }
 }
 
+/* 记忆生成：调用一次模型压缩，结果回传主进程（失败只回错误，不影响对话） */
+async function handleMemoryGenerate(input: Parameters<typeof generateMemoryContent>[0]): Promise<void> {
+  try {
+    const content = await generateMemoryContent(input)
+    post({ type: 'memory-result', requestId: input.requestId, ok: true, content })
+  } catch (error) {
+    post({
+      type: 'memory-result',
+      requestId: input.requestId,
+      ok: false,
+      message: (error as Error).message
+    })
+  }
+}
+
 /* 连通测试：临时连接 MCP 服务，返回服务信息与工具明细 */
 async function handleMcpTest(
   requestId: string,
@@ -238,6 +254,9 @@ function handleRequest(message: WorkerRequest): void {
       break
     case 'mcp-tools':
       void handleMcpTools(message.requestId, message.server, message.runtimePath)
+      break
+    case 'memory-generate':
+      void handleMemoryGenerate(message.input)
       break
     case 'browser-action-result': {
       const resolve = pendingBrowserActions.get(message.requestId)

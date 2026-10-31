@@ -28,6 +28,7 @@ import { listEnabledMcpServers } from './mcpService'
 import { listEnabledSkillsForRuntime } from './skillService'
 import { appendMessages, getSession, listMessages, updateSession } from './sessionService'
 import { getProject } from './projectService'
+import { getAgentMemory, maybeGenerateAgentMemory } from './agentMemoryService'
 import { buildRuntimePath } from './envService'
 import { abortAgent, evictAgent, isAgentRunning, runAgent } from '../agent/host/runtimeHost'
 import { resolveInteraction, cancelInteractionsOf } from '../agent/host/interaction'
@@ -277,7 +278,16 @@ export async function sendChat(
     /* 技能清单：全局启用，摘要随系统提示下发，正文由 read_skill 按需读取 */
     const skills = listEnabledSkillsForRuntime()
     /* 自定义指令全局生效：统一取当前设置，并附技能索引与模式说明（个性化变更对旧对话同样生效） */
-    const systemPrompt = `${settings.systemPrompt || ''}${buildSkillPrompt(skills)}${modeSystemHint(mode)}${hitlSystemHint(settings.builtinToolInteractionEnabled)}`
+    /* Agent 记忆：开启且会话归属项目时注入，作为可能过时的历史事实，冲突以当前指令为准 */
+    const memory = settings.agentMemoryEnabled && project ? getAgentMemory(project.id) : ''
+    const memoryPrompt = memory ? translate(language, 'agent.memoryInject', [memory]) : ''
+    const systemPrompt = [
+      settings.systemPrompt || '',
+      memoryPrompt,
+      buildSkillPrompt(skills),
+      modeSystemHint(mode),
+      hitlSystemHint(settings.builtinToolInteractionEnabled)
+    ].join('')
     /* 历史消息不携带 system 提示：系统指令始终取当前设置，保证旧对话也随设置变更生效 */
     /* 模型上下文与完整历史分离：这里只构造最近窗口，数据库仍保留完整历史 */
     const history = trimHistory(
@@ -343,6 +353,10 @@ export async function sendChat(
       }))
     appendMessages(sessionId, serialized)
     committed = true
+    /* 记忆生成异步执行：不阻塞本轮结束，失败只记日志（保留旧记忆） */
+    void maybeGenerateAgentMemory(sessionId).catch((error) => {
+      log.warn(`[chat] 记忆生成异常 session=${sessionId}`, error)
+    })
   } catch (error) {
     /* 主进程侧异常（读库/落库等）：记录堆栈、清理运行时缓存并落库错误提示 */
     log.error(`[chat] 本轮执行异常 session=${sessionId}`, error)

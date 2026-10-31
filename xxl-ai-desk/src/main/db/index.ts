@@ -89,6 +89,15 @@ CREATE TABLE IF NOT EXISTS desk_skill (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS i_desk_skill_source_id ON desk_skill (source_id) WHERE source_id <> '';
 CREATE INDEX IF NOT EXISTS i_desk_skill_enabled ON desk_skill (enabled);
+CREATE TABLE IF NOT EXISTS desk_agent_memory (
+  id              TEXT PRIMARY KEY,
+  project_id      TEXT NOT NULL DEFAULT '',
+  content         TEXT NOT NULL DEFAULT '',
+  last_message_id TEXT NOT NULL DEFAULT '',
+  add_time        TEXT NOT NULL DEFAULT '',
+  update_time     TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS i_desk_agent_memory_project ON desk_agent_memory (project_id);
 `
 
 /* 原生 better-sqlite3 连接（迁移直接执行 SQL 用） */

@@ -3,6 +3,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { IPC } from '../shared/ipc'
 import type {
+  AgentMemoryDTO,
+  AgentMemorySaveInput,
   AppSettings,
   BrowserActionRequest,
   BrowserActionResult,
@@ -78,6 +80,16 @@ const api: DeskApi = {
     get: () => ipcRenderer.invoke(IPC.settingsGet),
     /* 保存设置片段 */
     save: (patch: Partial<AppSettings>) => ipcRenderer.invoke(IPC.settingsSave, patch)
+  },
+  /* Agent 记忆 */
+  agentMemory: {
+    /* 项目记忆列表 */
+    list: (): Promise<AgentMemoryDTO[]> => ipcRenderer.invoke(IPC.agentMemoryList),
+    /* 保存项目记忆 */
+    save: (input: AgentMemorySaveInput): Promise<AgentMemoryDTO> =>
+      ipcRenderer.invoke(IPC.agentMemorySave, input),
+    /* 删除项目记忆 */
+    remove: (projectId: string) => ipcRenderer.invoke(IPC.agentMemoryRemove, projectId)
   },
   /* 供应商管理 */
   provider: {

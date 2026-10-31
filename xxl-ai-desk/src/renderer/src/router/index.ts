@@ -12,6 +12,12 @@ const PLUGIN_PAGES: Record<string, () => Promise<{ default: Component }>> = {
   builtin: () => import('@renderer/modules/plugin/builtin/pages/index.vue')
 }
 
+/* Agent 子页组件映射 */
+const AGENT_PAGES: Record<string, () => Promise<{ default: Component }>> = {
+  instructions: () => import('@renderer/modules/agent/instructions/pages/index.vue'),
+  memory: () => import('@renderer/modules/agent/memory/pages/index.vue')
+}
+
 /* 桌面端使用 hash 路由，兼容 file:// 加载 */
 const router = createRouter({
   history: createWebHashHistory(),
@@ -25,6 +31,18 @@ const router = createRouter({
       path: '/settings',
       name: 'settings',
       component: () => import('@renderer/modules/settings/pages/index.vue')
+    },
+    {
+      path: '/agent',
+      component: () => import('@renderer/modules/agent/pages/index.vue'),
+      redirect: NAV_SECTIONS.agent.entryPath,
+      children: NAV_SECTIONS.agent.items
+        .filter((item) => item.path && AGENT_PAGES[item.key])
+        .map((item) => ({
+          path: item.key,
+          name: `agent-${item.key}`,
+          component: AGENT_PAGES[item.key]
+        }))
     },
     {
       path: '/plugin',

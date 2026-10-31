@@ -7,7 +7,7 @@ import { basename } from 'path'
 import { randomUUID } from 'crypto'
 import { eq, inArray } from 'drizzle-orm'
 import { getDb } from '../db'
-import { messageTable, projectTable, sessionTable } from '../db/schema'
+import { messageTable, projectTable, sessionTable, agentMemoryTable } from '../db/schema'
 import { disposeTerminalsBySession } from './terminalService'
 import type { ProjectCreateInput, ProjectDTO } from '@shared/ipc'
 
@@ -94,6 +94,8 @@ export function deleteProject(id: string): string[] {
     db.delete(sessionTable).where(inArray(sessionTable.id, sessionIds)).run()
   }
   db.delete(projectTable).where(eq(projectTable.id, id)).run()
+  /* 级联删除项目记忆（SQLite 无外键，服务层统一闭环） */
+  db.delete(agentMemoryTable).where(eq(agentMemoryTable.projectId, id)).run()
   /* 级联回收项目下会话的终端进程 */
   sessionIds.forEach((sessionId) => disposeTerminalsBySession(sessionId))
   return sessionIds

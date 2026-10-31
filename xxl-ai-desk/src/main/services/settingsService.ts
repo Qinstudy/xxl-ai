@@ -7,6 +7,7 @@
 import { getDb } from '../db'
 import { settingTable } from '../db/schema'
 import {
+  AGENT_INSTRUCTION_MAX_CHARS,
   APPEARANCES,
   DEFAULT_APP_SETTINGS,
   DEFAULT_SHORTCUTS,
@@ -63,7 +64,7 @@ export function getSettings(): AppSettings {
     language,
     providerId: map.get('providerId') || DEFAULT_APP_SETTINGS.providerId,
     modelId: map.get('modelId') || DEFAULT_APP_SETTINGS.modelId,
-    systemPrompt: map.get('systemPrompt') ?? translate(language, 'runtime.defaultSystemPrompt'),
+    systemPrompt: map.get('systemPrompt') ?? translate(language, 'agent.presets.general.prompt'),
     appName: map.get('appName') ?? DEFAULT_APP_SETTINGS.appName,
     slogan: map.get('slogan') ?? DEFAULT_APP_SETTINGS.slogan,
     shortcuts: parseShortcuts(map.get('shortcuts')),
@@ -75,7 +76,8 @@ export function getSettings(): AppSettings {
     builtinToolFsEnabled: map.get('builtinToolFsEnabled') !== 'false',
     builtinToolShellEnabled: map.get('builtinToolShellEnabled') !== 'false',
     builtinToolGeneralEnabled: map.get('builtinToolGeneralEnabled') !== 'false',
-    builtinToolInteractionEnabled: map.get('builtinToolInteractionEnabled') !== 'false'
+    builtinToolInteractionEnabled: map.get('builtinToolInteractionEnabled') !== 'false',
+    agentMemoryEnabled: map.get('agentMemoryEnabled') === 'true'
   }
 }
 
@@ -86,7 +88,10 @@ export function saveSettings(patch: Partial<AppSettings>): AppSettings {
     if (value === undefined || value === null) {
       continue
     }
-    const text = typeof value === 'object' ? JSON.stringify(value) : String(value)
+    /* Agent 指令固定上限：主进程兜底截断，避免超长提示词进入上下文 */
+    const normalized =
+      key === 'systemPrompt' ? String(value).slice(0, AGENT_INSTRUCTION_MAX_CHARS) : value
+    const text = typeof normalized === 'object' ? JSON.stringify(normalized) : String(normalized)
     db.insert(settingTable)
       .values({ key, value: text })
       .onConflictDoUpdate({ target: settingTable.key, set: { value: text } })

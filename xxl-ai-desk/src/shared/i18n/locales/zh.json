@@ -267,6 +267,63 @@
     "needProject": "请先选择项目",
     "duplicate": "该目录已创建项目"
   },
+  "agent": {
+    "title": "Agent",
+    "instructions": "指令",
+    "memory": "记忆",
+    "instructionsTitle": "Agent 指令",
+    "instructionsTip": "作为每次对话的系统指令，统一应用于所有项目与会话。",
+    "instructionsPlaceholder": "设定 Agent 的角色与行为，例如：回答简洁；修改代码前先说明方案。",
+    "presetLabel": "预设指令",
+    "presets": {
+      "general": {
+        "label": "通用助手",
+        "prompt": "你是严谨、务实的通用助手。回答先给结论，再给必要依据；信息不足时明确说明并追问，不臆造事实。"
+      },
+      "coding": {
+        "label": "编码协作",
+        "prompt": "你是资深软件工程师。修改代码前先说明方案与影响范围，遵循项目现有结构与规范；完成后说明改动点与验证方式。"
+      },
+      "review": {
+        "label": "代码审查",
+        "prompt": "你是资深代码审查员。聚焦正确性、安全性与可维护性，按严重程度列出问题，并给出可直接执行的修改建议，不纠缠风格细节。"
+      },
+      "analysis": {
+        "label": "需求分析",
+        "prompt": "你是需求分析师。先确认目标、范围与约束，再输出分步可执行方案；对不确定项列出待确认问题，避免自行假设。"
+      },
+      "concise": {
+        "label": "简洁回答",
+        "prompt": "请保持简洁：先给结论，再给必要说明；不重复问题背景，不使用客套话，不展开无关内容。"
+      }
+    },
+    "memoryTitle": "Agent 记忆",
+    "memoryTip": "开启后，系统将按项目生成记忆，并在对话时作为上下文注入。",
+    "memoryEnabled": "启用记忆",
+    "memoryRule": "每 {0} 轮对话生成一次，涵盖用户偏好、项目事实、关键决策与待办风险。",
+    "memoryProject": "项目",
+    "memoryContent": "记忆内容",
+    "memoryUpdatedAt": "更新时间",
+    "memoryView": "查看",
+    "memoryDialogTitle": "「{0}」的项目记忆",
+    "memoryEmpty": "暂无项目",
+    "memoryOff": "记忆已关闭，项目记忆内容为空",
+    "memoryContentEmpty": "暂无记忆内容",
+    "memoryDeleteConfirm": "确定删除项目「{0}」的记忆？该操作不可恢复。",
+    "memoryContentPlaceholder": "按固定维度维护项目记忆，保存后在下次对话注入",
+    "memoryInject": "\n\n## Agent 记忆\n以下为历史记忆，可能过时；如与当前指令或实际文件冲突，以当前信息为准。\n{0}",
+    "memoryGen": {
+      "system": "你是记忆压缩助手。请把「旧记忆」与「最近对话」压缩成一份新的项目记忆，只输出 Markdown，且必须包含以下四个二级标题章节：## {0}、## {1}、## {2}、## {3}。要求：总字数不超过 2000 字；只保留长期有用的事实、偏好、决策与待办；不得编造；不得记录密钥、口令等敏感信息；无内容的章节写「暂无」。",
+      "user": "旧记忆：\n{0}\n\n最近对话：\n{1}",
+      "empty": "（无）"
+    },
+    "memoryDim": {
+      "preference": "用户偏好",
+      "fact": "项目事实",
+      "decision": "关键决策",
+      "todo": "待办与风险"
+    }
+  },
   "settings": {
     "title": "系统设置",
     "back": "返回对话",
@@ -295,8 +352,6 @@
     "namePlaceholder": "显示在左上角的应用名称",
     "slogan": "Slogan",
     "sloganPlaceholder": "空态欢迎语，如：需要我帮你做什么？",
-    "customInstruction": "自定义指令",
-    "customInstructionPlaceholder": "设定 Agent 的角色与行为，将作为新对话的系统指令",
     "systemPrompt": "系统指令",
     "systemPromptPlaceholder": "设定 Agent 的角色与行为",
     "providers": "模型供应商",
@@ -362,7 +417,7 @@
     "languageEn": "English"
   },
   "plugin": {
-    "title": "插件",
+    "title": "插件中心",
     "mcp": "MCP工具",
     "skill": "SKILL技能",
     "builtin": "内置工具",
@@ -590,7 +645,6 @@
     "providerNoModel": "请为供应商配置至少一个模型",
     "apiKeyMissing": "供应商「{0}」未配置 API Key，无法调用模型「{1}」，请在「设置」中补全后重试",
     "callFailed": "模型「{0}」（供应商「{1}」）调用失败{2}",
-    "defaultSystemPrompt": "你是 XXL-AI-Desk 智能助手，回答简洁、准确、有条理。",
     "continuePrompt": "[异常] 上一轮未正常结束，请继续输出剩余正文或工具调用，不要重复已有内容。",
     "tool": {
       "pathBlocked": "已拦截：超出项目目录",

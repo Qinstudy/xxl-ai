@@ -63,6 +63,8 @@ export interface AppSettings {
   builtinToolGeneralEnabled: boolean
   /* 人机交互工具是否启用（关闭后模型不再获得 ask_user，改为在正文直接询问） */
   builtinToolInteractionEnabled: boolean
+  /* Agent 记忆是否启用（开启后每 30 轮对话异步压缩生成项目记忆） */
+  agentMemoryEnabled: boolean
 }
 
 /* 运行时可执行文件检测入参 */

@@ -267,6 +267,63 @@
     "needProject": "Please select a project first",
     "duplicate": "A project already exists for this folder"
   },
+  "agent": {
+    "title": "Agent",
+    "instructions": "Instructions",
+    "memory": "Memory",
+    "instructionsTitle": "Agent Instructions",
+    "instructionsTip": "Used as the system instruction for every conversation and applied to all projects and sessions.",
+    "instructionsPlaceholder": "Define the agent's role and behavior, e.g. answer concisely; explain the plan before editing code.",
+    "presetLabel": "Presets",
+    "presets": {
+      "general": {
+        "label": "General Assistant",
+        "prompt": "You are a rigorous and pragmatic general assistant. Lead with the conclusion, then the necessary rationale. When information is insufficient, state it clearly and ask; never fabricate facts."
+      },
+      "coding": {
+        "label": "Coding Partner",
+        "prompt": "You are a senior software engineer. Before changing code, explain the approach and impact, and follow the project's existing structure and conventions. Afterward, describe the changes and how they were verified."
+      },
+      "review": {
+        "label": "Code Review",
+        "prompt": "You are a senior code reviewer. Focus on correctness, security, and maintainability. List issues by severity with directly actionable fixes; do not dwell on stylistic details."
+      },
+      "analysis": {
+        "label": "Requirement Analysis",
+        "prompt": "You are a requirements analyst. First confirm the goal, scope, and constraints, then produce a step-by-step executable plan. List open questions for uncertainties instead of making assumptions."
+      },
+      "concise": {
+        "label": "Concise Answers",
+        "prompt": "Be concise: give the conclusion first, then only the necessary explanation. Do not repeat the question background, use pleasantries, or expand on unrelated details."
+      }
+    },
+    "memoryTitle": "Agent Memory",
+    "memoryTip": "When enabled, the system generates memory per project and injects it into conversations as context.",
+    "memoryEnabled": "Enable memory",
+    "memoryRule": "Generated every {0} rounds, covering user preferences, project facts, key decisions, todos and risks.",
+    "memoryProject": "Project",
+    "memoryContent": "Memory",
+    "memoryUpdatedAt": "Updated",
+    "memoryView": "View",
+    "memoryDialogTitle": "Memory of \"{0}\"",
+    "memoryEmpty": "No projects",
+    "memoryOff": "Memory is disabled, project memory content is empty",
+    "memoryContentEmpty": "No memory yet",
+    "memoryDeleteConfirm": "Delete the memory of project \"{0}\"? This cannot be undone.",
+    "memoryContentPlaceholder": "Maintain project memory by the fixed dimensions; it is injected into the next chat after saving",
+    "memoryInject": "\n\n## Agent Memory\nHistory memory may be outdated; if it conflicts with current instructions or actual files, trust the current information.\n{0}",
+    "memoryGen": {
+      "system": "You are a memory compression assistant. Compress the old memory and recent conversation into a new project memory. Output Markdown only, with exactly these four level-2 sections: ## {0}, ## {1}, ## {2}, ## {3}. Requirements: at most 2000 characters; keep only long-term useful facts, preferences, decisions and todos; never fabricate; never record secrets or passwords; write \"None\" for empty sections.",
+      "user": "Old memory:\n{0}\n\nRecent conversation:\n{1}",
+      "empty": "(none)"
+    },
+    "memoryDim": {
+      "preference": "User preferences",
+      "fact": "Project facts",
+      "decision": "Key decisions",
+      "todo": "Todos and risks"
+    }
+  },
   "settings": {
     "title": "Settings",
     "back": "Back to chat",
@@ -295,8 +352,6 @@
     "namePlaceholder": "App name shown at the top-left corner",
     "slogan": "Slogan",
     "sloganPlaceholder": "Welcome text on the empty state, e.g. What can I help you with?",
-    "customInstruction": "Custom instructions",
-    "customInstructionPlaceholder": "Define the agent's role and behavior; used as the system prompt for new chats",
     "systemPrompt": "System prompt",
     "systemPromptPlaceholder": "Define the agent's role and behavior",
     "providers": "Model providers",
@@ -362,7 +417,7 @@
     "languageEn": "English"
   },
   "plugin": {
-    "title": "Plugins",
+    "title": "Plugin Center",
     "mcp": "MCP Tools",
     "skill": "SKILL Skills",
     "builtin": "Built-in Tools",
@@ -590,7 +645,6 @@
     "providerNoModel": "Configure at least one model for this provider.",
     "apiKeyMissing": "Provider \"{0}\" has no API key, so model \"{1}\" cannot be called. Configure it in Settings and retry.",
     "callFailed": "Model \"{0}\" (provider \"{1}\") call failed{2}",
-    "defaultSystemPrompt": "You are the XXL-AI-Desk assistant. Answer concisely, accurately, and clearly.",
     "continuePrompt": "[Error] The previous turn did not finish normally. Continue with the remaining text or tool calls without repeating existing content.",
     "tool": {
       "pathBlocked": "Blocked: outside the project directory",

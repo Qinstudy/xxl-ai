@@ -19,7 +19,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   language: 'zh',
   providerId: '',
   modelId: '',
-  systemPrompt: translate('zh', 'runtime.defaultSystemPrompt'),
+  systemPrompt: translate('zh', 'agent.presets.general.prompt'),
   appName: '',
   slogan: '',
   shortcuts: DEFAULT_SHORTCUTS,
@@ -31,7 +31,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   builtinToolFsEnabled: true,
   builtinToolShellEnabled: true,
   builtinToolGeneralEnabled: true,
-  builtinToolInteractionEnabled: true
+  builtinToolInteractionEnabled: true,
+  agentMemoryEnabled: false
 }
 
 /* 生成一份可安全修改的默认设置副本（含嵌套 shortcuts） */

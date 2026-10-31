@@ -4,7 +4,7 @@
 */
 
 /* 一级板块标识 */
-export type SectionKey = 'home' | 'plugin' | 'settings'
+export type SectionKey = 'home' | 'agent' | 'plugin' | 'settings'
 
 /* 子菜单项公共字段 */
 interface NavItemBase {
@@ -27,15 +27,24 @@ export interface NavSection {
   items: NavItem[]
 }
 
-/* 插件 / 系统设置 两个板块的子菜单 */
-export const NAV_SECTIONS: Record<'plugin' | 'settings', NavSection> = {
+/* Agent / 插件 / 系统设置 三个板块的子菜单 */
+export const NAV_SECTIONS: Record<Exclude<SectionKey, 'home'>, NavSection> = {
+  agent: {
+    key: 'agent',
+    titleKey: 'agent.title',
+    entryPath: '/agent/instructions',
+    items: [
+      { key: 'instructions', labelKey: 'agent.instructions', icon: 'Document', path: '/agent/instructions' },
+      { key: 'memory', labelKey: 'agent.memory', icon: 'Clock', path: '/agent/memory' }
+    ]
+  },
   plugin: {
     key: 'plugin',
     titleKey: 'plugin.title',
     entryPath: '/plugin/mcp',
     items: [
       { key: 'mcp', labelKey: 'plugin.mcp', icon: 'Connection', path: '/plugin/mcp' },
-      { key: 'skill', labelKey: 'plugin.skill', icon: 'MagicStick', path: '/plugin/skill' },
+      { key: 'skill', labelKey: 'plugin.skill', icon: 'Notebook', path: '/plugin/skill' },
       { key: 'builtin', labelKey: 'plugin.builtin', icon: 'Operation', path: '/plugin/builtin' }
     ]
   },
@@ -60,6 +69,7 @@ export const NAV_SECTIONS: Record<'plugin' | 'settings', NavSection> = {
 /* 各板块入口路径（图标栏切换用） */
 export const SECTION_ENTRY: Record<SectionKey, string> = {
   home: '/',
+  agent: NAV_SECTIONS.agent.entryPath,
   plugin: NAV_SECTIONS.plugin.entryPath,
   settings: NAV_SECTIONS.settings.entryPath
 }
@@ -67,12 +77,16 @@ export const SECTION_ENTRY: Record<SectionKey, string> = {
 /* 各板块图标（全局注册的图标组件名）：图标栏与顶栏标题共用同一来源 */
 export const SECTION_ICON: Record<SectionKey, string> = {
   home: 'ChatDotRound',
+  agent: 'MagicStick',
   plugin: 'SetUp',
   settings: 'Setting'
 }
 
 /* 由路由路径解析所属一级板块 */
 export function sectionOfPath(path: string): SectionKey {
+  if (path.startsWith('/agent')) {
+    return 'agent'
+  }
   if (path.startsWith('/plugin')) {
     return 'plugin'
   }

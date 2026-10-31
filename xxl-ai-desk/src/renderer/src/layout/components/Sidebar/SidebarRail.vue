@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
- * 左侧常驻导航图标栏：首页 / 插件 / 底部系统设置，切换一级板块
+ * 左侧常驻导航图标栏：首页 / Agent / 插件 / 底部系统设置，切换一级板块
  * @author xuxueli 2026-10-18
  */
 import { computed } from 'vue'
@@ -16,6 +16,21 @@ const layout = useLayoutStore()
 /* 当前所属板块（高亮对应入口） */
 const section = computed(() => sectionOfPath(route.path))
 
+/* 图标栏分组：顶部功能组 + 底部系统设置组 */
+interface RailEntry {
+  key: SectionKey
+  labelKey: string
+}
+
+const RAIL_GROUPS: RailEntry[][] = [
+  [
+    { key: 'home', labelKey: 'chat.title' },
+    { key: 'agent', labelKey: 'agent.title' },
+    { key: 'plugin', labelKey: 'plugin.title' }
+  ],
+  [{ key: 'settings', labelKey: 'settings.title' }]
+]
+
 /* 切换板块：点击其它板块展开子菜单栏并跳转入口地址；点击当前板块则折叠/展开子菜单栏 */
 function go(key: SectionKey): void {
   if (section.value === key) {
@@ -29,35 +44,28 @@ function go(key: SectionKey): void {
 
 <template>
   <nav class="sidebar-rail">
-    <div class="rail-group">
-      <button
-        class="rail-btn"
-        :class="{ active: section === 'home' }"
-        :title="t('chat.title')"
-        @click="go('home')"
+    <div v-for="(group, groupIndex) in RAIL_GROUPS" :key="groupIndex" class="rail-group">
+      <el-tooltip
+        v-for="entry in group"
+        :key="entry.key"
+        :content="t(entry.labelKey)"
+        placement="right"
+        effect="light"
+        :show-after="0"
+        :hide-after="0"
+        :offset="8"
+        transition=""
+        popper-class="rail-tooltip"
       >
-        <!-- 首页：会话气泡 -->
-        <el-icon><component :is="SECTION_ICON.home" /></el-icon>
-      </button>
-      <button
-        class="rail-btn"
-        :class="{ active: section === 'plugin' }"
-        :title="t('plugin.title')"
-        @click="go('plugin')"
-      >
-        <!-- 插件：装配/扩展 -->
-        <el-icon><component :is="SECTION_ICON.plugin" /></el-icon>
-      </button>
-    </div>
-    <div class="rail-group">
-      <button
-        class="rail-btn"
-        :class="{ active: section === 'settings' }"
-        :title="t('settings.title')"
-        @click="go('settings')"
-      >
-        <el-icon><component :is="SECTION_ICON.settings" /></el-icon>
-      </button>
+        <button
+          class="rail-btn"
+          :class="{ active: section === entry.key }"
+          :aria-label="t(entry.labelKey)"
+          @click="go(entry.key)"
+        >
+          <el-icon><component :is="SECTION_ICON[entry.key]" /></el-icon>
+        </button>
+      </el-tooltip>
     </div>
   </nav>
 </template>

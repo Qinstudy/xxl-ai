@@ -17,13 +17,23 @@ const settings = useSettingsStore()
 /* 当前所属板块 */
 const section = computed(() => sectionOfPath(route.path))
 
-/* 非首页板块的子菜单定义（插件 / 系统设置）；首页为自定义面板 */
-const submenu = computed(() => (section.value === 'home' ? null : NAV_SECTIONS[section.value]))
+/* 非首页板块的子菜单定义（Agent / 插件 / 系统设置）；首页为自定义面板 */
+const submenu = computed(() => {
+  if (section.value === 'home') {
+    return null
+  }
+  return NAV_SECTIONS[section.value]
+})
 
-/* 当前子菜单选中项：插件按路由、系统设置按设置分类 */
-const activeKey = computed(() =>
-  section.value === 'plugin' ? navItemKey('plugin', route.path) : settings.activeTab
-)
+/* 当前子菜单选中项：系统设置按设置分类，其余板块按路由 */
+const activeKey = computed(() => {
+  if (!submenu.value || section.value === 'home') {
+    return ''
+  }
+  return section.value === 'settings'
+    ? settings.activeTab
+    : navItemKey(section.value, route.path)
+})
 
 /* 子菜单项点击：插件跳路由；系统设置切分类并进入设置页 */
 function onSubmenuSelect(item: NavItem): void {

@@ -9,6 +9,7 @@ import log from 'electron-log/main'
 import { IPC } from '@shared/ipc'
 import { logIpcError } from './utils/logger'
 import type {
+  AgentMemorySaveInput,
   AppSettings,
   BrowserAction,
   BrowserActionResult,
@@ -30,6 +31,11 @@ import type {
   TerminalCreateInput
 } from '@shared/ipc'
 import { getSettings, saveSettings } from './services/settingsService'
+import {
+  listAgentMemories,
+  removeAgentMemory,
+  saveAgentMemory
+} from './services/agentMemoryService'
 import { getDataDir, getDbFile, getDefaultDataDir, setDataDir } from './config/paths'
 import { detectExecutable } from './services/envService'
 import { checkForUpdate, openDownload } from './services/updateService'
@@ -227,6 +233,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     }
     return saved
   })
+
+  /* --- Agent 记忆 --- */
+  handle(IPC.agentMemoryList, () => listAgentMemories())
+  handle(IPC.agentMemorySave, (_event, input: AgentMemorySaveInput) => saveAgentMemory(input))
+  handle(IPC.agentMemoryRemove, (_event, projectId: string) => removeAgentMemory(projectId))
 
   /* --- 供应商 --- */
   handle(IPC.providerList, () => listProviders())

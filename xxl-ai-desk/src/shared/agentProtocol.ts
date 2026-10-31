@@ -83,6 +83,22 @@ export interface RunAgentInput {
   text: string
 }
 
+/* Agent 记忆生成入参（主进程组装提示词，运行时进程只调用模型） */
+export interface MemoryGenerateInput {
+  /* 请求标识（结果回传关联） */
+  requestId: string
+  /* 供应商运行时配置 */
+  provider: ProviderModelConfig
+  /* 模型 ID */
+  modelId: string
+  /* 应用语言：提示词与输出语言 */
+  language: 'zh' | 'en'
+  /* 旧记忆（为空表示首次生成） */
+  oldMemory: string
+  /* 最近对话转录文本 */
+  transcript: string
+}
+
 /* 主进程 → 运行时进程 */
 export type WorkerRequest =
   | { type: 'run'; input: RunAgentInput } /* 启动一轮对话 */
@@ -94,6 +110,7 @@ export type WorkerRequest =
   | { type: 'interaction-response'; requestId: string; result: InteractionResult } /* 回传用户交互结果 */
   | { type: 'mcp-test'; requestId: string; server: McpRuntimeConfig; runtimePath: string } /* 连通测试（临时连接） */
   | { type: 'mcp-tools'; requestId: string; server: McpRuntimeConfig; runtimePath: string } /* 列举工具（复用连接缓存） */
+  | { type: 'memory-generate'; input: MemoryGenerateInput } /* 生成 Agent 记忆 */
   | { type: 'browser-action-result'; requestId: string; result: BrowserActionResult } /* 页面动作结果回传 */
 
 /* 运行时进程 → 主进程 */
@@ -107,4 +124,5 @@ export type WorkerMessage =
   | { type: 'interaction-cancel'; requestId: string } /* 交互取消（关闭渲染层弹窗） */
   | { type: 'mcp-test-result'; requestId: string; result: McpTestResult } /* 连通测试结果 */
   | { type: 'mcp-tools-result'; requestId: string; tools: McpToolMeta[] } /* 工具列表结果 */
+  | { type: 'memory-result'; requestId: string; ok: boolean; content?: string; message?: string } /* 记忆生成结果 */
   | { type: 'mcp-result-error'; requestId: string; message: string } /* MCP 操作失败 */

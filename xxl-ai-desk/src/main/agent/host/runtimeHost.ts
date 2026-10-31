@@ -13,6 +13,7 @@ import { openInteraction, cancelInteraction, clearInteractions } from './interac
 import { requestBrowserAction } from './browserBridge'
 import type {
   HostEvent,
+  MemoryGenerateInput,
   RunAgentInput,
   WorkerMessage,
   WorkerRequest
@@ -38,6 +39,15 @@ const pendingMcp = new Map<
 
 /* MCP 请求超时（毫秒）：握手 30s + 列举 30s，留出余量 */
 const MCP_REQUEST_TIMEOUT = 90000
+
+/* 记忆生成超时（毫秒）：一次非流式补全，留出足够生成 2000 字的余量 */
+const MEMORY_REQUEST_TIMEOUT = 180000
+
+/* 进行中的记忆生成：requestId → 结算 */
+const pendingMemory = new Map<
+  string,
+  { resolve: (content: string) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
+>()
 
 /* 右侧「浏览器」面板打开回调（由 ipc.ts 注册，把 URL 转发到对应会话的渲染层标签页） */
 let browserOpener: ((sessionId: string, url: string, newTab: boolean) => void) | null = null
@@ -86,6 +96,12 @@ function ensureWorker(): Promise<UtilityProcess> {
       clearTimeout(pending.timer)
       pending.reject(new Error('Agent 运行时进程异常退出，请重试'))
       pendingMcp.delete(requestId)
+    }
+    /* 未结算的记忆生成同样统一失败 */
+    for (const [requestId, pending] of pendingMemory) {
+      clearTimeout(pending.timer)
+      pending.reject(new Error('Agent 运行时进程异常退出，请重试'))
+      pendingMemory.delete(requestId)
     }
   })
   return workerReady
@@ -151,6 +167,19 @@ async function handleMessage(message: WorkerMessage): Promise<void> {
         clearTimeout(pending.timer)
         pendingMcp.delete(message.requestId)
         pending.reject(new Error(message.message))
+      }
+      break
+    }
+    case 'memory-result': {
+      const pending = pendingMemory.get(message.requestId)
+      if (pending) {
+        clearTimeout(pending.timer)
+        pendingMemory.delete(message.requestId)
+        if (message.ok) {
+          pending.resolve(message.content ?? '')
+        } else {
+          pending.reject(new Error(message.message ?? '记忆生成失败'))
+        }
       }
       break
     }
@@ -254,6 +283,30 @@ export function listMcpToolsByRuntime(
     server,
     runtimePath
   }))
+}
+
+/* 生成一次 Agent 记忆并等待结果（超时/进程退出统一转为异常） */
+export async function generateMemory(
+  input: Omit<MemoryGenerateInput, 'requestId'>
+): Promise<string> {
+  let proc: UtilityProcess
+  try {
+    proc = await ensureWorker()
+  } catch (error) {
+    throw new Error((error as Error).message)
+  }
+  const requestId = `mem_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`
+  return new Promise<string>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      pendingMemory.delete(requestId)
+      reject(new Error('记忆生成超时'))
+    }, MEMORY_REQUEST_TIMEOUT)
+    pendingMemory.set(requestId, { resolve, reject, timer })
+    proc.postMessage({
+      type: 'memory-generate',
+      input: { ...input, requestId }
+    } satisfies WorkerRequest)
+  })
 }
 
 /* 退出时终止运行时进程：先请求优雅关闭（释放 MCP 子进程），超时强杀，并兜底清理残留后代进程 */
