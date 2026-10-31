@@ -3,7 +3,6 @@
 import { app, BrowserWindow, nativeImage, shell } from 'electron'
 import { existsSync } from 'fs'
 import { join } from 'path'
-import log from 'electron-log/main'
 import { IPC } from '@shared/ipc'
 import { APP_NAME } from '@shared/appInfo'
 import { initDatabase } from './db'
@@ -16,6 +15,7 @@ import { disposeAllFsWatch } from './services/fsWatchService'
 import { disposeAllGitWatch } from './services/gitService'
 import { disposeAgentRuntime } from './agent/host/runtimeHost'
 import { disposeBrowserActions } from './agent/host/browserBridge'
+import { initLogger } from './utils/logger'
 
 /* 主窗口引用（未创建或已关闭时为 null） */
 let mainWindow: BrowserWindow | null = null
@@ -127,7 +127,7 @@ if (!gotLock) {
 
   /* 应用就绪：初始化数据库、播种供应商、注册 IPC、建立窗口 */
   app.whenReady().then(() => {
-    log.initialize()
+    initLogger()
     initDatabase()
     cleanupGithubArchiveTemps()
     ensureSeedProviders()

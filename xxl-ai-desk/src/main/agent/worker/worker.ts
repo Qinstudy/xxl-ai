@@ -5,6 +5,7 @@
  */
 
 import log from 'electron-log/main'
+import { initWorkerLogger } from './logger'
 import {
   abortAgent,
   clearSessionAbort,
@@ -39,6 +40,9 @@ import type { BrowserAction, BrowserActionResult, McpRuntimeConfig } from '@shar
 
 /* 与主进程通信的端口（utilityProcess 中始终存在） */
 const port = process.parentPort
+
+/* 日志先就绪：后续装配与运行异常都能落盘 */
+initWorkerLogger()
 
 /* 增量事件合批窗口（毫秒）：把高频 token 合并后再跨进程，降低 IPC 与主进程转发开销 */
 const COALESCE_MS = 40

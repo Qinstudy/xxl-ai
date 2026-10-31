@@ -45,15 +45,20 @@ function headerNumber(value: string | string[] | undefined): number {
   return Number.isFinite(num) && num > 0 ? num : 0
 }
 
+/* 附加请求地址：让错误既可直接展示，也能在日志中定位仓库 / 分支 */
+function withUrl(message: string, url: string): string {
+  return `${message}：${url}`
+}
+
 /* HTTP 状态码 → 可读错误 */
-function statusError(status: number): Error {
+function statusError(status: number, url: string): Error {
   if (status === 404) {
-    return new Error('仓库、分支或标签不存在，或为私有仓库（GitHub 404）')
+    return new Error(withUrl('仓库、分支或标签不存在，或为私有仓库（GitHub 404）', url))
   }
   if (status === 403 || status === 429) {
-    return new Error('GitHub 拒绝下载请求，请稍后重试')
+    return new Error(withUrl(`GitHub 拒绝下载请求（HTTP ${status}）`, url))
   }
-  return new Error(`GitHub 归档下载失败（HTTP ${status}）`)
+  return new Error(withUrl(`GitHub 归档下载失败（HTTP ${status}）`, url))
 }
 
 /* 下载归档到指定文件，支持取消 */
@@ -69,7 +74,7 @@ function downloadArchive(url: string, dest: string, signal?: AbortSignal): Promi
     let total = 0
 
     const timer = setTimeout(() => {
-      fail(new Error('GitHub 归档下载超时，请检查网络后重试'))
+      fail(new Error(withUrl('GitHub 归档下载超时，请检查网络后重试', url)))
     }, DOWNLOAD_TIMEOUT)
 
     function cleanup(): void {
@@ -112,7 +117,7 @@ function downloadArchive(url: string, dest: string, signal?: AbortSignal): Promi
       const status = response.statusCode ?? 0
       if (status < 200 || status >= 300) {
         response.on('data', () => {})
-        response.on('end', () => fail(statusError(status)))
+        response.on('end', () => fail(statusError(status, url)))
         return
       }
       const length = headerNumber(response.headers['content-length'])
@@ -141,12 +146,12 @@ function downloadArchive(url: string, dest: string, signal?: AbortSignal): Promi
         stream?.end(() => finish())
       })
       response.on('error', (error) => {
-        fail(new Error(`GitHub 归档读取失败：${error.message}`))
+        fail(new Error(withUrl(`GitHub 归档读取失败：${error.message}`, url)))
       })
     })
 
     request.on('error', (error) => {
-      fail(new Error(`GitHub 归档请求失败：${error.message}`))
+      fail(new Error(withUrl(`GitHub 归档请求失败：${error.message}`, url)))
     })
     request.end()
   })

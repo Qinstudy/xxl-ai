@@ -57,6 +57,7 @@ import 'element-plus/theme-chalk/dark/css-vars.css'
 import 'katex/dist/katex.min.css'
 import App from './App.vue'
 import router from './router'
+import { api } from './api'
 import { i18n } from './i18n'
 import './styles/index.scss'
 
@@ -121,4 +122,18 @@ app.use(createPinia())
 app.use(router)
 app.use(i18n)
 app.use(ElementPlus)
+
+/* 异常对象 → 可读文本（保留堆栈） */
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.stack || error.message : String(error)
+}
+
+/* 全局异常上报：Vue 渲染异常与未处理 Promise 统一写入主进程日志 */
+app.config.errorHandler = (error, _instance, info) => {
+  api.app.logError(`[vue] ${info}: ${formatError(error)}`)
+}
+window.addEventListener('unhandledrejection', (event) => {
+  api.app.logError(`[promise] ${formatError(event.reason)}`)
+})
+
 app.mount('#app')

@@ -61,7 +61,9 @@ const api: DeskApi = {
     selectExecutable: (title?: string) => ipcRenderer.invoke(IPC.appSelectExecutable, title),
     /* 检测运行时可执行文件版本 */
     detectExecutable: (input: RuntimeExecInput): Promise<RuntimeDetectResult> =>
-      ipcRenderer.invoke(IPC.appDetectExecutable, input)
+      ipcRenderer.invoke(IPC.appDetectExecutable, input),
+    /* 上报渲染层异常 */
+    logError: (message: string) => ipcRenderer.send(IPC.appLogError, message)
   },
   /* 客户端更新（引导式） */
   update: {

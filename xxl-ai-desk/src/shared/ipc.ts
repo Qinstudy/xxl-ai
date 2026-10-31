@@ -96,6 +96,8 @@ export interface DeskApi {
     selectExecutable(title?: string): Promise<string>
     /* 检测运行时可执行文件（node / python）版本 */
     detectExecutable(input: RuntimeExecInput): Promise<RuntimeDetectResult>
+    /* 上报渲染层异常（只写日志，不返回结果） */
+    logError(message: string): void
   }
   /* 客户端更新（引导式：检测 + 前往下载） */
   update: {
@@ -308,6 +310,7 @@ export const IPC = {
   appRelaunch: 'desk:app:relaunch',
   appSelectExecutable: 'desk:app:select-executable',
   appDetectExecutable: 'desk:app:detect-executable',
+  appLogError: 'desk:app:log-error',
   /* 客户端更新 */
   updateCheck: 'desk:update:check',
   updateOpen: 'desk:update:open',

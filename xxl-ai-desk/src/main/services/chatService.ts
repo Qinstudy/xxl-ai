@@ -6,6 +6,7 @@
  */
 
 import { app } from 'electron'
+import log from 'electron-log/main'
 import { trimHistory } from '@shared/ipc'
 import { translate } from '@shared/i18n'
 import type {
@@ -319,7 +320,11 @@ export async function sendChat(
     }
     const result = await runAgent(runInput, emitEvent)
     if (!result.ok) {
-      /* 运行时构建/执行异常（如模型未找到）：错误提示落库并由主进程下发 */
+      /* 运行时构建/执行异常（如模型未找到）：先落日志，再以错误消息回给用户 */
+      log.error(
+        `[chat] 运行时执行失败 session=${sessionId} provider=${providerName} model=${modelId}`,
+        result.message
+      )
       fail(result.message)
       return
     }
@@ -339,7 +344,8 @@ export async function sendChat(
     appendMessages(sessionId, serialized)
     committed = true
   } catch (error) {
-    /* 主进程侧异常（读库/落库等）：清理运行时缓存并落库错误提示 */
+    /* 主进程侧异常（读库/落库等）：记录堆栈、清理运行时缓存并落库错误提示 */
+    log.error(`[chat] 本轮执行异常 session=${sessionId}`, error)
     evictAgent(sessionId)
     fail((error as Error).message)
   } finally {

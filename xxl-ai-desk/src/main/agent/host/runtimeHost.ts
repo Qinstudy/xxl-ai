@@ -8,6 +8,7 @@ import { join } from 'path'
 import { execFileSync, spawn } from 'child_process'
 import { utilityProcess, type UtilityProcess } from 'electron'
 import log from 'electron-log/main'
+import { getTempDir } from '../../config/paths'
 import { openInteraction, cancelInteraction, clearInteractions } from './interaction'
 import { requestBrowserAction } from './browserBridge'
 import type {
@@ -54,7 +55,9 @@ function ensureWorker(): Promise<UtilityProcess> {
     return workerReady
   }
   const proc = utilityProcess.fork(join(__dirname, 'agent/worker/worker.js'), [], {
-    serviceName: 'xxl-ai-desk-agent'
+    serviceName: 'xxl-ai-desk-agent',
+    /* 运行时进程与主进程写入同一目录的按天日志 */
+    env: { ...process.env, XXL_AI_LOG_DIR: getTempDir() }
   })
   worker = proc
   workerReady = new Promise<UtilityProcess>((resolve, reject) => {

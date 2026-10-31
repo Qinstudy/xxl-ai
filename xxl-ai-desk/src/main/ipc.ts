@@ -4,11 +4,14 @@
  *   - 本文件不写业务规则，保持薄网关。
  */
 
-import { app, dialog, ipcMain, shell, type BrowserWindow } from 'electron'
+import { app, dialog, ipcMain, shell, type BrowserWindow, type IpcMainInvokeEvent } from 'electron'
+import log from 'electron-log/main'
 import { IPC } from '@shared/ipc'
+import { logIpcError } from './utils/logger'
 import type {
   AppSettings,
   BrowserAction,
+  BrowserActionResult,
   GitCommitInput,
   GitDiffInput,
   GithubSkillInstallInput,
@@ -109,6 +112,21 @@ import {
 } from './agent/host/runtimeHost'
 import { resolveBrowserAction, setBrowserActionSender } from './agent/host/browserBridge'
 
+/* IPC 处理器统一兜底：异常先落日志再抛回渲染层，避免只停留在控制台 */
+function handle<T extends unknown[]>(
+  channel: string,
+  handler: (event: IpcMainInvokeEvent, ...args: T) => unknown
+): void {
+  ipcMain.handle(channel, async (event, ...args) => {
+    try {
+      return await handler(event, ...(args as T))
+    } catch (error) {
+      logIpcError(channel, args, error)
+      throw error
+    }
+  })
+}
+
 /* 注册全部 IPC 处理器 */
 export function registerIpc(getWindow: () => BrowserWindow | null): void {
   /* Git 文件变更：主进程监听到项目变化后通知渲染层刷新 */
@@ -126,11 +144,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   setBrowserActionSender((request) => {
     getWindow()?.webContents.send(IPC.browserActionRequest, request)
   })
-  ipcMain.handle(IPC.browserActionResult, (_event, requestId: string, result) =>
+  handle(IPC.browserActionResult, (_event, requestId: string, result: BrowserActionResult) =>
     resolveBrowserAction(requestId, result)
   )
 
-  ipcMain.handle(
+  handle(
     IPC.appInfo,
     (): RuntimeInfo => ({
       version: app.getVersion(),
@@ -140,8 +158,12 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       dbFile: getDbFile()
     })
   )
-  ipcMain.handle(IPC.appSetDataDir, (_event, dir: string) => setDataDir(dir))
-  ipcMain.handle(IPC.appSelectDataDir, async () => {
+  handle(IPC.appSetDataDir, (_event, dir: string) => setDataDir(dir))
+  /* 渲染层异常上报：只落日志，不做业务处理 */
+  ipcMain.on(IPC.appLogError, (_event, message: string) => {
+    log.error('[renderer]', message)
+  })
+  handle(IPC.appSelectDataDir, async () => {
     const result = await dialog.showOpenDialog({
       title: '选择数据目录',
       defaultPath: getDataDir(),
@@ -149,10 +171,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     })
     return result.canceled || result.filePaths.length === 0 ? '' : result.filePaths[0]
   })
-  ipcMain.handle(IPC.appOpenDataDir, async () => {
+  handle(IPC.appOpenDataDir, async () => {
     await shell.openPath(getDataDir())
   })
-  ipcMain.handle(IPC.appRelaunch, () => {
+  handle(IPC.appRelaunch, () => {
     /*
      * 开发模式：electron-vite 的 dev server 会随本进程退出而关闭，
      * app.relaunch 拉起的新进程无渲染服务可加载（白屏），故此处兜底不重启（渲染层已做样式化提示）。
@@ -169,7 +191,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   })
 
   /* 弹出可执行文件选择框（供设置中选择 Node / Python） */
-  ipcMain.handle(IPC.appSelectExecutable, async (_event, title?: string) => {
+  handle(IPC.appSelectExecutable, async (_event, title?: string) => {
     const result = await dialog.showOpenDialog({
       title: title || '选择可执行文件',
       properties: ['openFile']
@@ -180,17 +202,17 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     return result.filePaths[0]
   })
   /* 检测运行时可执行文件（node / python）版本 */
-  ipcMain.handle(IPC.appDetectExecutable, (_event, input: RuntimeExecInput) =>
+  handle(IPC.appDetectExecutable, (_event, input: RuntimeExecInput) =>
     detectExecutable(input)
   )
 
   /* --- 客户端更新（引导式） --- */
-  ipcMain.handle(IPC.updateCheck, () => checkForUpdate())
-  ipcMain.handle(IPC.updateOpen, (_event, url: string) => openDownload(url))
+  handle(IPC.updateCheck, () => checkForUpdate())
+  handle(IPC.updateOpen, (_event, url: string) => openDownload(url))
 
   /* --- 设置 --- */
-  ipcMain.handle(IPC.settingsGet, () => getSettings())
-  ipcMain.handle(IPC.settingsSave, (_event, patch: Partial<AppSettings>) => {
+  handle(IPC.settingsGet, () => getSettings())
+  handle(IPC.settingsSave, (_event, patch: Partial<AppSettings>) => {
     const saved = saveSettings(patch)
     /* 自定义指令与内置工具开关变更后清空运行时缓存，使全部会话（含旧对话）下次对话即生效 */
     if (
@@ -207,24 +229,24 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   })
 
   /* --- 供应商 --- */
-  ipcMain.handle(IPC.providerList, () => listProviders())
-  ipcMain.handle(IPC.providerSave, (_event, dto: Partial<ProviderDTO>) => {
+  handle(IPC.providerList, () => listProviders())
+  handle(IPC.providerSave, (_event, dto: Partial<ProviderDTO>) => {
     const saved = saveProvider(dto)
     /* 供应商配置（含 API Key）变更后，清空运行时缓存，使下一次对话立即生效 */
     resetAgents()
     return saved
   })
-  ipcMain.handle(IPC.providerRemove, (_event, id: string) => {
+  handle(IPC.providerRemove, (_event, id: string) => {
     deleteProvider(id)
     resetAgents()
   })
-  ipcMain.handle(IPC.providerRemoteModels, (_event, input: ProviderModelQuery) =>
+  handle(IPC.providerRemoteModels, (_event, input: ProviderModelQuery) =>
     fetchRemoteModels(input)
   )
 
   /* --- 项目（1:1 绑定本地目录） --- */
-  ipcMain.handle(IPC.projectList, () => listProjects())
-  ipcMain.handle(IPC.projectCreate, async (_event, input?: ProjectCreateInput) => {
+  handle(IPC.projectList, () => listProjects())
+  handle(IPC.projectCreate, async (_event, input?: ProjectCreateInput) => {
     /* 未显式传入路径时，弹出系统目录选择对话框（取消返回 null） */
     let path = input?.path?.trim() ?? ''
     if (!path) {
@@ -239,8 +261,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     }
     return createProject({ name: input?.name, path })
   })
-  ipcMain.handle(IPC.projectRename, (_event, id: string, name: string) => renameProject(id, name))
-  ipcMain.handle(IPC.projectRemove, async (_event, id: string) => {
+  handle(IPC.projectRename, (_event, id: string, name: string) => renameProject(id, name))
+  handle(IPC.projectRemove, async (_event, id: string) => {
     /* 级联删除前先终止项目下会话的运行中轮次，并清理运行时 Agent 缓存与越界白名单 */
     const removed = deleteProject(id)
     for (const sessionId of removed) {
@@ -250,7 +272,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
       clearSessionPermissions(sessionId)
     }
   })
-  ipcMain.handle(IPC.projectReveal, (_event, id: string) => {
+  handle(IPC.projectReveal, (_event, id: string) => {
     /* 在系统文件管理器中展示项目目录（macOS Finder / Windows 资源管理器 / Linux 文件管理器） */
     const project = getProject(id)
     if (project) {
@@ -259,27 +281,27 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   })
 
   /* --- 会话 --- */
-  ipcMain.handle(IPC.sessionList, () => listSessions())
-  ipcMain.handle(IPC.sessionCreate, (_event, input?: Partial<SessionDTO>) => createSession(input))
-  ipcMain.handle(IPC.sessionUpdate, async (_event, id: string, patch: Partial<SessionDTO>) => {
+  handle(IPC.sessionList, () => listSessions())
+  handle(IPC.sessionCreate, (_event, input?: Partial<SessionDTO>) => createSession(input))
+  handle(IPC.sessionUpdate, async (_event, id: string, patch: Partial<SessionDTO>) => {
     /* 模型/模式变更可能影响正在运行的一轮：先终止并丢弃回写，再更新配置 */
     discardSessionRuns(id)
     await abortChat(id)
     evictAgent(id)
     return updateSession(id, patch)
   })
-  ipcMain.handle(IPC.sessionRename, (_event, id: string, title: string) => {
+  handle(IPC.sessionRename, (_event, id: string, title: string) => {
     updateSession(id, { title })
   })
-  ipcMain.handle(IPC.sessionRemove, (_event, id: string) => {
+  handle(IPC.sessionRemove, (_event, id: string) => {
     evictAgent(id)
     clearSessionPermissions(id)
     deleteSession(id)
   })
-  ipcMain.handle(IPC.sessionMessages, (_event, sessionId: string): StoredMessage[] =>
+  handle(IPC.sessionMessages, (_event, sessionId: string): StoredMessage[] =>
     listMessages(sessionId)
   )
-  ipcMain.handle(IPC.sessionDeleteMessages, async (_event, sessionId: string, ids: string[]) => {
+  handle(IPC.sessionDeleteMessages, async (_event, sessionId: string, ids: string[]) => {
     /* 删除消息后终止运行中轮次并清空运行时缓存，使对话上下文与存储一致 */
     discardSessionRuns(sessionId)
     await abortChat(sessionId)
@@ -288,42 +310,42 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   })
 
   /* --- 对话（编排下沉 chatService，网关仅转发事件） --- */
-  ipcMain.handle(IPC.chatSend, (_event, input: { sessionId: string; text: string }) =>
+  handle(IPC.chatSend, (_event, input: { sessionId: string; text: string }) =>
     sendChat(input, (payload) => {
       getWindow()?.webContents.send(IPC.chatEvent, payload)
     })
   )
-  ipcMain.handle(IPC.chatAbort, (_event, sessionId: string) => abortChat(sessionId))
+  handle(IPC.chatAbort, (_event, sessionId: string) => abortChat(sessionId))
   /* 人机交互：渲染进程回传用户结果，唤醒等待中的工具调用 */
-  ipcMain.handle(
+  handle(
     IPC.chatInteractionRespond,
     (_event, requestId: string, result: InteractionResult) =>
       respondInteraction(requestId, result)
   )
 
   /* --- Git 工具（项目空间维度） --- */
-  ipcMain.handle(IPC.gitStatus, (_event, projectId: string) => getGitStatus(projectId))
-  ipcMain.handle(IPC.gitDiff, (_event, input: GitDiffInput) => getGitDiff(input))
-  ipcMain.handle(IPC.gitStage, (_event, projectId: string, path: string, oldPath?: string) =>
+  handle(IPC.gitStatus, (_event, projectId: string) => getGitStatus(projectId))
+  handle(IPC.gitDiff, (_event, input: GitDiffInput) => getGitDiff(input))
+  handle(IPC.gitStage, (_event, projectId: string, path: string, oldPath?: string) =>
     stageGit(projectId, path, oldPath)
   )
-  ipcMain.handle(IPC.gitUnstage, (_event, projectId: string, path: string, oldPath?: string) =>
+  handle(IPC.gitUnstage, (_event, projectId: string, path: string, oldPath?: string) =>
     unstageGit(projectId, path, oldPath)
   )
-  ipcMain.handle(IPC.gitCommit, (_event, input: GitCommitInput) => commitGit(input))
-  ipcMain.handle(IPC.gitWatch, (_event, projectId: string) => watchGitProject(projectId))
-  ipcMain.handle(IPC.gitUnwatch, (_event, projectId: string) => unwatchGitProject(projectId))
+  handle(IPC.gitCommit, (_event, input: GitCommitInput) => commitGit(input))
+  handle(IPC.gitWatch, (_event, projectId: string) => watchGitProject(projectId))
+  handle(IPC.gitUnwatch, (_event, projectId: string) => unwatchGitProject(projectId))
 
   /* --- 终端（本地 PTY） --- */
-  ipcMain.handle(IPC.terminalCreate, (_event, input: TerminalCreateInput) => createTerminal(input))
-  ipcMain.handle(IPC.terminalList, (_event, sessionId: string) => listTerminals(sessionId))
-  ipcMain.handle(IPC.terminalAttach, (_event, id: string) => attachTerminal(id))
-  ipcMain.handle(IPC.terminalWrite, (_event, id: string, data: string) => writeTerminal(id, data))
-  ipcMain.handle(IPC.terminalResize, (_event, id: string, cols: number, rows: number) =>
+  handle(IPC.terminalCreate, (_event, input: TerminalCreateInput) => createTerminal(input))
+  handle(IPC.terminalList, (_event, sessionId: string) => listTerminals(sessionId))
+  handle(IPC.terminalAttach, (_event, id: string) => attachTerminal(id))
+  handle(IPC.terminalWrite, (_event, id: string, data: string) => writeTerminal(id, data))
+  handle(IPC.terminalResize, (_event, id: string, cols: number, rows: number) =>
     resizeTerminal(id, cols, rows)
   )
-  ipcMain.handle(IPC.terminalDispose, (_event, id: string) => disposeTerminal(id))
-  ipcMain.handle(IPC.terminalReassign, (_event, fromSessionId: string, toSessionId: string) =>
+  handle(IPC.terminalDispose, (_event, id: string) => disposeTerminal(id))
+  handle(IPC.terminalReassign, (_event, fromSessionId: string, toSessionId: string) =>
     reassignTerminals(fromSessionId, toSessionId)
   )
   /* 终端输出/退出事件统一转发到渲染窗口 */
@@ -332,52 +354,52 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   })
 
   /* --- 本地文件系统（右侧「文件」面板；限定项目目录内） --- */
-  ipcMain.handle(IPC.fsList, (_event, root: string, dir: string) => listDir(root, dir))
-  ipcMain.handle(IPC.fsRead, (_event, root: string, path: string) => readFile(root, path))
-  ipcMain.handle(IPC.fsWrite, (_event, root: string, path: string, content: string) =>
+  handle(IPC.fsList, (_event, root: string, dir: string) => listDir(root, dir))
+  handle(IPC.fsRead, (_event, root: string, path: string) => readFile(root, path))
+  handle(IPC.fsWrite, (_event, root: string, path: string, content: string) =>
     writeFile(root, path, content)
   )
-  ipcMain.handle(IPC.fsTrash, (_event, root: string, path: string) => trashFile(root, path))
+  handle(IPC.fsTrash, (_event, root: string, path: string) => trashFile(root, path))
   /* 目录监听：本地增删文件后推送变更，渲染层刷新对应目录 */
   initFsWatch((dir) => getWindow()?.webContents.send(IPC.fsChange, dir))
-  ipcMain.handle(IPC.fsWatch, (_event, dir: string) => watchDir(dir))
-  ipcMain.handle(IPC.fsUnwatch, (_event, dir: string) => unwatchDir(dir))
+  handle(IPC.fsWatch, (_event, dir: string) => watchDir(dir))
+  handle(IPC.fsUnwatch, (_event, dir: string) => unwatchDir(dir))
 
   /* --- 系统外壳能力 --- */
-  ipcMain.handle(IPC.shellOpenExternal, (_event, url: string) => shell.openExternal(url))
-  ipcMain.handle(IPC.shellOpenPath, (_event, path: string) => shell.openPath(path))
-  ipcMain.handle(IPC.shellReveal, (_event, path: string) => {
+  handle(IPC.shellOpenExternal, (_event, url: string) => shell.openExternal(url))
+  handle(IPC.shellOpenPath, (_event, path: string) => shell.openPath(path))
+  handle(IPC.shellReveal, (_event, path: string) => {
     shell.showItemInFolder(path)
   })
-  ipcMain.handle(IPC.shellOpenWithApps, () => listOpenWithApps())
-  ipcMain.handle(IPC.shellOpenWith, (_event, appPath: string, file: string) =>
+  handle(IPC.shellOpenWithApps, () => listOpenWithApps())
+  handle(IPC.shellOpenWith, (_event, appPath: string, file: string) =>
     openWith(appPath, file)
   )
 
   /* --- MCP 插件中心（保存即生效：清空运行时缓存，下一轮对话重建工具） --- */
-  ipcMain.handle(IPC.mcpList, () => listMcps())
-  ipcMain.handle(IPC.mcpSave, (_event, dto: Partial<McpDTO>) => {
+  handle(IPC.mcpList, () => listMcps())
+  handle(IPC.mcpSave, (_event, dto: Partial<McpDTO>) => {
     const saved = saveMcp(dto)
     resetAgents()
     return saved
   })
-  ipcMain.handle(IPC.mcpRemove, (_event, id: string) => {
+  handle(IPC.mcpRemove, (_event, id: string) => {
     deleteMcp(id)
     resetAgents()
   })
-  ipcMain.handle(IPC.mcpTest, (_event, dto: Partial<McpDTO>) => testMcp(dto))
-  ipcMain.handle(IPC.mcpTools, (_event, id: string) => listMcpTools(id))
-  ipcMain.handle(IPC.mcpDiscover, (_event, query: McpDiscoverQuery) => discoverMcp(query))
-  ipcMain.handle(IPC.mcpCategories, () => listMcpCategories())
-  ipcMain.handle(IPC.mcpDetail, (_event, slug: string) => discoverMcpDetail(slug))
+  handle(IPC.mcpTest, (_event, dto: Partial<McpDTO>) => testMcp(dto))
+  handle(IPC.mcpTools, (_event, id: string) => listMcpTools(id))
+  handle(IPC.mcpDiscover, (_event, query: McpDiscoverQuery) => discoverMcp(query))
+  handle(IPC.mcpCategories, () => listMcpCategories())
+  handle(IPC.mcpDetail, (_event, slug: string) => discoverMcpDetail(slug))
 
   /* --- SKILL 技能中心（导入 / 启停 / 删除均由 service 统一失效运行时缓存） --- */
-  ipcMain.handle(IPC.skillList, () => listSkills())
-  ipcMain.handle(IPC.skillDetail, (_event, id: string) => getSkillDetail(id))
-  ipcMain.handle(IPC.skillContent, (_event, id: string, offset: number) =>
+  handle(IPC.skillList, () => listSkills())
+  handle(IPC.skillDetail, (_event, id: string) => getSkillDetail(id))
+  handle(IPC.skillContent, (_event, id: string, offset: number) =>
     getSkillContent(id, offset)
   )
-  ipcMain.handle(IPC.skillImportDir, async () => {
+  handle(IPC.skillImportDir, async () => {
     const result = await dialog.showOpenDialog({
       title: '选择技能目录',
       properties: ['openDirectory']
@@ -387,7 +409,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     }
     return importSkillsFromDirectory(result.filePaths[0])
   })
-  ipcMain.handle(IPC.skillImportZip, async () => {
+  handle(IPC.skillImportZip, async () => {
     const result = await dialog.showOpenDialog({
       title: '选择技能 Zip 文件',
       properties: ['openFile'],
@@ -398,24 +420,24 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     }
     return importSkillsFromZip(result.filePaths[0])
   })
-  ipcMain.handle(IPC.skillSetEnabled, (_event, id: string, enabled: boolean) =>
+  handle(IPC.skillSetEnabled, (_event, id: string, enabled: boolean) =>
     setSkillEnabled(id, enabled)
   )
-  ipcMain.handle(IPC.skillRemove, (_event, id: string) => deleteSkill(id))
-  ipcMain.handle(IPC.skillReveal, (_event, id: string) => {
+  handle(IPC.skillRemove, (_event, id: string) => deleteSkill(id))
+  handle(IPC.skillReveal, (_event, id: string) => {
     shell.showItemInFolder(getSkillRevealPath(id))
   })
-  ipcMain.handle(IPC.skillRefresh, () => refreshSkills())
-  ipcMain.handle(IPC.skillDiscover, (_event, query: SkillDiscoverQuery) => discoverSkills(query))
-  ipcMain.handle(IPC.skillDiscoverDetail, (_event, id: string) => discoverSkillDetail(id))
-  ipcMain.handle(IPC.skillInstall, (_event, id: string) => installDiscoveredSkill(id))
-  ipcMain.handle(IPC.skillGithubInspect, (_event, query: GithubSkillQuery) =>
+  handle(IPC.skillRefresh, () => refreshSkills())
+  handle(IPC.skillDiscover, (_event, query: SkillDiscoverQuery) => discoverSkills(query))
+  handle(IPC.skillDiscoverDetail, (_event, id: string) => discoverSkillDetail(id))
+  handle(IPC.skillInstall, (_event, id: string) => installDiscoveredSkill(id))
+  handle(IPC.skillGithubInspect, (_event, query: GithubSkillQuery) =>
     inspectGithubSkills(query)
   )
-  ipcMain.handle(IPC.skillGithubInstall, (_event, input: GithubSkillInstallInput) =>
+  handle(IPC.skillGithubInstall, (_event, input: GithubSkillInstallInput) =>
     installGithubSkill(input)
   )
-  ipcMain.handle(IPC.skillGithubCancel, (_event, query: GithubSkillQuery) =>
+  handle(IPC.skillGithubCancel, (_event, query: GithubSkillQuery) =>
     cancelGithubSkills(query)
   )
 }
