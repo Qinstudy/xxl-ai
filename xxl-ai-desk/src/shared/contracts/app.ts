@@ -57,6 +57,8 @@ export interface AppSettings {
   builtinToolBrowserEnabled: boolean
   /* 通用类内置工具是否启用（关闭后模型不再获得时间等通用能力） */
   builtinToolGeneralEnabled: boolean
+  /* 人机交互工具是否启用（关闭后模型不再获得 ask_user，改为在正文直接询问） */
+  builtinToolInteractionEnabled: boolean
 }
 
 /* 运行时可执行文件检测入参 */

@@ -26,6 +26,8 @@ export interface ToolContext {
   browserToolsEnabled: boolean
   /* 通用类内置工具是否启用（关闭时通用工具工厂直接返回空集） */
   generalToolsEnabled: boolean
+  /* 人机交互工具是否启用（关闭时交互工具工厂直接返回空集） */
+  interactionToolsEnabled: boolean
 }
 
 /* 工具分组：便于按域拆分文件与后续扩展 */

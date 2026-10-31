@@ -72,7 +72,8 @@ export function getSettings(): AppSettings {
     runtimePythonPath: map.get('runtimePythonPath') ?? DEFAULT_APP_SETTINGS.runtimePythonPath,
     updateAutoCheck: map.get('updateAutoCheck') !== 'false',
     builtinToolBrowserEnabled: map.get('builtinToolBrowserEnabled') !== 'false',
-    builtinToolGeneralEnabled: map.get('builtinToolGeneralEnabled') !== 'false'
+    builtinToolGeneralEnabled: map.get('builtinToolGeneralEnabled') !== 'false',
+    builtinToolInteractionEnabled: map.get('builtinToolInteractionEnabled') !== 'false'
   }
 }
 

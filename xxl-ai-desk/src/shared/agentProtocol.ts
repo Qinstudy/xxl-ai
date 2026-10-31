@@ -67,6 +67,8 @@ export interface RunAgentInput {
   browserToolsEnabled: boolean
   /* 通用类内置工具是否启用（关闭时不装配时间等通用能力） */
   generalToolsEnabled: boolean
+  /* 人机交互工具是否启用（关闭时不装配 ask_user） */
+  interactionToolsEnabled: boolean
   /* 本轮用户输入 */
   text: string
 }

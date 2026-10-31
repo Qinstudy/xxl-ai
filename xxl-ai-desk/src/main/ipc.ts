@@ -196,7 +196,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     if (
       patch.systemPrompt !== undefined ||
       patch.builtinToolBrowserEnabled !== undefined ||
-      patch.builtinToolGeneralEnabled !== undefined
+      patch.builtinToolGeneralEnabled !== undefined ||
+      patch.builtinToolInteractionEnabled !== undefined
     ) {
       resetAgents()
     }

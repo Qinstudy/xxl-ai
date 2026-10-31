@@ -164,8 +164,11 @@ function modeSystemHint(mode: ChatMode): string {
   return '\n\n当前为 Build（构建）模式：你可以读取、写入、编辑项目文件并执行命令；文件操作限制在当前项目目录内，越界需用户确认。'
 }
 
-/* 人机交互说明：仅多方案拍板时弹窗；确认与自由文本回到正文，避免多余弹层 */
-function hitlSystemHint(): string {
+/* 人机交互说明：工具关闭时不下发，避免模型调用不存在的工具 */
+function hitlSystemHint(enabled: boolean): string {
+  if (!enabled) {
+    return ''
+  }
   return '\n\n## 人机交互\n只有在需要用户在多个候选方案中拍板时，才调用 ask_user，并提供 2~20 个选项（可多选，默认允许「其他」）。需要确认操作、补充信息或自由文本时，直接在回复里提问，不要调用工具。一次只问一个关键问题；选项是候选值而非强制枚举；用户拒绝或取消后不要重复追问。'
 }
 
@@ -273,7 +276,7 @@ export async function sendChat(
     /* 技能清单：全局启用，摘要随系统提示下发，正文由 read_skill 按需读取 */
     const skills = listEnabledSkillsForRuntime()
     /* 自定义指令全局生效：统一取当前设置，并附技能索引与模式说明（个性化变更对旧对话同样生效） */
-    const systemPrompt = `${settings.systemPrompt || ''}${buildSkillPrompt(skills)}${modeSystemHint(mode)}${hitlSystemHint()}`
+    const systemPrompt = `${settings.systemPrompt || ''}${buildSkillPrompt(skills)}${modeSystemHint(mode)}${hitlSystemHint(settings.builtinToolInteractionEnabled)}`
     /* 历史消息不携带 system 提示：系统指令始终取当前设置，保证旧对话也随设置变更生效 */
     /* 模型上下文与完整历史分离：这里只构造最近窗口，数据库仍保留完整历史 */
     const history = trimHistory(
@@ -304,9 +307,10 @@ export async function sendChat(
       mcpServers: listEnabledMcpServers(),
       /* SKILL：已启用技能索引，运行时进程据此装配 read_skill */
       skills,
-      /* 内置工具：浏览器 / 通用类按设置开关决定是否下发 */
+      /* 内置工具：浏览器 / 通用 / 人机交互类按设置开关决定是否下发 */
       browserToolsEnabled: settings.builtinToolBrowserEnabled,
       generalToolsEnabled: settings.builtinToolGeneralEnabled,
+      interactionToolsEnabled: settings.builtinToolInteractionEnabled,
       text
     }
     const result = await runAgent(runInput, emitEvent)

@@ -545,7 +545,7 @@
         "shell": "Run shell commands inside the project directory. Dangerous commands are blocked; Build mode only.",
         "browser": "Open pages, read content and structure, click and fill forms, take screenshots and run diagnostics. When disabled, the model no longer receives browser tools.",
         "general": "General, side-effect-free capabilities such as the current time.",
-        "interaction": "The Agent asks the user to confirm an action, choose an option or provide input during a task. Always enabled and cannot be turned off."
+        "interaction": "The Agent asks the user to pick among candidate options during a task. When disabled, the model asks directly in chat."
       },
       "desc": {
         "readFile": "Read a text file by line range inside the project directory",

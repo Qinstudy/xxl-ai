@@ -93,6 +93,16 @@ export const useSettingsStore = defineStore('settings', () => {
     applyAppearance()
   }
 
+  /* 保存单个设置项：键与值类型联动，避免调用方拼装宽泛 Partial */
+  async function saveSetting<K extends keyof AppSettings>(
+    key: K,
+    value: AppSettings[K]
+  ): Promise<void> {
+    const patch: Partial<AppSettings> = {}
+    patch[key] = value
+    await saveSettings(patch)
+  }
+
   /* 保存供应商并刷新列表 */
   async function saveProvider(dto: Partial<ProviderDTO>): Promise<ProviderDTO> {
     const saved = await api.provider.save(dto)
@@ -206,6 +216,7 @@ export const useSettingsStore = defineStore('settings', () => {
     enabledProviders,
     load,
     saveSettings,
+    saveSetting,
     saveProvider,
     removeProvider,
     queryRemoteModels,

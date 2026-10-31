@@ -145,11 +145,11 @@ function formatResult(
   return text(tr(context, 'runtime.hitl.selected', [labels]), { ...details, value: clean })
 }
 
-/* 构建人机交互工具 */
-export async function createInteractionTools(context: ToolContext): Promise<ToolEntry[]> {
+/* 构建 ask_user 工具：入参校验、发起交互并回填结果 */
+async function buildAskUserTool(context: ToolContext): Promise<AgentTool> {
   const { Type } = await import('@earendil-works/pi-ai')
 
-  const askUser: AgentTool = {
+  return {
     name: 'ask_user',
     label: '询问用户',
     description: describe(
@@ -183,7 +183,13 @@ export async function createInteractionTools(context: ToolContext): Promise<Tool
       return formatResult(context, request, result)
     }
   }
+}
 
+/* 构建人机交互工具：关闭时不装配 ask_user，模型改为在正文询问 */
+export async function createInteractionTools(context: ToolContext): Promise<ToolEntry[]> {
+  if (!context.interactionToolsEnabled) {
+    return []
+  }
   return [
     {
       meta: {
@@ -192,7 +198,7 @@ export async function createInteractionTools(context: ToolContext): Promise<Tool
         modes: ALL_MODES,
         maxOutput: 4000
       },
-      tool: askUser
+      tool: await buildAskUserTool(context)
     }
   ]
 }

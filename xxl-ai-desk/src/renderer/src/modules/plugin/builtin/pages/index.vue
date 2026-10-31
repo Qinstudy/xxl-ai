@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
- * 内置工具页：按分类展示内置工具能力；文件操作固定启用，浏览器支持开关启用。
+ * 内置工具页：按分类展示内置工具能力；浏览器 / 通用 / 人机交互支持开关启用。
  * @author xuxueli 2026-10-25
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -69,9 +69,10 @@ const columnWidths = computed(() => {
   }
 })
 
-/* 浏览器 / 通用类开关状态（其它分类固定启用） */
-const browserEnabled = computed(() => settings.settings.builtinToolBrowserEnabled)
-const generalEnabled = computed(() => settings.settings.builtinToolGeneralEnabled)
+/* 分类 → 开关设置字段（固定启用分类无此字段） */
+const TOGGLE_FIELDS = new Map(
+  BUILTIN_TOOL_CATEGORIES.map((category) => [category.key, category.toggleField] as const)
+)
 
 /* 已展开的分类（默认全部折叠，点击分类行展开/收起工具明细） */
 const expandedKeys = ref<BuiltinToolCategoryKey[]>([])
@@ -90,26 +91,18 @@ function toggleGroup(key: BuiltinToolCategoryKey): void {
 
 /* 分类当前是否启用 */
 function isEnabled(key: BuiltinToolCategoryKey): boolean {
-  if (key === 'browser') {
-    return browserEnabled.value
-  }
-  if (key === 'general') {
-    return generalEnabled.value
-  }
-  return true
+  const field = TOGGLE_FIELDS.get(key)
+  return field ? settings.settings[field] : true
 }
 
-/* 切换浏览器 / 通用类工具（保存设置后由主进程清理运行时缓存，下一轮对话生效） */
+/* 切换可开关分类（保存设置后由主进程清理运行时缓存，下一轮对话生效） */
 async function onToggle(key: BuiltinToolCategoryKey, value: boolean): Promise<void> {
-  if (key !== 'browser' && key !== 'general') {
+  const field = TOGGLE_FIELDS.get(key)
+  if (!field) {
     return
   }
   try {
-    await settings.saveSettings(
-      key === 'browser'
-        ? { builtinToolBrowserEnabled: value }
-        : { builtinToolGeneralEnabled: value }
-    )
+    await settings.saveSetting(field, value)
     ElMessage.success(
       value ? t('plugin.builtinTool.enabledOn') : t('plugin.builtinTool.enabledOff')
     )
@@ -145,7 +138,7 @@ function modeLabel(modes: ChatMode[]): string {
           </div>
           <div class="group-actions" @click.stop>
             <el-switch
-              v-if="group.switchable"
+              v-if="group.toggleField"
               :model-value="isEnabled(group.key)"
               @update:model-value="(value: boolean) => onToggle(group.key, value)"
             />
