@@ -22,25 +22,18 @@ const toolPanel = computed(() => workspace.sliceOf(props.sessionId).toolPanel)
 /* 当前工具类型（模板与监听统一取值） */
 const activeTool = computed<WorkspaceTool>(() => toolPanel.value.activeTool)
 
-/* 确保会话工作区已创建 */
-watch(() => props.sessionId, (sessionId) => workspace.ensure(sessionId), { immediate: true })
-
 /* 面板首次打开后保持挂载（切换工具用 v-show），保留文件树/浏览器页面状态 */
-const filesOpened = ref(false)
-const browserOpened = ref(false)
-const terminalOpened = ref(false)
+const opened = ref<Record<WorkspaceTool, boolean>>({
+  files: false,
+  browser: false,
+  terminal: false
+})
 
 /* 标记已打开过的工具，使其面板首次打开后保持挂载（切换用 v-show） */
 watch(
   activeTool,
   (tool) => {
-    if (tool === 'files') {
-      filesOpened.value = true
-    } else if (tool === 'browser') {
-      browserOpened.value = true
-    } else if (tool === 'terminal') {
-      terminalOpened.value = true
-    }
+    opened.value[tool] = true
   },
   { immediate: true }
 )
@@ -108,15 +101,15 @@ function toggleFocus(): void {
 
     <div class="tool-panel-body">
       <FilePanel
-        v-if="filesOpened"
+        v-if="opened.files"
         v-show="activeTool === 'files'"
         :session-id="props.sessionId"
         :root="props.root"
         :project-name="props.projectName"
       />
-      <BrowserPanel v-if="browserOpened" v-show="activeTool === 'browser'" :session-id="props.sessionId" />
+      <BrowserPanel v-if="opened.browser" v-show="activeTool === 'browser'" :session-id="props.sessionId" />
       <TerminalPanel
-        v-if="terminalOpened"
+        v-if="opened.terminal"
         v-show="activeTool === 'terminal'"
         :session-id="props.sessionId"
         :cwd="props.root"

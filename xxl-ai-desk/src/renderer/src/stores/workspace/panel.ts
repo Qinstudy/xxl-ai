@@ -2,8 +2,6 @@
 
 import { LAYOUT } from '@renderer/config/layout'
 import {
-  clamp,
-  toolWidthMax,
   type ToolPanelMode,
   type WorkspaceState,
   type WorkspaceTool
@@ -31,18 +29,14 @@ export function createPanelActions(stateOf: StateOf) {
     state.toolPanel.visible = true
   }
 
-  /* 设置工具面板宽度（夹取到窗口可用范围） */
+  /* 设置工具面板宽度（保存期望宽度，实际显示上限由布局组件按会话区宽度约束） */
   function setToolWidth(key: string, width: number): void {
-    stateOf(key).toolPanel.width = clamp(width, LAYOUT.toolPanel.minWidth, toolWidthMax())
+    stateOf(key).toolPanel.width = Math.max(LAYOUT.toolPanel.minWidth, Math.round(width))
   }
 
   /* 恢复工具面板默认宽度 */
   function resetToolWidth(key: string): void {
-    stateOf(key).toolPanel.width = clamp(
-      LAYOUT.toolPanel.defaultWidth,
-      LAYOUT.toolPanel.minWidth,
-      toolWidthMax()
-    )
+    stateOf(key).toolPanel.width = LAYOUT.toolPanel.defaultWidth
   }
 
   /* 设置工具面板布局模式 */

@@ -36,6 +36,7 @@ const {
 /* 内容区锚点：供壳级宿主层把 webview 覆盖到本区域 */
 const viewportRef = ref<HTMLElement | null>(null)
 let observer: ResizeObserver | null = null
+let anchorFrame = 0
 
 /* 上报内容区在视口中的位置；尺寸为 0 时保留上次锚点，避免宿主反复改尺寸 */
 function updateAnchor(): void {
@@ -66,21 +67,36 @@ function updateAnchor(): void {
   browser.setAnchor(next)
 }
 
+/* 合并面板拖拽期间的高频尺寸回调，每帧最多上报一次锚点 */
+function scheduleAnchor(): void {
+  if (anchorFrame) {
+    return
+  }
+  anchorFrame = requestAnimationFrame(() => {
+    anchorFrame = 0
+    updateAnchor()
+  })
+}
+
 onMounted(() => {
   void nextTick(() => {
     updateAnchor()
     if (viewportRef.value) {
-      observer = new ResizeObserver(updateAnchor)
+      observer = new ResizeObserver(scheduleAnchor)
       observer.observe(viewportRef.value)
     }
-    window.addEventListener('resize', updateAnchor)
+    window.addEventListener('resize', scheduleAnchor)
   })
 })
 
 onBeforeUnmount(() => {
+  if (anchorFrame) {
+    cancelAnimationFrame(anchorFrame)
+    anchorFrame = 0
+  }
   observer?.disconnect()
   observer = null
-  window.removeEventListener('resize', updateAnchor)
+  window.removeEventListener('resize', scheduleAnchor)
   /* 保留最后一次锚点：其他会话的后台宿主沿用相同尺寸，避免切换时改尺寸造成卡顿 */
 })
 </script>

@@ -3,8 +3,7 @@
  * 会话工作区布局：左侧默认 slot（对话区） + 右侧工具面板，工具面板可拖拽宽度、可 focus 占满正文
  * @author xuxueli 2026-10-31
  */
-import { computed, watch } from 'vue'
-import { useWorkspaceStore } from '@renderer/stores/workspace'
+import { usePanelWidths } from '@renderer/layout/composables/usePanelWidths'
 import PanelResizer from '@renderer/layout/components/PanelResizer/index.vue'
 import WorkspaceToolPanel from './WorkspaceToolPanel.vue'
 import { t } from '@renderer/i18n'
@@ -18,20 +17,10 @@ const props = defineProps<{
   projectName?: string
 }>()
 
-const workspace = useWorkspaceStore()
-const toolPanel = computed(() => workspace.sliceOf(props.sessionId).toolPanel)
-
-/* 确保当前会话的工作区状态已创建（含本地持久化恢复） */
-watch(() => props.sessionId, (key) => workspace.ensure(key), { immediate: true })
-
-/* 工具面板宽度双向绑定：拖拽写入当前会话切片（含夹取） */
-const toolWidth = computed({
-  get: () => toolPanel.value.width,
-  set: (width: number) => workspace.setToolWidth(props.sessionId, width)
-})
-
-/* 工具面板是否占满正文 */
-const focused = computed(() => toolPanel.value.mode === 'focus')
+/* 工具面板状态与宽度约束（首次读取时自动创建会话切片） */
+const { toolPanel, focused, toolWidth, resetToolWidth } = usePanelWidths(
+  () => props.sessionId
+)
 </script>
 
 <template>
@@ -47,7 +36,7 @@ const focused = computed(() => toolPanel.value.mode === 'focus')
         v-show="toolPanel.visible"
         class="workspace-tool-panel"
         :class="{ focused }"
-        :style="focused ? undefined : { width: `${toolPanel.width}px` }"
+        :style="focused ? undefined : { width: `${toolWidth}px` }"
       >
         <!-- 左边缘拖拽手柄：拖拽调整侧栏宽度，双击恢复默认宽度（focus 态下不可拖拽） -->
         <PanelResizer
@@ -55,7 +44,7 @@ const focused = computed(() => toolPanel.value.mode === 'focus')
           v-model:size="toolWidth"
           side="right"
           :title="t('layout.resetPanelWidth')"
-          @reset="workspace.resetToolWidth(props.sessionId)"
+          @reset="resetToolWidth"
         />
         <WorkspaceToolPanel
           :key="props.sessionId"

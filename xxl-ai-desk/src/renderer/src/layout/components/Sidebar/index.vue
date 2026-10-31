@@ -8,15 +8,19 @@ import SidebarRail from './SidebarRail.vue'
 import SidebarContent from './SidebarContent.vue'
 import PanelResizer from '../PanelResizer/index.vue'
 import { useLayoutStore } from '@renderer/stores/layout'
+import { useChatStore } from '@renderer/stores/chat'
+import { DRAFT_SESSION_KEY } from '@renderer/stores/workspace'
+import { usePanelWidths } from '@renderer/layout/composables/usePanelWidths'
 import { t } from '@renderer/i18n'
 
 const layout = useLayoutStore()
+const chat = useChatStore()
 
-/* 子菜单栏宽度双向绑定：拖拽写入 store（含夹取与持久化） */
-const sidebarWidth = computed({
-  get: () => layout.sidebarWidth,
-  set: (value: number) => layout.setSidebarWidth(value)
-})
+/* 当前工作区 key：真实会话 id；新建对话草稿态使用固定 key */
+const workspaceKey = computed(() => chat.currentId || DRAFT_SESSION_KEY)
+
+/* 侧栏宽度：按窗口、工具面板与会话区最小宽度动态约束 */
+const { sidebarWidth, resetSidebarWidth } = usePanelWidths(() => workspaceKey.value)
 </script>
 
 <template>
@@ -26,7 +30,7 @@ const sidebarWidth = computed({
     :style="{
       width: layout.sidebarCollapsed
         ? 'var(--desk-rail-width)'
-        : `calc(var(--desk-rail-width) + ${layout.sidebarWidth}px)`
+        : `calc(var(--desk-rail-width) + ${sidebarWidth}px)`
     }"
   >
     <SidebarRail />
@@ -38,7 +42,7 @@ const sidebarWidth = computed({
         v-model:size="sidebarWidth"
         side="left"
         :title="t('layout.resetPanelWidth')"
-        @reset="layout.resetSidebarWidth"
+        @reset="resetSidebarWidth"
       />
 
       <SidebarContent />
@@ -59,8 +63,8 @@ const sidebarWidth = computed({
   transition: width 0.2s ease;
 }
 
-/* 拖拽调整宽度期间禁用过渡 */
-:global(body.resizing) .sidebar-container {
+/* 拖拽调整宽度期间禁用过渡，避免追帧造成卡顿 */
+:global(body.resizing .sidebar-container) {
   transition: none;
 }
 

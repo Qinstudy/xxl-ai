@@ -1,7 +1,6 @@
 /* 会话工作区状态结构：类型、默认值、持久化归一化与尺寸边界 */
 
 import { LAYOUT } from '@renderer/config/layout'
-import { useLayoutStore } from '@renderer/stores/layout'
 
 /* 新建对话草稿态使用的固定工作区 key（首次发送创建会话后迁移给真实会话） */
 export const DRAFT_SESSION_KEY = '__draft__'
@@ -54,6 +53,8 @@ export interface FileExplorerState {
   keyword: string
   /* 目录展开态 */
   expanded: Record<string, boolean>
+  /* 目录树宽度（px，展示时按 10% - 90% 动态约束） */
+  treeWidth: number
 }
 
 /* 单个会话的工作区状态（仅存 UI 状态，不含 PTY / webview 运行时） */
@@ -80,23 +81,16 @@ export function createState(): WorkspaceState {
       tabs: [],
       activeId: ''
     },
-    fileExplorer: { selectedPath: '', preview: false, keyword: '', expanded: {} },
+    fileExplorer: {
+      selectedPath: '',
+      preview: false,
+      keyword: '',
+      expanded: {},
+      treeWidth: defaultTreeWidth(LAYOUT.toolPanel.defaultWidth)
+    },
     updateTime: Date.now(),
     version: STORAGE_VERSION
   }
-}
-
-/* 数值夹取 */
-export function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, Math.round(value)))
-}
-
-/* 计算工具面板最大宽度：窗口宽度扣除图标栏、左侧子菜单栏与正文最小可用宽度 */
-export function toolWidthMax(): number {
-  const sidebarWidth = useLayoutStore().sidebarWidth
-  const available =
-    window.innerWidth - LAYOUT.railWidth - sidebarWidth - LAYOUT.toolPanel.minChatWidth
-  return Math.max(LAYOUT.toolPanel.minWidth, available)
 }
 
 /* 读取布尔值（非法时回落默认值） */
@@ -114,6 +108,35 @@ function expandedOf(value: unknown): Record<string, boolean> {
   return value && typeof value === 'object' ? (value as Record<string, boolean>) : {}
 }
 
+/*
+ * 默认目录树宽度：按工具面板宽度自适应。
+ *   - 目标宽度为工具面板的 45%；
+ *   - 限制在 180px - 300px，面板放大时目录树保持稳定，不随面板无限变宽。
+ */
+export function defaultTreeWidth(toolPanelWidth: number): number {
+  const target = Math.max(1, toolPanelWidth) * LAYOUT.fileTree.defaultRatio
+  return Math.round(
+    Math.min(
+      LAYOUT.fileTree.defaultMaxWidth,
+      Math.max(LAYOUT.fileTree.defaultMinWidth, target)
+    )
+  )
+}
+
+/* 解析目录树宽度：兼容旧版占比字段，非法时回落默认值 */
+function treeWidthOf(value: unknown, toolPanelWidth: number): number {
+  const fileExplorer = value as { treeWidth?: unknown; treeWidthRatio?: unknown } | undefined
+  const width = Number(fileExplorer?.treeWidth)
+  if (Number.isFinite(width) && width > 0) {
+    return Math.round(width)
+  }
+  const ratio = Number(fileExplorer?.treeWidthRatio)
+  if (Number.isFinite(ratio) && ratio > 0) {
+    return Math.round(ratio * Math.max(1, toolPanelWidth))
+  }
+  return defaultTreeWidth(toolPanelWidth)
+}
+
 /* 归一化持久化数据：结构非法时逐字段回落默认值 */
 export function normalizeState(raw: unknown): WorkspaceState {
   const parsed = raw as Partial<WorkspaceState>
@@ -125,10 +148,9 @@ export function normalizeState(raw: unknown): WorkspaceState {
         parsed.toolPanel?.activeTool === 'browser' || parsed.toolPanel?.activeTool === 'terminal'
           ? parsed.toolPanel.activeTool
           : 'files',
-      width: clamp(
-        Number(parsed.toolPanel?.width) || base.toolPanel.width,
+      width: Math.max(
         LAYOUT.toolPanel.minWidth,
-        toolWidthMax()
+        Math.round(Number(parsed.toolPanel?.width) || base.toolPanel.width)
       ),
       mode: parsed.toolPanel?.mode === 'focus' ? 'focus' : 'dock'
     },
@@ -141,7 +163,11 @@ export function normalizeState(raw: unknown): WorkspaceState {
       selectedPath: stringOf(parsed.fileExplorer?.selectedPath, ''),
       preview: boolOf(parsed.fileExplorer?.preview, false),
       keyword: stringOf(parsed.fileExplorer?.keyword, ''),
-      expanded: expandedOf(parsed.fileExplorer?.expanded)
+      expanded: expandedOf(parsed.fileExplorer?.expanded),
+      treeWidth: treeWidthOf(
+        parsed.fileExplorer,
+        Number(parsed.toolPanel?.width) || base.toolPanel.width
+      )
     },
     updateTime: Number(parsed.updateTime) || Date.now(),
     version: STORAGE_VERSION

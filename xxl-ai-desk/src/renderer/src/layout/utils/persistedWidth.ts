@@ -1,5 +1,5 @@
 /*
-* 持久化宽度：localStorage 读写 + 越界夹取 + 默认值回落（左侧栏 / 右侧栏共用）
+* 持久化宽度：localStorage 读写 + 越界夹取 + 默认值回落（左侧栏）
 * @author xuxueli 2026-10-18
 */
 import { ref, type Ref } from 'vue'
@@ -11,11 +11,10 @@ export interface PersistedWidthOptions {
   max: number | (() => number)
 }
 
-/* 返回：响应式宽度 + 设置（夹取并持久化）+ 恢复默认 */
+/* 返回：响应式宽度 + 设置（夹取并持久化） */
 export interface PersistedWidth {
   width: Ref<number>
   setWidth: (width: number) => void
-  resetWidth: () => void
 }
 
 /* 创建持久化宽度：读取越界则回落默认；set 夹取后写回；reset 恢复默认值 */
@@ -32,17 +31,30 @@ export function createPersistedWidth(
       : options.default
   )
 
-  /* 设置宽度：夹取到 [min, max] 并持久化 */
+  /* 持久化防抖：拖拽期间只更新响应式宽度，停止后再写 localStorage */
+  let persistTimer: ReturnType<typeof setTimeout> | null = null
+  function persist(): void {
+    try {
+      localStorage.setItem(storageKey, String(width.value))
+    } catch {
+      /* 本地存储不可用时忽略（仅影响恢复） */
+    }
+  }
+  function schedulePersist(): void {
+    if (persistTimer) {
+      clearTimeout(persistTimer)
+    }
+    persistTimer = setTimeout(() => {
+      persistTimer = null
+      persist()
+    }, 150)
+  }
+
+  /* 设置宽度：夹取到 [min, max]，拖拽期间不逐帧写 localStorage */
   function setWidth(next: number): void {
     width.value = Math.min(maxWidth(), Math.max(options.min, Math.round(next)))
-    localStorage.setItem(storageKey, String(width.value))
+    schedulePersist()
   }
 
-  /* 恢复默认宽度并持久化 */
-  function resetWidth(): void {
-    width.value = Math.min(maxWidth(), Math.max(options.min, options.default))
-    localStorage.setItem(storageKey, String(width.value))
-  }
-
-  return { width, setWidth, resetWidth }
+  return { width, setWidth }
 }

@@ -312,8 +312,9 @@ layout/index.vue（app-wrapper，纵向）
 - **子菜单**：标题 18px/600，条目 14px/400，选中项 600 + 浅底；不展示 Logo；点击当前板块按钮切换子菜单栏折叠/展开，图标栏常驻。
 - **布局不承载域逻辑**：域内逻辑下沉 `modules/{module}`；`SidebarContent` 是唯一装配侧栏域内容的位置。
 - **布局不承载启动逻辑**：`App.vue` 只组装外壳；全局快捷键、设置/项目/会话初始化、会话生命周期与更新检查在 `composables/useAppBootstrap.ts`。
+- **面板宽度约束**：左侧栏与右侧工具面板均按像素持久化，最小 40px，最大保证会话区不低于 300px；拖拽统一走 `usePanelResize`（rAF 合并）与 `PanelResizer`。
 - **工具面板统一入口**：文件 / 浏览器 / 终端均为右侧工具面板的 Tab，顺序为文件、浏览器、终端；不再保留底部独立终端面板。
-- **面板交互统一复用**：拖拽用 `composables/usePanelResize.ts` + `layout/components/PanelResizer/index.vue`；左侧栏宽度走 `stores/layout.ts`，工具面板宽度等会话级尺寸走 `stores/workspace/`（按会话持久化）。
+- **面板交互统一复用**：拖拽用 `composables/usePanelResize.ts` + `layout/components/PanelResizer/index.vue`；左侧栏宽度走 `stores/layout.ts`，工具面板宽度、文件树宽度等会话级尺寸走 `stores/workspace/`（按会话持久化）；文件树与文件内容之间的拖拽复用 `PanelResizer`。
 - **共享选中态归属域**：跨「子菜单 ↔ 页面」的选中态放所属域 store（如 `settings.activeTab`），不塞进 `layout`。
 - **配色分层**：`--desk-chrome-bg`（顶栏+图标栏）> `--desk-panel-bg`（子菜单栏）> `--desk-bg`（正文）；不加分隔线，仅「子菜单栏 ↔ 正文」保留 1px `--desk-border`。
 - **尺寸令牌**：`--desk-header-height`、`--desk-rail-width`、`--desk-sidebar-width`、`--desk-terminal-height`、`--desk-panel-header-height`；JS 侧尺寸统一取 `config/layout.ts#LAYOUT`；自绘 SVG 统一 `.desk-svg-icon`，尺寸由使用处覆盖。

@@ -30,11 +30,27 @@ export function usePanelResize(options: PanelResizeOptions): {
     const startSize = options.getSize()
     /* 按面板位置换算方向：左侧栏/顶部面板随鼠标正向变大，右侧面板/底部面板反向变大 */
     const direction = options.side === 'left' || options.side === 'top' ? 1 : -1
+    /* 用 requestAnimationFrame 合并高频 mousemove，每帧最多写入一次尺寸 */
+    let frame = 0
+    let nextSize = startSize
+    const applySize = (): void => {
+      frame = 0
+      options.setSize(nextSize)
+    }
     const onMove = (e: MouseEvent): void => {
       const delta = (vertical ? e.clientY : e.clientX) - startPos
-      options.setSize(startSize + direction * delta)
+      nextSize = startSize + direction * delta
+      if (!frame) {
+        frame = requestAnimationFrame(applySize)
+      }
     }
     const onUp = (): void => {
+      /* 拖拽结束：取消防抖帧并提交最终尺寸，避免丢失最后一次位移 */
+      if (frame) {
+        cancelAnimationFrame(frame)
+        frame = 0
+        options.setSize(nextSize)
+      }
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
       document.body.classList.remove('resizing', 'resizing-vertical')

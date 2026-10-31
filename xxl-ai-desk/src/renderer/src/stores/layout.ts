@@ -10,7 +10,8 @@ export const useLayoutStore = defineStore('layout', () => {
   const sidebar = createPersistedWidth('desk-panel-width', {
     default: LAYOUT.sidebar.default,
     min: LAYOUT.sidebar.min,
-    max: LAYOUT.sidebar.max
+    /* 存储不限业务上限，实际拖拽上限由组件按窗口与会话区宽度计算 */
+    max: () => Math.max(LAYOUT.sidebar.min, window.innerWidth)
   })
 
   /* 左侧栏是否折叠（折叠后仅保留图标栏，内容区铺满） */
@@ -30,7 +31,6 @@ export const useLayoutStore = defineStore('layout', () => {
     sidebarCollapsed,
     sidebarWidth: sidebar.width,
     setSidebarWidth: sidebar.setWidth,
-    resetSidebarWidth: sidebar.resetWidth,
     toggleSidebar,
     expandSidebar
   }

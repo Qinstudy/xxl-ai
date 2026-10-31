@@ -3,9 +3,11 @@
  * 项目文件树：目录过滤、懒加载展开与文件选中。
  * @author xuxueli 2026-10-25
  */
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useProjectFileTree } from '../../composables/useProjectFileTree'
 import { useWorkspaceStore } from '@renderer/stores/workspace'
+import { LAYOUT } from '@renderer/config/layout'
+import PanelResizer from '@renderer/layout/components/PanelResizer/index.vue'
 import FileTreeNode from './FileTreeNode.vue'
 import { t } from '@renderer/i18n'
 import type { FsEntry } from '@shared/ipc'
@@ -32,6 +34,65 @@ const expanded = computed({
     workspace.setExpanded(props.sessionId, value)
   }
 })
+/* 文件区容器宽度：用于把拖拽像素换算为占比 */
+const treeRef = ref<HTMLElement | null>(null)
+const containerWidth = ref(0)
+let observer: ResizeObserver | null = null
+let syncFrame = 0
+
+/* 同步文件区宽度（工具面板宽度变化时更新） */
+function syncContainerWidth(): void {
+  containerWidth.value = treeRef.value?.parentElement?.clientWidth ?? 0
+}
+
+/* 合并面板拖拽期间的高频尺寸回调 */
+function scheduleSyncContainerWidth(): void {
+  if (syncFrame) {
+    return
+  }
+  syncFrame = requestAnimationFrame(() => {
+    syncFrame = 0
+    syncContainerWidth()
+  })
+}
+
+onMounted(() => {
+  syncContainerWidth()
+  const parent = treeRef.value?.parentElement
+  if (parent) {
+    observer = new ResizeObserver(scheduleSyncContainerWidth)
+    observer.observe(parent)
+  }
+})
+
+onBeforeUnmount(() => {
+  if (syncFrame) {
+    cancelAnimationFrame(syncFrame)
+    syncFrame = 0
+  }
+  observer?.disconnect()
+  observer = null
+})
+
+/* 按文件区宽度夹取目录树宽度（10% - 90%） */
+function clampTreeWidth(width: number): number {
+  if (containerWidth.value === 0) {
+    return width
+  }
+  const min = containerWidth.value * LAYOUT.fileTree.minRatio
+  const max = containerWidth.value * LAYOUT.fileTree.maxRatio
+  return Math.min(max, Math.max(min, width))
+}
+
+/*
+ * 目录树宽度：按像素保存，展示时动态夹取。
+ *   - 面板 dock / focus 切换时保持像素宽度，不随面板放大同比变宽；
+ *   - 拖拽仍可达到当前文件区的 10% - 90%。
+ */
+const treeWidth = computed({
+  get: () => clampTreeWidth(fileState.value.treeWidth),
+  set: (value: number) => workspace.setTreeWidth(props.sessionId, clampTreeWidth(value))
+})
 
 const { childrenMap, expandedMap, loadingMap, rootChildren, visibleRoot, toggle } =
   useProjectFileTree({ root: () => props.root, keyword, expanded })
@@ -43,7 +104,14 @@ function onContextMenu(entry: FsEntry, position: { x: number; y: number }): void
 </script>
 
 <template>
-  <div class="file-tree">
+  <div ref="treeRef" class="file-tree" :style="{ width: `${treeWidth}px` }">
+    <!-- 右边缘拖拽手柄：拖拽调整目录树宽度，双击恢复默认宽度 -->
+    <PanelResizer
+      v-model:size="treeWidth"
+      side="left"
+      :title="t('layout.resetPanelWidth')"
+      @reset="workspace.resetTreeWidth(props.sessionId)"
+    />
     <div class="tree-filter">
       <el-input v-model="keyword" size="small" clearable :placeholder="t('panel.filterPlaceholder')">
         <template #prefix><el-icon><Search /></el-icon></template>
@@ -78,10 +146,12 @@ function onContextMenu(entry: FsEntry, position: { x: number; y: number }): void
 </template>
 
 <style scoped lang="scss">
-/* 左侧文件树 */
+/* 左侧文件树：宽度可拖拽，限制在文件区的 10% - 90% */
 .file-tree {
+  position: relative;
   flex-shrink: 0;
-  width: 240px;
+  min-width: 10%;
+  max-width: 90%;
   display: flex;
   flex-direction: column;
   min-height: 0;
