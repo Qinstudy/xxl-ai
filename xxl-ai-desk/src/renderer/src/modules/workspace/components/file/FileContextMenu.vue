@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
- * 文件右键菜单：跟随鼠标位置展示，提供默认应用打开 / 打开所在文件夹 / 复制路径 / 删除。
+ * 文件 / 目录右键菜单：跟随鼠标位置展示，提供打开 / 在文件管理器中显示 / 复制路径 / 删除。
  * @author xuxueli 2026-10-31
  */
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -12,6 +12,8 @@ const props = defineProps<{
   /* 鼠标位置（视口坐标） */
   x: number
   y: number
+  /* 右键目标是否为目录 */
+  isDir: boolean
 }>()
 
 const emit = defineEmits<{
@@ -118,10 +120,10 @@ function choose(action: 'open' | 'reveal' | 'copy' | 'remove'): void {
       @contextmenu.prevent
     >
       <button class="file-menu-item" @click="choose('open')">
-        <el-icon><Document /></el-icon>
-        <span>{{ t('panel.openDefault') }}</span>
+        <el-icon><FolderOpened v-if="isDir" /><Document v-else /></el-icon>
+        <span>{{ isDir ? t('panel.openFolder') : t('panel.openDefault') }}</span>
       </button>
-      <button class="file-menu-item" @click="choose('reveal')">
+      <button v-if="!isDir" class="file-menu-item" @click="choose('reveal')">
         <el-icon><FolderOpened /></el-icon>
         <span>{{ t('panel.openFolder') }}</span>
       </button>

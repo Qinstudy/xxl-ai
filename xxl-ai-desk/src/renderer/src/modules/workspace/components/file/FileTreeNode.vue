@@ -53,11 +53,8 @@ function onClick(): void {
   }
 }
 
-/* 右键文件：阻止系统菜单，交给上层按鼠标位置展示操作菜单 */
+/* 右键文件 / 目录：阻止系统菜单，交给上层按鼠标位置展示操作菜单 */
 function onContextMenu(event: MouseEvent): void {
-  if (props.entry.isDir) {
-    return
-  }
   emit('context-menu', props.entry, { x: event.clientX, y: event.clientY })
 }
 

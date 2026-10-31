@@ -89,6 +89,46 @@ body.resizing-vertical {
   color: var(--desk-text-tertiary);
 }
 
+
+/* --- 面板工具按钮：文件 / Git 工具栏共用 --- */
+.panel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--desk-border);
+  border-radius: 8px;
+  background: var(--desk-bg);
+  color: var(--desk-text-secondary);
+  font-size: var(--desk-font-sm);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.panel-btn:hover:not(:disabled) {
+  background: var(--desk-primary-soft);
+  color: var(--desk-text);
+}
+
+.panel-btn.active {
+  background: var(--desk-segment-bg);
+  color: var(--desk-text);
+  border-color: var(--desk-segment-border);
+}
+
+.panel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.panel-btn .chevron {
+  font-size: var(--desk-icon-xs);
+}
+
 /* --- 滚动条 --- */
 ::-webkit-scrollbar {
   width: 8px;

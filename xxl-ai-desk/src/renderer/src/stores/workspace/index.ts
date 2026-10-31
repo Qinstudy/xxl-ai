@@ -6,6 +6,7 @@ import { api } from '@renderer/api'
 import { createPanelActions } from './panel'
 import { createFileExplorerActions } from './fileExplorer'
 import { createTerminalTabActions } from './terminalTabs'
+import { createGitPanelActions } from './gitPanel'
 import { workspaceStorage as storage } from './storage'
 import { DRAFT_SESSION_KEY, STORAGE_VERSION, createState, type WorkspaceState } from './state'
 
@@ -50,6 +51,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const panelActions = createPanelActions(sliceOf)
   const fileActions = createFileExplorerActions(sliceOf)
   const terminalActions = createTerminalTabActions(sliceOf)
+  const gitPanelActions = createGitPanelActions(sliceOf)
 
   /* 新建会话后迁移草稿工作区：草稿切片复制给真实会话，草稿切片复位 */
   function adoptDraft(sessionId: string): void {
@@ -68,6 +70,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
         ...draft.fileExplorer,
         expanded: { ...draft.fileExplorer.expanded }
       },
+      gitSidebarWidth: draft.gitSidebarWidth,
       updateTime: Date.now(),
       version: STORAGE_VERSION
     }
@@ -99,6 +102,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     ...panelActions,
     ...fileActions,
     ...terminalActions,
+    ...gitPanelActions,
     adoptDraft,
     cleanup,
     remove

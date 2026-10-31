@@ -172,7 +172,7 @@
     "openProjectFolder": "打开项目文件夹",
     "copyPath": "复制路径",
     "copied": "路径已复制",
-    "deleteTitle": "删除文件",
+    "deleteTitle": "删除确认",
     "deleteConfirm": "确定将「{0}」移到废纸篓？",
     "deleteFail": "删除失败",
     "preview": "查看预览",
@@ -531,5 +531,38 @@
     "callFailed": "模型「{0}」（供应商「{1}」）调用失败{2}",
     "defaultSystemPrompt": "你是 XXL-AI-Desk 智能助手，回答简洁、准确、有条理。",
     "continuePrompt": "[异常] 上一轮未正常结束，请继续输出剩余正文或工具调用，不要重复已有内容。"
+  },
+  "git": {
+    "tab": "Git",
+    "noProject": "请先在对话中选择一个项目",
+    "notRepo": "当前项目不是 Git 仓库",
+    "detached": "游离 HEAD",
+    "refresh": "刷新",
+    "loading": "正在读取 Git 状态…",
+    "staged": "已暂存",
+    "changes": "未暂存",
+    "noChanges": "工作区干净",
+    "stage": "暂存",
+    "unstage": "取消暂存",
+    "commitPlaceholder": "提交信息",
+    "commit": "提交",
+    "commitEmpty": "请输入提交信息",
+    "committed": "提交成功：{0}",
+    "binary": "二进制文件，无法展示文本差异",
+    "noDiff": "暂无差异",
+    "status": {
+      "modified": "已修改",
+      "added": "新增",
+      "deleted": "删除",
+      "renamed": "重命名",
+      "copied": "复制",
+      "typechange": "类型变更",
+      "untracked": "未跟踪",
+      "conflicted": "冲突"
+    },
+    "selectFile": "选择左侧变更文件查看差异",
+    "diffLoading": "正在读取差异…",
+    "expandAll": "展开全部目录",
+    "collapseAll": "折叠全部目录"
   }
 }

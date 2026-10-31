@@ -189,14 +189,23 @@ export function useProjectFileTree(options: UseProjectFileTreeOptions) {
     }
   })
 
+  /* 窗口重新获得焦点时刷新已加载目录，补充系统 watcher 可能漏掉的变更 */
+  function refreshLoadedDirs(): void {
+    for (const dir of Object.keys(childrenMap.value)) {
+      void reloadDir(dir)
+    }
+  }
+
   /* 挂载：监听目录变更 */
   onMounted(() => {
     offFsChange = api.fs.onChange(onFsChange)
+    window.addEventListener('focus', refreshLoadedDirs)
   })
 
   /* 卸载：取消文件变更监听并注销全部目录监听 */
   onBeforeUnmount(() => {
     offFsChange?.()
+    window.removeEventListener('focus', refreshLoadedDirs)
     for (const dir of [...watchedDirs]) {
       unwatch(dir)
     }

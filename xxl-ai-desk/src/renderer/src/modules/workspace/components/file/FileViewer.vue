@@ -31,6 +31,8 @@ const emit = defineEmits<{ save: [] }>()
 
 /* 编辑区着色长度上限：超过则退化为纯文本，保证大文件编辑流畅 */
 const MAX_EDITOR_HIGHLIGHT = 100000
+/* 小文件同步着色：避免输入后等待节流定时器，文字实时出现 */
+const MAX_EDITOR_HIGHLIGHT_SYNC = 20000
 /* Markdown 预览渲染上限：超长文档只渲染前段，避免解析/排版阻塞界面 */
 const MAX_MARKDOWN_PREVIEW = 400000
 
@@ -81,8 +83,12 @@ let highlightTimer: ReturnType<typeof setTimeout> | null = null
 watch(
   draft,
   (value, previous) => {
-    /* 首次（含文件切换后的初始值）立即着色，避免高亮层短暂空白 */
-    if (previous === undefined) {
+    /* 首次加载或小文件立即着色，避免输入后文字延迟出现 */
+    if (previous === undefined || value.length <= MAX_EDITOR_HIGHLIGHT_SYNC) {
+      if (highlightTimer) {
+        clearTimeout(highlightTimer)
+        highlightTimer = null
+      }
       highlightSource.value = value
       return
     }
@@ -92,7 +98,7 @@ watch(
     highlightTimer = setTimeout(() => {
       highlightTimer = null
       highlightSource.value = value
-    }, 120)
+    }, 80)
   },
   { immediate: true }
 )

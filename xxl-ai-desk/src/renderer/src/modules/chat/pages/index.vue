@@ -23,6 +23,7 @@ watch(workspaceKey, (key) => workspace.ensure(key), { immediate: true })
     :session-id="workspaceKey"
     :root="terminalProject?.path"
     :project-name="terminalProject?.name"
+    :project-id="terminalProject?.id"
   >
     <ChatRegion />
   </WorkspaceLayout>

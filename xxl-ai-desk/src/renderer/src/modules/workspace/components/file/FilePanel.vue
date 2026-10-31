@@ -47,7 +47,7 @@ const saving = ref(false)
 const openApps = ref<OpenWithApp[]>([])
 
 /* 右键菜单：可见态、鼠标位置与目标文件（菜单动作只针对该文件） */
-const contextMenu = ref({ visible: false, x: 0, y: 0, path: '', name: '' })
+const contextMenu = ref({ visible: false, x: 0, y: 0, path: '', name: '', isDir: false })
 
 /* 文件变更监听解绑函数 */
 let offFsChange: (() => void) | null = null
@@ -274,24 +274,27 @@ function onOpenCommand(command: string): void {
   }
 }
 
-/* 右键文件：先选中（保留未保存修改确认），再按鼠标位置展示菜单 */
+/* 右键文件 / 目录：文件先选中（保留未保存修改确认），目录直接展示菜单 */
 async function openContextMenu(
   entry: FsEntry,
   position: { x: number; y: number }
 ): Promise<void> {
-  if (!props.root || entry.isDir) {
+  if (!props.root) {
     return
   }
-  const selectedOk = await select(entry)
-  if (!selectedOk) {
-    return
+  if (!entry.isDir) {
+    const selectedOk = await select(entry)
+    if (!selectedOk) {
+      return
+    }
   }
   contextMenu.value = {
     visible: true,
     x: position.x,
     y: position.y,
     path: entry.path,
-    name: entry.name
+    name: entry.name,
+    isDir: entry.isDir
   }
 }
 
@@ -329,8 +332,13 @@ async function menuRemove(): Promise<void> {
   try {
     await api.fs.trash(root, path)
     ElMessage.success(t('common.deleted'))
-    /* 删除的是当前文件：清空查看器，避免残留已删除内容 */
-    if (selected.value?.path === path) {
+    /* 删除的是当前文件或当前文件所在目录：清空查看器，避免残留已删除内容 */
+    const selectedPath = selected.value?.path ?? ''
+    if (
+      selectedPath === path ||
+      selectedPath.startsWith(`${path}/`) ||
+      selectedPath.startsWith(`${path}\\`)
+    ) {
       clearSelection()
     }
   } catch (error) {
@@ -391,6 +399,7 @@ async function menuRemove(): Promise<void> {
       v-model:visible="contextMenu.visible"
       :x="contextMenu.x"
       :y="contextMenu.y"
+      :is-dir="contextMenu.isDir"
       @open="menuOpenDefault"
       @reveal="menuReveal"
       @copy="menuCopyPath"

@@ -123,7 +123,8 @@ const emit = defineEmits<{
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 8px 12px 8px 16px;
+  height: var(--desk-panel-header-height);
+  padding: 0 12px 0 16px;
   border-bottom: 1px solid var(--desk-border);
 }
 
@@ -160,45 +161,6 @@ const emit = defineEmits<{
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-}
-
-/* 通用面板按钮 */
-.panel-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--desk-border);
-  border-radius: 8px;
-  background: var(--desk-bg);
-  color: var(--desk-text-secondary);
-  font-size: var(--desk-font-sm);
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.panel-btn:hover:not(:disabled) {
-  background: var(--desk-primary-soft);
-  color: var(--desk-text);
-}
-
-.panel-btn.active {
-  background: var(--desk-segment-bg);
-  color: var(--desk-text);
-  border-color: var(--desk-segment-border);
-}
-
-.panel-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.panel-btn .chevron {
-  font-size: var(--desk-icon-xs);
 }
 
 /* 打开按钮：左半默认打开 + 右半打开方式下拉，整体保持一个按钮外观 */

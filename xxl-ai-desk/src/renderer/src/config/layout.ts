@@ -11,6 +11,8 @@ export const LAYOUT = {
   sidebar: { default: 240, min: 40 },
   /* 右侧工具面板宽度 / 正文最小可用宽度 */
   toolPanel: { defaultWidth: 520, minWidth: 40, minChatWidth: 300 },
+  /* Git 工具：左侧变更树默认宽度 */
+  git: { defaultSidebarWidth: 240 },
   /* 文件工具：目录树默认占比与默认宽度区间 / 拖拽占比上下限 */
   fileTree: {
     defaultRatio: 0.45,

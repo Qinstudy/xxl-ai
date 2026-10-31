@@ -10,6 +10,8 @@ import type {
   AppSettings,
   BrowserAction,
   ChatApprovalChoice,
+  GitCommitInput,
+  GitDiffInput,
   McpDTO,
   McpDiscoverQuery,
   ProviderDTO,
@@ -61,6 +63,16 @@ import {
 import { listDir, readFile, trashFile, writeFile } from './services/fsService'
 import { initFsWatch, unwatchDir, watchDir } from './services/fsWatchService'
 import { listOpenWithApps, openWith } from './services/openWithService'
+import {
+  commitGit,
+  getGitDiff,
+  getGitStatus,
+  initGitWatch,
+  stageGit,
+  unstageGit,
+  unwatchGitProject,
+  watchGitProject
+} from './services/gitService'
 import { abortChat, discardSessionRuns, respondApproval, sendChat } from './services/chatService'
 import { deleteMcp, listMcps, saveMcp } from './services/mcpService'
 import { listMcpTools, testMcp } from './services/mcpRuntimeService'
@@ -92,6 +104,9 @@ import { resolveBrowserAction, setBrowserActionSender } from './agent/host/brows
 
 /* 注册全部 IPC 处理器 */
 export function registerIpc(getWindow: () => BrowserWindow | null): void {
+  /* Git 文件变更：主进程监听到项目变化后通知渲染层刷新 */
+  initGitWatch((projectId) => getWindow()?.webContents.send(IPC.gitChange, projectId))
+
   /* Agent 工具 open_browser：把 URL 交给渲染层，在对应会话的浏览器面板打开（可指定新建标签页） */
   setBrowserOpener((sessionId, url, newTab) => {
     getWindow()?.webContents.send(IPC.browserOpenTab, {
@@ -273,6 +288,19 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.chatApprovalRespond, (_event, requestId: string, choice: ChatApprovalChoice) =>
     respondApproval(requestId, choice)
   )
+
+  /* --- Git 工具（项目空间维度） --- */
+  ipcMain.handle(IPC.gitStatus, (_event, projectId: string) => getGitStatus(projectId))
+  ipcMain.handle(IPC.gitDiff, (_event, input: GitDiffInput) => getGitDiff(input))
+  ipcMain.handle(IPC.gitStage, (_event, projectId: string, path: string, oldPath?: string) =>
+    stageGit(projectId, path, oldPath)
+  )
+  ipcMain.handle(IPC.gitUnstage, (_event, projectId: string, path: string, oldPath?: string) =>
+    unstageGit(projectId, path, oldPath)
+  )
+  ipcMain.handle(IPC.gitCommit, (_event, input: GitCommitInput) => commitGit(input))
+  ipcMain.handle(IPC.gitWatch, (_event, projectId: string) => watchGitProject(projectId))
+  ipcMain.handle(IPC.gitUnwatch, (_event, projectId: string) => unwatchGitProject(projectId))
 
   /* --- 终端（本地 PTY） --- */
   ipcMain.handle(IPC.terminalCreate, (_event, input: TerminalCreateInput) => createTerminal(input))

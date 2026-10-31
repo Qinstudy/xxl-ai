@@ -10,7 +10,7 @@ export const STORAGE_PREFIX = 'desk:workspace:'
 export const STORAGE_VERSION = 3
 
 /* 工具面板当前工具 */
-export type WorkspaceTool = 'files' | 'browser' | 'terminal'
+export type WorkspaceTool = 'files' | 'browser' | 'terminal' | 'git'
 
 /* 工具面板布局模式：dock = 与正文并排，focus = 占满正文 */
 export type ToolPanelMode = 'dock' | 'focus'
@@ -62,6 +62,8 @@ export interface WorkspaceState {
   toolPanel: ToolPanelState
   terminalPanel: TerminalPanelState
   fileExplorer: FileExplorerState
+  /* Git 工具左侧变更树宽度 */
+  gitSidebarWidth: number
   /* 最近更新时间 */
   updateTime: number
   /* 持久化结构版本 */
@@ -88,6 +90,7 @@ export function createState(): WorkspaceState {
       expanded: {},
       treeWidth: defaultTreeWidth(LAYOUT.toolPanel.defaultWidth)
     },
+    gitSidebarWidth: LAYOUT.git.defaultSidebarWidth,
     updateTime: Date.now(),
     version: STORAGE_VERSION
   }
@@ -145,7 +148,9 @@ export function normalizeState(raw: unknown): WorkspaceState {
     toolPanel: {
       visible: boolOf(parsed.toolPanel?.visible, base.toolPanel.visible),
       activeTool:
-        parsed.toolPanel?.activeTool === 'browser' || parsed.toolPanel?.activeTool === 'terminal'
+        parsed.toolPanel?.activeTool === 'browser' ||
+        parsed.toolPanel?.activeTool === 'terminal' ||
+        parsed.toolPanel?.activeTool === 'git'
           ? parsed.toolPanel.activeTool
           : 'files',
       width: Math.max(
@@ -169,6 +174,10 @@ export function normalizeState(raw: unknown): WorkspaceState {
         Number(parsed.toolPanel?.width) || base.toolPanel.width
       )
     },
+    gitSidebarWidth: Math.max(
+      0,
+      Math.round(Number(parsed.gitSidebarWidth) || base.gitSidebarWidth)
+    ),
     updateTime: Number(parsed.updateTime) || Date.now(),
     version: STORAGE_VERSION
   }

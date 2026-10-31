@@ -1,18 +1,24 @@
 <script setup lang="ts">
 /*
- * 会话工作区右侧「工具」面板：顶部横向 Tab（文件 / 浏览器 / 终端）切换工具，
+ * 会话工作区右侧「工具」面板：顶部横向 Tab（文件 / Git / 终端 / 浏览器）切换工具，
  * 选定后承载对应面板；显隐、宽度、当前工具与布局模式均按会话隔离。
  */
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useWorkspaceStore, type WorkspaceTool } from '@renderer/stores/workspace'
 import { t } from '@renderer/i18n'
 import FilePanel from './file/FilePanel.vue'
-import { GlobeIcon, TerminalIcon } from '@renderer/components/icons'
+import { GitIcon, GlobeIcon, TerminalIcon } from '@renderer/components/icons'
 import BrowserPanel from './browser/BrowserPanel.vue'
+import GitPanel from './git/GitPanel.vue'
 /* 终端按需加载：未打开终端 Tab 时不加载 xterm */
 const TerminalPanel = defineAsyncComponent(() => import('./terminal/TerminalPanel.vue'))
 
-const props = defineProps<{ sessionId: string; root?: string; projectName?: string }>()
+const props = defineProps<{
+  sessionId: string
+  root?: string
+  projectName?: string
+  projectId?: string
+}>()
 
 /* 会话工作区 store：提供本会话的面板显隐/宽度/当前工具/布局模式 */
 const workspace = useWorkspaceStore()
@@ -26,7 +32,8 @@ const activeTool = computed<WorkspaceTool>(() => toolPanel.value.activeTool)
 const opened = ref<Record<WorkspaceTool, boolean>>({
   files: false,
   browser: false,
-  terminal: false
+  terminal: false,
+  git: false
 })
 
 /* 标记已打开过的工具，使其面板首次打开后保持挂载（切换用 v-show） */
@@ -69,11 +76,11 @@ function toggleFocus(): void {
         </button>
         <button
           class="tool-tab"
-          :class="{ active: activeTool === 'browser' }"
-          @click="openTool('browser')"
+          :class="{ active: activeTool === 'git' }"
+          @click="openTool('git')"
         >
-          <GlobeIcon class="tool-tab-icon" />
-          <span>{{ t('panel.browser') }}</span>
+          <GitIcon class="tool-tab-icon" />
+          <span>{{ t('git.tab') }}</span>
         </button>
         <button
           class="tool-tab"
@@ -82,6 +89,14 @@ function toggleFocus(): void {
         >
           <TerminalIcon class="tool-tab-icon" />
           <span>{{ t('workspace.terminal') }}</span>
+        </button>
+        <button
+          class="tool-tab"
+          :class="{ active: activeTool === 'browser' }"
+          @click="openTool('browser')"
+        >
+          <GlobeIcon class="tool-tab-icon" />
+          <span>{{ t('panel.browser') }}</span>
         </button>
       </div>
       <div class="tool-actions">
@@ -115,6 +130,13 @@ function toggleFocus(): void {
         :cwd="props.root"
         :title="props.projectName || t('workspace.terminal')"
         :visible="toolPanel.visible && activeTool === 'terminal'"
+      />
+      <GitPanel
+        v-if="opened.git"
+        v-show="activeTool === 'git'"
+        :session-id="props.sessionId"
+        :project-id="props.projectId"
+        :active="toolPanel.visible && activeTool === 'git'"
       />
     </div>
   </div>

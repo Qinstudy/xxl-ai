@@ -11,6 +11,7 @@ export * from './contracts/session'
 export * from './contracts/chat'
 export * from './contracts/terminal'
 export * from './contracts/fs'
+export * from './contracts/git'
 export * from './contracts/shell'
 export * from './contracts/mcp'
 export * from './contracts/skill'
@@ -36,6 +37,14 @@ import type {
   TerminalEvent
 } from './contracts/terminal'
 import type { FileContent, FsEntry } from './contracts/fs'
+import type {
+  GitCommitInput,
+  GitCommitResult,
+  GitDiffInput,
+  GitDiffResult,
+  GitOperationResult,
+  GitStatus
+} from './contracts/git'
 import type { OpenWithApp } from './contracts/shell'
 import type {
   BrowserActionResult,
@@ -117,6 +126,25 @@ export interface DeskApi {
     remove(id: string): Promise<void>
     /* 在文件管理器中显示项目目录 */
     reveal(id: string): Promise<void>
+  }
+  /* Git 工具（按项目空间执行，限定已登记项目目录） */
+  git: {
+    /* 项目 Git 状态：分支 / ahead-behind / 暂存与工作区变更 */
+    status(projectId: string): Promise<GitStatus>
+    /* 查看单文件差异（暂存区或工作区） */
+    diff(input: GitDiffInput): Promise<GitDiffResult>
+    /* 暂存单个文件 */
+    stage(projectId: string, path: string, oldPath?: string): Promise<GitOperationResult>
+    /* 取消暂存单个文件 */
+    unstage(projectId: string, path: string, oldPath?: string): Promise<GitOperationResult>
+    /* 提交暂存区变更 */
+    commit(input: GitCommitInput): Promise<GitCommitResult>
+    /* 监听项目 Git 变更（外部 git 操作即时刷新） */
+    watch(projectId: string): Promise<void>
+    /* 取消项目 Git 变更监听 */
+    unwatch(projectId: string): Promise<void>
+    /* 订阅项目 Git 变更事件（返回取消订阅函数） */
+    onChange(cb: (projectId: string) => void): () => void
   }
   /* 会话管理 */
   session: {
@@ -281,6 +309,15 @@ export const IPC = {
   projectRename: 'desk:project:rename',
   projectRemove: 'desk:project:remove',
   projectReveal: 'desk:project:reveal',
+  /* Git 工具 */
+  gitStatus: 'desk:git:status',
+  gitDiff: 'desk:git:diff',
+  gitStage: 'desk:git:stage',
+  gitUnstage: 'desk:git:unstage',
+  gitCommit: 'desk:git:commit',
+  gitWatch: 'desk:git:watch',
+  gitUnwatch: 'desk:git:unwatch',
+  gitChange: 'desk:git:change',
   /* 会话 */
   sessionList: 'desk:session:list',
   sessionCreate: 'desk:session:create',

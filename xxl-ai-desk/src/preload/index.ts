@@ -13,6 +13,12 @@ import type {
   DeskApi,
   FileContent,
   FsEntry,
+  GitCommitInput,
+  GitCommitResult,
+  GitDiffInput,
+  GitDiffResult,
+  GitOperationResult,
+  GitStatus,
   McpDTO,
   McpDiscoverQuery,
   OpenWithApp,
@@ -90,6 +96,24 @@ const api: DeskApi = {
     remove: (id: string) => ipcRenderer.invoke(IPC.projectRemove, id),
     /* 在文件管理器中显示项目目录 */
     reveal: (id: string) => ipcRenderer.invoke(IPC.projectReveal, id)
+  },
+  /* Git 工具（项目空间维度） */
+  git: {
+    status: (projectId: string): Promise<GitStatus> => ipcRenderer.invoke(IPC.gitStatus, projectId),
+    diff: (input: GitDiffInput): Promise<GitDiffResult> => ipcRenderer.invoke(IPC.gitDiff, input),
+    stage: (projectId: string, path: string, oldPath?: string): Promise<GitOperationResult> =>
+      ipcRenderer.invoke(IPC.gitStage, projectId, path, oldPath),
+    unstage: (projectId: string, path: string, oldPath?: string): Promise<GitOperationResult> =>
+      ipcRenderer.invoke(IPC.gitUnstage, projectId, path, oldPath),
+    commit: (input: GitCommitInput): Promise<GitCommitResult> =>
+      ipcRenderer.invoke(IPC.gitCommit, input),
+    watch: (projectId: string) => ipcRenderer.invoke(IPC.gitWatch, projectId),
+    unwatch: (projectId: string) => ipcRenderer.invoke(IPC.gitUnwatch, projectId),
+    onChange: (callback: (projectId: string) => void) => {
+      const listener = (_event: unknown, projectId: string): void => callback(projectId)
+      ipcRenderer.on(IPC.gitChange, listener)
+      return () => ipcRenderer.removeListener(IPC.gitChange, listener)
+    }
   },
   /* 会话管理 */
   session: {

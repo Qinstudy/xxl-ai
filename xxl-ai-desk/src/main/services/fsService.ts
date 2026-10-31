@@ -19,19 +19,28 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024
 /* 列出目录内容：目录在前、名称升序（不递归，子目录按需懒加载） */
 export async function listDir(root: string, dir: string): Promise<FsEntry[]> {
   assertInside(root, dir || root)
-  const dirents = await readdir(dir || root, { withFileTypes: true })
-  return dirents
-    .map((item) => ({
-      name: item.name,
-      path: resolve(dir || root, item.name),
-      isDir: item.isDirectory()
-    }))
-    .sort((a, b) => {
-      if (a.isDir !== b.isDir) {
-        return a.isDir ? -1 : 1
-      }
-      return a.name.localeCompare(b.name)
-    })
+  try {
+    const dirents = await readdir(dir || root, { withFileTypes: true })
+    return dirents
+      .map((item) => ({
+        name: item.name,
+        path: resolve(dir || root, item.name),
+        isDir: item.isDirectory()
+      }))
+      .sort((a, b) => {
+        if (a.isDir !== b.isDir) {
+          return a.isDir ? -1 : 1
+        }
+        return a.name.localeCompare(b.name)
+      })
+  } catch (error) {
+    /* 目录在展开后被删除 / 移动：返回空列表，交给上层 watcher 清理对应节点 */
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === 'ENOENT' || code === 'ENOTDIR') {
+      return []
+    }
+    throw error
+  }
 }
 
 /* 读取图片为 data URL（超限返回空串） */
@@ -66,10 +75,6 @@ export async function trashFile(root: string, file: string): Promise<void> {
   const target = resolve(file)
   if (target === resolve(root)) {
     throw new Error('不允许删除项目根目录')
-  }
-  const info = await stat(target)
-  if (info.isDirectory()) {
-    throw new Error('暂不支持删除目录')
   }
   await shell.trashItem(target)
 }

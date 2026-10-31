@@ -15,6 +15,8 @@ const props = defineProps<{
   root?: string
   /* 当前项目名称 */
   projectName?: string
+  /* 当前项目主键（Git 工具使用） */
+  projectId?: string
 }>()
 
 /* 工具面板状态与宽度约束（首次读取时自动创建会话切片） */
@@ -51,6 +53,7 @@ const { toolPanel, focused, toolWidth, resetToolWidth } = usePanelWidths(
           :session-id="props.sessionId"
           :root="props.root"
           :project-name="props.projectName"
+          :project-id="props.projectId"
         />
       </aside>
     </div>

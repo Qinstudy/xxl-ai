@@ -12,6 +12,7 @@ import { ensureSeedProviders } from './services/providerService'
 import { registerLocalFileProtocol } from './services/localFileProtocolService'
 import { disposeAllTerminals } from './services/terminalService'
 import { disposeAllFsWatch } from './services/fsWatchService'
+import { disposeAllGitWatch } from './services/gitService'
 import { disposeAgentRuntime } from './agent/host/runtimeHost'
 import { disposeBrowserActions } from './agent/host/browserBridge'
 
@@ -180,6 +181,7 @@ if (!gotLock) {
     void disposeAgentRuntime().finally(() => {
       disposeAllTerminals()
       disposeAllFsWatch()
+      disposeAllGitWatch()
       app.quit()
     })
   })
