@@ -120,7 +120,7 @@ async function toggleProvider(row: ProviderDTO, value: boolean): Promise<void> {
 }
 
 .provider-tip {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 

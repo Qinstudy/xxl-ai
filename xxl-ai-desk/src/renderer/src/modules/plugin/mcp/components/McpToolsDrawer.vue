@@ -75,7 +75,7 @@ watch(visible, async (value) => {
 }
 
 .tool-name {
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   font-weight: 600;
   color: var(--desk-text);
   font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
@@ -83,7 +83,7 @@ watch(visible, async (value) => {
 
 .tool-desc {
   margin-top: 4px;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-secondary);
   line-height: 1.5;
 }

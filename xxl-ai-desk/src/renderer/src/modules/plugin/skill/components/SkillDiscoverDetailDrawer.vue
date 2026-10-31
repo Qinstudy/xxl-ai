@@ -141,7 +141,7 @@ function formatInstalls(value: number): string {
   padding: 14px 16px;
   border-radius: 8px;
   background: var(--desk-panel-bg);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
 }
 
 .meta-label {
@@ -156,7 +156,7 @@ function formatInstalls(value: number): string {
 
 .mono {
   font-family: var(--el-font-family-mono, monospace);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
 }
 
 .detail-section {
@@ -165,13 +165,13 @@ function formatInstalls(value: number): string {
 
 .section-title {
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   font-weight: 600;
   color: var(--desk-text);
 }
 
 .detail-desc {
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   line-height: 1.7;
   color: var(--desk-text-secondary);
   word-break: break-word;

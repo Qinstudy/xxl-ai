@@ -99,7 +99,7 @@ const examples = ['chat.suggestion1', 'chat.suggestion2', 'chat.suggestion3']
   padding: 6px 10px;
   border-radius: 8px;
   color: var(--desk-text-secondary);
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   cursor: pointer;
   outline: none;
   transition:
@@ -115,7 +115,7 @@ const examples = ['chat.suggestion1', 'chat.suggestion2', 'chat.suggestion3']
 .project-trigger .project-icon,
 .project-trigger .project-arrow {
   flex-shrink: 0;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
 }
 
 .project-trigger .project-name {
@@ -139,7 +139,7 @@ const examples = ['chat.suggestion1', 'chat.suggestion2', 'chat.suggestion3']
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-tertiary);
 }
 

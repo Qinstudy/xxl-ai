@@ -68,7 +68,7 @@ const emit = defineEmits<{ 'update:active': [key: string] }>()
   padding: 0 0 12px;
   border: none;
   background: transparent;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   color: var(--desk-text-secondary);
   cursor: pointer;
   transition: color 0.15s ease;

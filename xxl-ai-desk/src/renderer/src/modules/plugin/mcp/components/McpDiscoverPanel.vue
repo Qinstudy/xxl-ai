@@ -259,7 +259,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   cursor: pointer;
 }
@@ -295,7 +295,7 @@ onUnmounted(() => {
   border-radius: 999px;
   background: transparent;
   color: var(--desk-text-secondary);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   cursor: pointer;
   transition:
     color 0.15s ease,
@@ -316,7 +316,7 @@ onUnmounted(() => {
 }
 
 .chip-count {
-  font-size: 11px;
+  font-size: var(--desk-font-xs);
   font-weight: 400;
   color: var(--desk-text-tertiary);
 }
@@ -365,7 +365,7 @@ onUnmounted(() => {
 .card-name {
   flex: 1;
   min-width: 0;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   font-weight: 600;
   color: var(--desk-text);
   overflow: hidden;
@@ -379,7 +379,7 @@ onUnmounted(() => {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   line-height: 1.6;
   color: var(--desk-text-secondary);
 }
@@ -388,7 +388,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   min-height: 18px;
 }

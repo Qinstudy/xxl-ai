@@ -40,13 +40,13 @@ const settings = useSettingsStore()
 
 <style scoped lang="scss">
 .update-version {
-  font-size: 15px;
+  font-size: var(--desk-font-md);
   font-weight: 600;
 }
 
 .update-current {
   margin-top: 4px;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-tertiary);
 }
 
@@ -58,7 +58,7 @@ const settings = useSettingsStore()
   white-space: pre-wrap;
   word-break: break-word;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-secondary);
   background: var(--desk-bg-elevated);
   border: 1px solid var(--desk-border);

@@ -276,7 +276,7 @@ function toolDetailsText(tool: ToolCallState): string {
   border: none;
   background: transparent;
   color: var(--desk-text-secondary);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   text-align: left;
   cursor: pointer;
   user-select: none;
@@ -288,7 +288,7 @@ function toolDetailsText(tool: ToolCallState): string {
 
 .step-icon {
   flex-shrink: 0;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   color: var(--desk-text-tertiary);
 }
 
@@ -315,14 +315,14 @@ function toolDetailsText(tool: ToolCallState): string {
   white-space: nowrap;
   color: var(--desk-text-tertiary);
   font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
 }
 
 .tool-state {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
 }
 
 .step-tool.done .tool-state {
@@ -340,13 +340,13 @@ function toolDetailsText(tool: ToolCallState): string {
 .step-time {
   flex-shrink: 0;
   color: var(--desk-text-tertiary);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   font-variant-numeric: tabular-nums;
 }
 
 .step-chevron {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   transition: transform 0.2s ease;
 }
@@ -362,7 +362,7 @@ function toolDetailsText(tool: ToolCallState): string {
   max-height: min(480px, 55vh);
   overflow-y: auto;
   overscroll-behavior: contain;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   line-height: 1.75;
   color: var(--desk-text-tertiary);
   white-space: pre-wrap;
@@ -378,7 +378,7 @@ function toolDetailsText(tool: ToolCallState): string {
 }
 
 .tool-block-title {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   margin-bottom: 4px;
 }
@@ -392,7 +392,7 @@ function toolDetailsText(tool: ToolCallState): string {
   border: 1px solid var(--desk-code-border);
   border-radius: 8px;
   font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
-  font-size: 12.5px;
+  font-size: var(--desk-font-sm);
   line-height: 1.65;
   color: var(--desk-code-text);
   white-space: pre-wrap;
@@ -405,7 +405,7 @@ function toolDetailsText(tool: ToolCallState): string {
 
 /* 正文答复：与过程区分，正常字号与颜色 */
 .step-text {
-  font-size: 14px;
+  font-size: var(--desk-font-base);
 }
 
 .markdown-body.is-error {
@@ -415,7 +415,7 @@ function toolDetailsText(tool: ToolCallState): string {
 /* 本轮耗时：过程结束后的小字提示 */
 .turn-meta {
   margin-top: 6px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
@@ -426,7 +426,7 @@ function toolDetailsText(tool: ToolCallState): string {
   gap: 6px;
   margin-top: 6px;
   color: var(--desk-text-tertiary);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
 }
 
 .generating-dots {

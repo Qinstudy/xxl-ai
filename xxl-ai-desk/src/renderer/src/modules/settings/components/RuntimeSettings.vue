@@ -224,13 +224,13 @@ function showDetectResult(result: RuntimeDetectResult): void {
 }
 
 .runtime-title {
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   color: var(--el-text-color-regular);
   margin-bottom: 6px;
 }
 
 .runtime-tip {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   margin-bottom: 16px;
 }
@@ -246,7 +246,7 @@ function showDetectResult(result: RuntimeDetectResult): void {
 }
 
 .runtime-group-title {
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   font-weight: 600;
   color: var(--desk-text);
   margin-bottom: 10px;
@@ -266,7 +266,7 @@ function showDetectResult(result: RuntimeDetectResult): void {
 .runtime-field-label {
   flex-shrink: 0;
   width: 40px;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-secondary);
 }
 
@@ -278,7 +278,7 @@ function showDetectResult(result: RuntimeDetectResult): void {
 .runtime-status {
   flex: 1;
   min-width: 0;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   word-break: break-all;
 }
@@ -300,7 +300,7 @@ function showDetectResult(result: RuntimeDetectResult): void {
 }
 
 .runtime-dirty {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--el-color-warning);
 }
 </style>

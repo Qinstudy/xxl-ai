@@ -197,7 +197,7 @@ function modeLabel(modes: ChatMode[]): string {
 /* 说明区：位于中心外壳 header 内 */
 .page-tip {
   padding-bottom: 16px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   line-height: 1.6;
 }
@@ -205,7 +205,7 @@ function modeLabel(modes: ChatMode[]): string {
 /* 正文：在外壳滚动区内补充左右与底部间距 */
 .builtin-body {
   padding: 0 28px 32px;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   --el-font-size-base: 14px;
 }
 
@@ -256,13 +256,13 @@ function modeLabel(modes: ChatMode[]): string {
 }
 
 .group-title {
-  font-size: 15px;
+  font-size: var(--desk-font-md);
   font-weight: 600;
   color: var(--desk-text);
 }
 
 .group-count {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
@@ -288,7 +288,7 @@ function modeLabel(modes: ChatMode[]): string {
 
 .group-desc {
   margin: 4px 0 0 24px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   line-height: 1.5;
 }
@@ -299,14 +299,14 @@ function modeLabel(modes: ChatMode[]): string {
 
 .tool-desc {
   margin-top: 2px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   line-height: 1.5;
 }
 
 .tool-id {
   font-family: var(--el-font-family-mono, monospace);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-secondary);
 }
 </style>

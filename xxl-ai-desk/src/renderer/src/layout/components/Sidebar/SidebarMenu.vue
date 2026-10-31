@@ -33,6 +33,6 @@ const emit = defineEmits<{ select: [item: NavItem] }>()
 <style scoped lang="scss">
 .menu-icon {
   flex-shrink: 0;
-  font-size: 15px;
+  font-size: var(--desk-font-md);
 }
 </style>

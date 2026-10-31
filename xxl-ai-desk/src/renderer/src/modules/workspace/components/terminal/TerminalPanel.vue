@@ -98,7 +98,7 @@ const { tabs, activeId, setContainer, activate, openTerminal, disposeTab } = use
   border: none;
   border-radius: 8px;
   background: transparent;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-secondary);
   cursor: pointer;
   transition:
@@ -136,7 +136,7 @@ const { tabs, activeId, setContainer, activate, openTerminal, disposeTab } = use
 
 /* 关闭图标：默认隐藏，悬浮标签时展示 */
 .terminal-tab-close {
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   visibility: hidden;
 }
 

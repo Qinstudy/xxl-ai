@@ -18,6 +18,6 @@ const { openPalette } = useCommandPalette()
 <style scoped lang="scss">
 /* 搜索图标尺寸：与面板图标保持一致 */
 .search-icon {
-  font-size: 16px;
+  font-size: var(--desk-icon-md);
 }
 </style>

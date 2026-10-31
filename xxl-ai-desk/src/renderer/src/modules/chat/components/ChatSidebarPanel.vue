@@ -168,7 +168,7 @@ async function onSelect(id: string): Promise<void> {
 
 .new-icon {
   flex-shrink: 0;
-  font-size: 15px;
+  font-size: var(--desk-font-md);
 }
 
 /* 「项目:」分组标题：右侧排序/新建入口 */
@@ -182,7 +182,7 @@ async function onSelect(id: string): Promise<void> {
 
 /* 「项目」分组标签：小号加粗，颜色比条目略浅 */
 .project-label {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   font-weight: 600;
   color: var(--desk-text-secondary);
 }
@@ -200,7 +200,7 @@ async function onSelect(id: string): Promise<void> {
 }
 
 .project-icon-btn {
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   color: var(--desk-text-secondary);
   cursor: pointer;
   transition: color 0.15s ease;

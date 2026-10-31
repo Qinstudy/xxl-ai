@@ -249,7 +249,7 @@ function syncGutter(): void {
   align-items: center;
   justify-content: center;
   padding: 20px;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-tertiary);
   text-align: center;
 }
@@ -263,7 +263,7 @@ function syncGutter(): void {
   padding: 6px 12px;
   background: var(--desk-bg-elevated);
   border-bottom: 1px solid var(--desk-border);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
@@ -296,7 +296,7 @@ function syncGutter(): void {
   text-align: right;
   color: var(--desk-text-tertiary);
   font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   line-height: 22px;
   font-variant-numeric: tabular-nums;
   user-select: none;
@@ -313,7 +313,7 @@ function syncGutter(): void {
   padding: 12px 18px;
   color: var(--desk-code-text);
   font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   line-height: 22px;
   white-space: pre;
 }
@@ -337,7 +337,7 @@ function syncGutter(): void {
   text-align: right;
   color: var(--desk-text-tertiary);
   font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   line-height: 22px;
   font-variant-numeric: tabular-nums;
   user-select: none;
@@ -363,7 +363,7 @@ function syncGutter(): void {
   padding: 12px 18px;
   border: none;
   font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   line-height: 22px;
   white-space: pre;
   tab-size: 2;
@@ -403,7 +403,7 @@ function syncGutter(): void {
   min-height: 0;
   overflow: auto;
   padding: 16px 20px;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
 }
 
 /* 音视频预览：居中展示，视频自适应容器高度 */

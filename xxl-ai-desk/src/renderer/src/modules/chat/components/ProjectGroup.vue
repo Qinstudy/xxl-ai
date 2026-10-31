@@ -184,7 +184,7 @@ async function onDeleteSession(id: string): Promise<void> {
 
 .project-icon {
   flex-shrink: 0;
-  font-size: 15px;
+  font-size: var(--desk-font-md);
 }
 
 /* 行内操作：内容本身横排（悬浮展示由 SidebarRow 统一控制） */
@@ -197,12 +197,12 @@ async function onDeleteSession(id: string): Promise<void> {
 
 .session-empty {
   padding: 6px 12px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
 .op {
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-tertiary);
 }
 

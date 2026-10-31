@@ -133,7 +133,7 @@ const emit = defineEmits<{
   gap: 4px;
   min-width: 0;
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-tertiary);
 }
 
@@ -173,7 +173,7 @@ const emit = defineEmits<{
   border-radius: 8px;
   background: var(--desk-bg);
   color: var(--desk-text-secondary);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -198,7 +198,7 @@ const emit = defineEmits<{
 }
 
 .panel-btn .chevron {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
 }
 
 /* 打开按钮：左半默认打开 + 右半打开方式下拉，整体保持一个按钮外观 */

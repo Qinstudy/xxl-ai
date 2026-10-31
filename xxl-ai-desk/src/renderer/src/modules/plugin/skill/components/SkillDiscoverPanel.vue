@@ -279,7 +279,7 @@ onUnmounted(() => {
 <style scoped lang="scss">
 .discover-panel {
   padding: 0 28px 32px;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   --el-font-size-base: 14px;
 }
 
@@ -305,7 +305,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   cursor: pointer;
 }
@@ -332,7 +332,7 @@ onUnmounted(() => {
   border-radius: 999px;
   background: transparent;
   color: var(--desk-text-secondary);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   cursor: pointer;
   transition:
     color 0.15s ease,
@@ -354,7 +354,7 @@ onUnmounted(() => {
 
 .board-total {
   margin-left: auto;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
@@ -374,7 +374,7 @@ onUnmounted(() => {
 
 .source-text {
   font-family: var(--el-font-family-mono, monospace);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-secondary);
 }
 
@@ -404,7 +404,7 @@ onUnmounted(() => {
 }
 
 .loaded-tip {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 </style>

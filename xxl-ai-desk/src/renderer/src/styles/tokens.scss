@@ -62,6 +62,15 @@
   --desk-btn-text: #1a1a1a;
   /* 开关激活色：柔和中性灰，避免纯黑且与关闭态有区分 */
   --desk-switch-on: #9a9a9a;
+  /* 字体层级：xs=辅助说明 / sm=紧凑控件 / base=常规 UI / md=正文 / lg=栏目标题 / xl=展示标题 */
+  --desk-font-xs: 12px;
+  --desk-font-sm: 13px;
+  --desk-font-base: 14px;
+  --desk-font-md: 15px;
+  --desk-font-lg: 18px;
+  --desk-font-xl: 22px;
+  /* 图标字号：仅用于 el-icon / 自绘图标，不属于文字层级 */
+  --desk-icon-md: 16px;
 
   /* Element Plus 主题对齐（黑白灰） */
   --el-color-primary: #0d0d0d;
@@ -71,7 +80,9 @@
   --el-color-primary-light-8: #c7c7c7;
   --el-color-primary-light-9: #f0f0f0;
   --el-color-primary-dark-2: #000000;
-  --el-font-size-base: 15px;
+  --el-font-size-extra-small: var(--desk-font-xs);
+  --el-font-size-small: var(--desk-font-sm);
+  --el-font-size-base: var(--desk-font-md);
   --el-border-radius-base: 10px;
 }
 

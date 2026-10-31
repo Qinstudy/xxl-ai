@@ -111,7 +111,7 @@ onBeforeUnmount(stopTyping)
 }
 
 .empty-title {
-  font-size: 22px;
+  font-size: var(--desk-font-xl);
   font-weight: 600;
   /* 预留一行高度，逐字展示时页面不抖动 */
   min-height: 32px;

@@ -174,7 +174,7 @@ function onContextMenu(entry: FsEntry, position: { x: number; y: number }): void
 
 .tree-empty {
   padding: 16px 10px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   text-align: center;
 }

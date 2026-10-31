@@ -20,7 +20,7 @@ body {
   background: var(--desk-bg);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
-  font-size: 15px;
+  font-size: var(--desk-font-md);
 }
 
 /* --- 外壳布局：结构样式由 App / AppTopbar / SidebarShell 组件自身维护 --- */
@@ -62,7 +62,7 @@ body.resizing-vertical {
   border-radius: 8px;
   background: transparent;
   color: var(--desk-text-tertiary);
-  font-size: 16px;
+  font-size: var(--desk-icon-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -106,7 +106,7 @@ body.resizing-vertical {
 
 /* --- Markdown 渲染 --- */
 .markdown-body {
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   line-height: 1.75;
   word-break: break-word;
   /* 连续无空格的 URL / 长串也能在容器内换行 */
@@ -183,7 +183,7 @@ body.resizing-vertical {
   border: 1px dashed var(--desk-border-strong);
   border-radius: 6px;
   color: var(--desk-text-tertiary);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
 }
 
 .markdown-body h1,
@@ -327,7 +327,7 @@ body.resizing-vertical {
   padding: 0;
   border-radius: 0;
   color: inherit;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
 }
 
 .markdown-body blockquote {
@@ -367,7 +367,7 @@ body.resizing-vertical {
   width: max-content;
   min-width: 100%;
   margin: 0;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
 }
 
 .markdown-body th,
@@ -393,7 +393,7 @@ body.resizing-vertical {
 }
 
 .markdown-body .footnotes {
-  font-size: 12.5px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-secondary);
 }
 
@@ -573,7 +573,7 @@ body.resizing-vertical {
 
 .markdown-body .code-lang {
   font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   text-transform: lowercase;
 }
@@ -596,7 +596,7 @@ body.resizing-vertical {
   border-radius: 6px;
   background: transparent;
   color: var(--desk-text-secondary);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -634,7 +634,7 @@ body.resizing-vertical {
 }
 
 .markdown-body .code-block pre code {
-  font-size: 12.5px;
+  font-size: var(--desk-font-sm);
   line-height: 1.65;
 }
 
@@ -691,7 +691,7 @@ html.dark .el-button--primary {
 
 /* --- 模型选择下拉：供应商为分组标题、模型缩进，体现两级层次 --- */
 .model-dropdown .provider-group {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   cursor: default;
 }
@@ -702,7 +702,7 @@ html.dark .el-button--primary {
 
 /* --- 项目排序下拉：分组标题与选中标记 --- */
 .sort-dropdown .sort-group {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   cursor: default;
 }
@@ -710,17 +710,22 @@ html.dark .el-button--primary {
 .sort-dropdown .sort-check {
   margin-left: auto;
   padding-left: 12px;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-primary);
 }
 
 /* --- 下拉菜单选项：字体与左侧菜单文案一致，首图标与文字留白 --- */
 .el-dropdown-menu__item {
-  font-size: 14px;
+  font-size: var(--desk-font-base);
 }
 
 .el-dropdown-menu__item > .el-icon:first-child {
   margin-right: 8px;
+}
+
+/* 浏览器工具「...」菜单：与工具 Tab / 地址栏保持 13px */
+.browser-more-menu .el-dropdown-menu__item {
+  font-size: var(--desk-font-sm);
 }
 
 /*

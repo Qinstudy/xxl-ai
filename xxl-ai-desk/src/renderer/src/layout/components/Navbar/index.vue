@@ -142,7 +142,7 @@ function goHome(): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   font-weight: 600;
   color: var(--desk-text);
 }
@@ -159,7 +159,7 @@ function goHome(): void {
 
 /* 非对话页标题（插件 / 系统设置） */
 .topbar-title {
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   font-weight: 500;
   color: var(--desk-text-secondary);
 }

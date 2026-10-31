@@ -184,7 +184,7 @@ async function onDelete(row: McpDTO): Promise<void> {
 .manage-panel {
   padding: 0 28px 32px;
   /* 与「设置 → 模型供应商」列表保持一致的字号 */
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   --el-font-size-base: 14px;
 }
 
@@ -207,13 +207,13 @@ async function onDelete(row: McpDTO): Promise<void> {
 }
 
 .enabled-tip {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
 .empty-tip {
   margin-bottom: 12px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
@@ -242,7 +242,7 @@ async function onDelete(row: McpDTO): Promise<void> {
   white-space: normal;
   word-break: break-word;
   line-height: 1.6;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
 }
 
 /* 备注列：单行省略（悬浮由 el-table show-overflow-tooltip 提供） */
@@ -256,7 +256,7 @@ async function onDelete(row: McpDTO): Promise<void> {
 /* 工具列表列：点击查看明细 */
 .tool-link {
   padding: 0;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
 }
 
 </style>

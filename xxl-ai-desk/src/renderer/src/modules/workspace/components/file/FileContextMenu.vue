@@ -161,7 +161,7 @@ function choose(action: 'open' | 'reveal' | 'copy' | 'remove'): void {
   border-radius: 6px;
   background: transparent;
   color: var(--desk-text-secondary);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   text-align: left;
   cursor: pointer;
   transition:

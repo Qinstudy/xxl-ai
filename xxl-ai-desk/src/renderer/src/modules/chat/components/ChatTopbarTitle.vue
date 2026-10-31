@@ -51,7 +51,7 @@ const { onChatCommand } = useSessionActions()
 }
 
 .chat-title {
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   font-weight: 500;
   color: var(--desk-text-secondary);
   min-width: 0;
@@ -63,7 +63,7 @@ const { onChatCommand } = useSessionActions()
 /* 会话操作用「...」：默认隐藏，悬浮标题文案时展示 */
 .chat-title-more {
   flex-shrink: 0;
-  font-size: 16px;
+  font-size: var(--desk-icon-md);
   color: var(--desk-text-tertiary);
   cursor: pointer;
   outline: none;

@@ -68,7 +68,7 @@ function onKeydown(event: KeyboardEvent): void {
   border: 1px solid var(--desk-border);
   border-radius: var(--desk-radius-sm);
   background: var(--desk-bg-elevated);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text);
   cursor: pointer;
   user-select: none;

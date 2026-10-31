@@ -87,7 +87,7 @@ function removeMessage(): void {
   color: var(--desk-bubble-user-text);
   padding: 12px 16px;
   border-radius: 18px 18px 4px 18px;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
@@ -112,13 +112,13 @@ function removeMessage(): void {
 }
 
 .message-time {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   user-select: none;
 }
 
 .action {
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   color: var(--desk-text-tertiary);
   cursor: pointer;
 }

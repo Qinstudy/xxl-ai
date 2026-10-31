@@ -28,7 +28,7 @@ defineProps<{ titleKey: string }>()
 .sidebar-title {
   flex: 1;
   min-width: 0;
-  font-size: 18px;
+  font-size: var(--desk-font-lg);
   font-weight: 600;
   line-height: 32px;
   color: var(--desk-text);

@@ -98,12 +98,12 @@ onBeforeUnmount(() => {
 }
 
 .approval-icon {
-  font-size: 18px;
+  font-size: var(--desk-font-lg);
   color: var(--el-color-warning);
 }
 
 .approval-title {
-  font-size: 15px;
+  font-size: var(--desk-font-md);
   font-weight: 600;
   color: var(--desk-text);
 }
@@ -116,7 +116,7 @@ onBeforeUnmount(() => {
 
 .approval-message {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   line-height: 1.6;
   color: var(--desk-text);
 }
@@ -128,7 +128,7 @@ onBeforeUnmount(() => {
   padding: 8px 10px;
   border-radius: 8px;
   background: var(--desk-bg-elevated);
-  font-size: 12.5px;
+  font-size: var(--desk-font-sm);
   line-height: 1.5;
 }
 
@@ -145,7 +145,7 @@ onBeforeUnmount(() => {
 
 .approval-question {
   margin: 2px 0 0;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-secondary);
 }
 

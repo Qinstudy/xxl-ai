@@ -239,7 +239,7 @@ async function submit(): Promise<void> {
 <style scoped lang="scss">
 .field-hint {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-tertiary);
   font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
 }

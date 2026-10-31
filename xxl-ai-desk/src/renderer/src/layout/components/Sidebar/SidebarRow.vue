@@ -45,7 +45,7 @@ const emit = defineEmits<{ click: [] }>()
   border-radius: 10px;
   cursor: pointer;
   color: var(--desk-text-secondary);
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   font-weight: 400;
   transition: background 0.15s ease;
   -webkit-app-region: no-drag;

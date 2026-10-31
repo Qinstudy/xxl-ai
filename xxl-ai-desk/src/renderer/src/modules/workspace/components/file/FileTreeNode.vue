@@ -121,7 +121,7 @@ function forwardContextMenu(entry: FsEntry, position: { x: number; y: number }):
   border: none;
   background: transparent;
   color: var(--desk-text-secondary);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   text-align: left;
   cursor: pointer;
   border-radius: 6px;
@@ -143,7 +143,7 @@ function forwardContextMenu(entry: FsEntry, position: { x: number; y: number }):
 .tree-caret {
   flex-shrink: 0;
   width: 12px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   transition: transform 0.15s ease;
 }
@@ -158,7 +158,7 @@ function forwardContextMenu(entry: FsEntry, position: { x: number; y: number }):
 
 .tree-icon {
   flex-shrink: 0;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   color: var(--desk-text-tertiary);
 }
 
@@ -172,7 +172,7 @@ function forwardContextMenu(entry: FsEntry, position: { x: number; y: number }):
 
 .tree-loading {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 

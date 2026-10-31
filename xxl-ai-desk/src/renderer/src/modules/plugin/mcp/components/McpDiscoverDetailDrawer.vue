@@ -155,7 +155,7 @@ function onAdd(): void {
 
 .detail-desc {
   margin: 10px 0 0;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   line-height: 1.6;
   color: var(--desk-text-secondary);
 }
@@ -166,7 +166,7 @@ function onAdd(): void {
 
 .section-title {
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   font-weight: 600;
   color: var(--desk-text);
 }
@@ -191,7 +191,7 @@ function onAdd(): void {
   padding: 10px 12px;
   max-height: 220px;
   overflow: auto;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-all;
@@ -207,7 +207,7 @@ function onAdd(): void {
 .readme {
   max-height: 200px;
   overflow-y: auto;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   line-height: 1.6;
   color: var(--desk-text-secondary);
   white-space: pre-wrap;

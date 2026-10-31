@@ -78,7 +78,7 @@ const settings = useSettingsStore()
 }
 
 .about-name {
-  font-size: 17px;
+  font-size: var(--desk-font-lg);
   font-weight: 600;
   line-height: 1.3;
   text-align: center;
@@ -97,7 +97,7 @@ const settings = useSettingsStore()
   justify-content: space-between;
   gap: 16px;
   padding: 12px 16px;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
 }
 
 .about-row + .about-row {
@@ -112,7 +112,7 @@ const settings = useSettingsStore()
 .about-value {
   color: var(--desk-text);
   font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
 }
 
 /* 版本行：版本号与「检查更新」同行展示，保持间距不挤压 */

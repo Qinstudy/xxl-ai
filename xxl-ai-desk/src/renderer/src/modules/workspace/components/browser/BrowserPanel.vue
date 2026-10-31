@@ -152,7 +152,7 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- 更多操作：页面操作与开发者工具 -->
-      <el-dropdown trigger="click" @command="onMore">
+      <el-dropdown trigger="click" popper-class="browser-more-menu" @command="onMore">
         <button class="nav-btn" :title="t('common.actions')">
           <el-icon><MoreFilled /></el-icon>
         </button>
@@ -214,7 +214,7 @@ onBeforeUnmount(() => {
   padding: 0 4px 0 10px;
   border-radius: 8px 8px 0 0;
   color: var(--desk-text-secondary);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   cursor: pointer;
   user-select: none;
   transition:
@@ -255,7 +255,7 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   background: transparent;
   color: var(--desk-text-tertiary);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   cursor: pointer;
 }
 
@@ -277,7 +277,7 @@ onBeforeUnmount(() => {
 .tab-add {
   width: 26px;
   height: 26px;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   border-radius: 8px;
 }
 
@@ -299,7 +299,7 @@ onBeforeUnmount(() => {
   border-radius: 8px;
   background: transparent;
   color: var(--desk-text-secondary);
-  font-size: 15px;
+  font-size: var(--desk-font-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -346,7 +346,7 @@ onBeforeUnmount(() => {
   outline: none;
   background: transparent;
   color: var(--desk-text);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
 }
 
 .address-input::placeholder {
@@ -420,13 +420,13 @@ onBeforeUnmount(() => {
 }
 
 .empty-title {
-  font-size: 15px;
+  font-size: var(--desk-font-md);
   font-weight: 600;
   color: var(--desk-text);
 }
 
 .empty-tip {
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-tertiary);
 }
 </style>

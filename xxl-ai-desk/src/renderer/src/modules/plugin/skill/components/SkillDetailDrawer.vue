@@ -193,7 +193,7 @@ async function onReveal(): Promise<void> {
 <style scoped lang="scss">
 .detail-body {
   min-height: 200px;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
 }
 
 .meta-card {
@@ -212,7 +212,7 @@ async function onReveal(): Promise<void> {
 .meta-label {
   flex-shrink: 0;
   width: 76px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
@@ -223,7 +223,7 @@ async function onReveal(): Promise<void> {
 }
 
 .meta-version {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
@@ -238,12 +238,12 @@ async function onReveal(): Promise<void> {
 
 .mono {
   font-family: var(--el-font-family-mono, monospace);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
 }
 
 .section-title {
   margin: 20px 0 10px;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   font-weight: 600;
   color: var(--desk-text);
 }
@@ -251,7 +251,7 @@ async function onReveal(): Promise<void> {
 /* 详情正文：字号略小以贴合抽屉宽度，代码块与引用样式统一由全局 Markdown 样式提供 */
 .detail-markdown {
   padding: 4px 2px;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   line-height: 1.7;
   color: var(--desk-text);
 }
@@ -264,12 +264,12 @@ async function onReveal(): Promise<void> {
 }
 
 .content-progress {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
 .empty-files {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
@@ -296,7 +296,7 @@ async function onReveal(): Promise<void> {
 
 .file-size {
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 </style>

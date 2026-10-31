@@ -177,7 +177,7 @@ function onQuickAction(action: QuickAction): void {
   outline: none;
   background: transparent;
   color: var(--desk-text);
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   font-family: inherit;
 }
 
@@ -194,7 +194,7 @@ function onQuickAction(action: QuickAction): void {
 
 .palette-section {
   padding: 8px 10px 4px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
@@ -206,7 +206,7 @@ function onQuickAction(action: QuickAction): void {
   border-radius: 8px;
   cursor: pointer;
   color: var(--desk-text-secondary);
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   transition: background 0.12s ease;
 }
 
@@ -217,7 +217,7 @@ function onQuickAction(action: QuickAction): void {
 
 .palette-item-icon {
   flex-shrink: 0;
-  font-size: 15px;
+  font-size: var(--desk-font-md);
 }
 
 /* 内联 SVG 图标（终端 / 浏览器）：尺寸 */
@@ -241,13 +241,13 @@ function onQuickAction(action: QuickAction): void {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
 .palette-empty {
   padding: 10px;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-tertiary);
   text-align: center;
 }

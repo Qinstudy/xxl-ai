@@ -266,7 +266,7 @@ async function onRefresh(): Promise<void> {
 .manage-panel {
   padding: 0 28px 32px;
   /* 与 MCP 管理列表保持一致的字号 */
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   --el-font-size-base: 14px;
 }
 
@@ -289,7 +289,7 @@ async function onRefresh(): Promise<void> {
 }
 
 .enabled-tip {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
@@ -308,7 +308,7 @@ async function onRefresh(): Promise<void> {
 
 .empty-tip {
   margin-bottom: 12px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
@@ -329,7 +329,7 @@ async function onRefresh(): Promise<void> {
 /* 文件夹列：等宽字体，便于区分相近目录名 */
 .folder-name {
   font-family: var(--el-font-family-mono, monospace);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-secondary);
 }
 </style>

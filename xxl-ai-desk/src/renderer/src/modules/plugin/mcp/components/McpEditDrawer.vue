@@ -453,7 +453,7 @@ watch(visible, (value) => {
 }
 
 .switch-tip {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
 }
 
@@ -476,7 +476,7 @@ watch(visible, (value) => {
   padding: 10px 12px;
   border-radius: 8px;
   background: var(--desk-primary-soft);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text);
 }
 
@@ -493,13 +493,13 @@ watch(visible, (value) => {
 .test-elapsed {
   margin-left: auto;
   color: var(--desk-text-tertiary);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
 }
 
 .test-server {
   margin-top: 4px;
   color: var(--desk-text-secondary);
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
 }
 
 .test-tools {
@@ -514,7 +514,7 @@ watch(visible, (value) => {
 .test-tool {
   display: flex;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-secondary);
 }
 

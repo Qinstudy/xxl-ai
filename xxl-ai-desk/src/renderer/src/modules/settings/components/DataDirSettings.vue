@@ -85,13 +85,13 @@ function onRelaunch(): void {
 }
 
 .data-dir-title {
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   color: var(--el-text-color-regular);
   margin-bottom: 6px;
 }
 
 .data-dir-tip {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   margin-bottom: 12px;
 }
@@ -116,7 +116,7 @@ function onRelaunch(): void {
 
 .field-hint {
   margin-top: 6px;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   color: var(--desk-text-tertiary);
   font-family: 'SFMono-Regular', ui-monospace, Menlo, Consolas, monospace;
 }

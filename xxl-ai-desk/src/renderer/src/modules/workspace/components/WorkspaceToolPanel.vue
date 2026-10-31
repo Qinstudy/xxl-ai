@@ -158,7 +158,7 @@ function toggleFocus(): void {
   border-radius: 7px;
   background: transparent;
   color: var(--desk-text-secondary);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   cursor: pointer;
   white-space: nowrap;
   transition:

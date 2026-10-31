@@ -219,7 +219,7 @@ function onKeydown(event: KeyboardEvent): void {
   background: transparent;
   box-shadow: none;
   padding: 8px 0;
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   color: var(--desk-text);
 }
 
@@ -248,7 +248,7 @@ function onKeydown(event: KeyboardEvent): void {
   border-radius: 8px;
   cursor: pointer;
   color: var(--desk-text-secondary);
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
   outline: none;
   transition:
     color 0.15s ease,
@@ -263,7 +263,7 @@ function onKeydown(event: KeyboardEvent): void {
 .picker-trigger .picker-icon,
 .picker-trigger .picker-arrow {
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--desk-font-sm);
 }
 
 .picker-trigger .picker-name {

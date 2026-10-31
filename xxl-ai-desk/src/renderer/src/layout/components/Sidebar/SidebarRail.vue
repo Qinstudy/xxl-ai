@@ -91,7 +91,7 @@ function go(key: SectionKey): void {
   border-radius: 8px;
   background: transparent;
   color: var(--desk-text-secondary);
-  font-size: 18px;
+  font-size: var(--desk-font-lg);
   display: flex;
   align-items: center;
   justify-content: center;

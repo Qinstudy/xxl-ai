@@ -70,13 +70,13 @@ function resetShortcuts(): void {
 }
 
 .shortcuts-title {
-  font-size: 14px;
+  font-size: var(--desk-font-base);
   color: var(--el-text-color-regular);
   margin-bottom: 6px;
 }
 
 .shortcuts-tip {
-  font-size: 12px;
+  font-size: var(--desk-font-xs);
   color: var(--desk-text-tertiary);
   margin-bottom: 12px;
 }
