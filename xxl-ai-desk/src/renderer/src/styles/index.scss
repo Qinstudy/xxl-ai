@@ -145,6 +145,17 @@ body.resizing-vertical {
   cursor: zoom-in;
 }
 
+/*
+ * 图片预览（ElImageViewer 传送到 body，只能全局命中）：
+ * contain 模式只限制上限、不设固定宽高 —— 大图缩到舒适尺寸、小图保持原始像素不失真。
+ * Element Plus 以行内 max-width/max-height:100% 撑满画布，需用 !important 覆盖。
+ */
+.el-image-viewer__img[style*='max-width'] {
+  max-width: 85vw !important;
+  max-height: 85vh !important;
+  border-radius: var(--desk-radius-sm);
+}
+
 /* 图片加载失败占位 */
 .markdown-body .md-image-fallback {
   display: inline-flex;
