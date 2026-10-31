@@ -13,6 +13,9 @@ import type {
   DeskApi,
   FileContent,
   FsEntry,
+  GithubSkillInspectResult,
+  GithubSkillInstallInput,
+  GithubSkillQuery,
   GitCommitInput,
   GitCommitResult,
   GitDiffInput,
@@ -286,7 +289,16 @@ const api: DeskApi = {
     discoverDetail: (id: string): Promise<SkillDiscoverDetail> =>
       ipcRenderer.invoke(IPC.skillDiscoverDetail, id),
     /* 发现 SKILL：安装 */
-    install: (id: string): Promise<SkillDTO> => ipcRenderer.invoke(IPC.skillInstall, id)
+    install: (id: string): Promise<SkillDTO> => ipcRenderer.invoke(IPC.skillInstall, id),
+    /* 从 GitHub 安装：扫描仓库技能 */
+    githubInspect: (query: GithubSkillQuery): Promise<GithubSkillInspectResult> =>
+      ipcRenderer.invoke(IPC.skillGithubInspect, query),
+    /* 从 GitHub 安装：安装指定技能 */
+    githubInstall: (input: GithubSkillInstallInput): Promise<SkillDTO> =>
+      ipcRenderer.invoke(IPC.skillGithubInstall, input),
+    /* 从 GitHub 安装：释放临时归档 */
+    githubCancel: (query: GithubSkillQuery) =>
+      ipcRenderer.invoke(IPC.skillGithubCancel, query)
   }
 }
 

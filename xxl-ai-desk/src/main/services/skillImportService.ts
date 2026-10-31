@@ -65,7 +65,7 @@ function isInside(root: string, target: string): boolean {
 }
 
 /* 技能名 → 目录名：小写、非法字符转连字符，保证跨平台可用 */
-function slugify(value: string): string {
+function slugifySkillName(value: string): string {
   const slug = value
     .trim()
     .toLowerCase()
@@ -78,7 +78,7 @@ function slugify(value: string): string {
 
 /* 目录名去重：已存在时追加 -2 / -3 ... */
 export function uniqueSkillId(preferred: string): string {
-  const base = slugify(preferred)
+  const base = slugifySkillName(preferred)
   let candidate = base
   let index = 2
   while (existsSync(join(getSkillsDir(), candidate))) {
@@ -158,16 +158,23 @@ async function copySkillDir(source: string, target: string): Promise<void> {
   })
 }
 
+/* 技能目录扫描选项 */
+export interface SkillRootScanOptions {
+  /* 是否扫描 .claude/skills 等隐藏容器目录（默认否） */
+  includeHidden?: boolean
+}
+
 /*
  * 在指定根目录内识别技能目录：
  *   - 根目录自身含 SKILL.md 即为单技能（Zip 常把技能打在一个顶层目录里）；
  *   - 否则逐层向下扫描（不限制深度与数量），命中 SKILL.md 即收下并停止深入该分支，
  *     既兼容 repo/skills/foo 的多技能包，也避免把技能内部示例目录误判为新技能。
  */
-function resolveSkillRoots(root: string): string[] {
+export function listSkillRoots(root: string, options: SkillRootScanOptions = {}): string[] {
   if (existsSync(join(root, 'SKILL.md'))) {
     return [root]
   }
+  const includeHidden = options.includeHidden === true
   const roots: string[] = []
   const queue = [root]
   while (queue.length > 0) {
@@ -179,7 +186,10 @@ function resolveSkillRoots(root: string): string[] {
       continue
     }
     for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith('.') || SKIP_DIRS.has(entry.name)) {
+      if (!entry.isDirectory() || SKIP_DIRS.has(entry.name)) {
+        continue
+      }
+      if (!includeHidden && entry.name.startsWith('.')) {
         continue
       }
       const child = join(current, entry.name)
@@ -206,7 +216,7 @@ function createTempDir(): string {
  *   - copy=true 时先复制到临时目录再原子移动（本地目录导入）；
  *   - copy=false 时直接移动已解压的目录（Zip 导入）。
  */
-async function commitSkillRoot(root: string, copy: boolean): Promise<ImportedSkill> {
+export async function commitSkillRoot(root: string, copy: boolean): Promise<ImportedSkill> {
   const meta = parseSkillMeta(root, basename(root))
   const id = uniqueSkillId(meta.name)
   const target = join(getSkillsDir(), id)
@@ -230,7 +240,7 @@ async function commitSkillRoot(root: string, copy: boolean): Promise<ImportedSki
 /* 普通目录导入：识别技能目录 → 校验 → 复制落位 */
 export async function importSkillDirectory(sourceDir: string): Promise<SkillImportOutcome> {
   ensureSkillsDir()
-  const roots = resolveSkillRoots(sourceDir)
+  const roots = listSkillRoots(sourceDir)
   if (roots.length === 0) {
     return {
       imported: [],
@@ -303,7 +313,7 @@ export async function importSkillZip(zipFile: string): Promise<SkillImportOutcom
   const temp = createTempDir()
   try {
     extractZip(zipFile, temp)
-    const roots = resolveSkillRoots(temp)
+    const roots = listSkillRoots(temp)
     if (roots.length === 0) {
       return {
         imported: [],

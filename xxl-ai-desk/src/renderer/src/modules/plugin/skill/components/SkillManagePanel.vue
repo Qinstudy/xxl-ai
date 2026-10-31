@@ -3,11 +3,12 @@
  * SKILL 管理面板：技能列表（过滤 / 启停 / 详情 / 目录 / 删除）与本地目录、Zip 导入。
  * @author xuxueli 2026-10-25
  */
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useSkillStore } from '@renderer/stores/skill'
 import { ipcErrorMessage } from '@renderer/utils/ipcError'
 import { t } from '@renderer/i18n'
+import SkillGithubInstallDialog from './SkillGithubInstallDialog.vue'
 import type { SkillDTO, SkillImportResult } from '@shared/ipc'
 
 const emit = defineEmits<{
@@ -16,6 +17,8 @@ const emit = defineEmits<{
 }>()
 
 const skill = useSkillStore()
+/* 从 GitHub 安装弹框 */
+const githubVisible = ref(false)
 
 /* 首次进入加载列表（已加载则复用 store 状态） */
 onMounted(() => {
@@ -112,14 +115,18 @@ async function onImport(kind: 'directory' | 'zip'): Promise<void> {
   }
 }
 
-/* 新建 SKILL：下拉选择来源（Zip / 目录 / 去发现页浏览） */
-function onCreate(command: 'zip' | 'directory' | 'discover'): void {
+/* 新建 SKILL：下拉选择来源（Zip / 目录 / GitHub / 去发现页浏览） */
+function onCreate(command: 'zip' | 'directory' | 'github' | 'discover'): void {
   if (command === 'zip') {
     void onImport('zip')
     return
   }
   if (command === 'directory') {
     void onImport('directory')
+    return
+  }
+  if (command === 'github') {
+    githubVisible.value = true
     return
   }
   emit('discover')
@@ -165,6 +172,9 @@ async function onRefresh(): Promise<void> {
               </el-dropdown-item>
               <el-dropdown-item command="zip">
                 <el-icon><UploadFilled /></el-icon>{{ t('plugin.skillCenter.installFromZip') }}
+              </el-dropdown-item>
+              <el-dropdown-item command="github">
+                <el-icon><Link /></el-icon>{{ t('plugin.skillCenter.installFromGithub') }}
               </el-dropdown-item>
               <el-dropdown-item command="discover" divided>
                 <el-icon><Search /></el-icon>{{ t('plugin.skillCenter.browseDiscover') }}
@@ -213,7 +223,9 @@ async function onRefresh(): Promise<void> {
             {{
               row.source === 'local'
                 ? t('plugin.skillCenter.sourceLocal')
-                : t('plugin.skillCenter.sourceRemote')
+                : row.source === 'github'
+                  ? t('plugin.skillCenter.sourceGithub')
+                  : t('plugin.skillCenter.sourceRemote')
             }}
           </el-tag>
         </template>
@@ -259,6 +271,8 @@ async function onRefresh(): Promise<void> {
         </el-empty>
       </template>
     </el-table>
+
+    <SkillGithubInstallDialog v-model:visible="githubVisible" @installed="emit('detail', $event)" />
   </div>
 </template>
 

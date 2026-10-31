@@ -8,6 +8,7 @@ import { IPC } from '@shared/ipc'
 import { APP_NAME } from '@shared/appInfo'
 import { initDatabase } from './db'
 import { registerIpc } from './ipc'
+import { cleanupGithubArchiveTemps } from './agent/host/skills/githubArchive'
 import { ensureSeedProviders } from './services/providerService'
 import { registerLocalFileProtocol } from './services/localFileProtocolService'
 import { disposeAllTerminals } from './services/terminalService'
@@ -128,6 +129,7 @@ if (!gotLock) {
   app.whenReady().then(() => {
     log.initialize()
     initDatabase()
+    cleanupGithubArchiveTemps()
     ensureSeedProviders()
     registerLocalFileProtocol()
     registerIpc(() => mainWindow)

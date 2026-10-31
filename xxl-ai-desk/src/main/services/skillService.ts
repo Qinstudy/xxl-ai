@@ -33,6 +33,11 @@ type SkillRow = typeof skillTable.$inferSelect
 /* 技能名自然排序（数字按数值比较） */
 const NAME_COLLATOR = new Intl.Collator('zh-Hans-CN', { numeric: true, sensitivity: 'base' })
 
+/* 数据库来源值归一（历史脏数据按本地处理） */
+function normalizeSource(value: string): SkillSource {
+  return value === 'skillssh' || value === 'github' ? value : 'local'
+}
+
 /* 行记录 → DTO（布尔归一） */
 function toDTO(row: SkillRow): SkillDTO {
   return {
@@ -40,7 +45,7 @@ function toDTO(row: SkillRow): SkillDTO {
     name: row.name,
     description: row.description,
     version: row.version,
-    source: row.source === 'skillssh' ? 'skillssh' : 'local',
+    source: normalizeSource(row.source),
     sourceId: row.sourceId,
     enabled: row.enabled === 1,
     addTime: row.addTime,

@@ -12,6 +12,8 @@ import type {
   ChatApprovalChoice,
   GitCommitInput,
   GitDiffInput,
+  GithubSkillInstallInput,
+  GithubSkillQuery,
   McpDTO,
   McpDiscoverQuery,
   ProviderDTO,
@@ -93,6 +95,11 @@ import {
   discoverSkills,
   installDiscoveredSkill
 } from './services/skillDiscoverService'
+import {
+  inspectGithubSkills,
+  installGithubSkill,
+  cancelGithubSkills
+} from './services/skillGithubService'
 import {
   clearSessionPermissions,
   disposeAgentRuntime,
@@ -397,4 +404,13 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   ipcMain.handle(IPC.skillDiscover, (_event, query: SkillDiscoverQuery) => discoverSkills(query))
   ipcMain.handle(IPC.skillDiscoverDetail, (_event, id: string) => discoverSkillDetail(id))
   ipcMain.handle(IPC.skillInstall, (_event, id: string) => installDiscoveredSkill(id))
+  ipcMain.handle(IPC.skillGithubInspect, (_event, query: GithubSkillQuery) =>
+    inspectGithubSkills(query)
+  )
+  ipcMain.handle(IPC.skillGithubInstall, (_event, input: GithubSkillInstallInput) =>
+    installGithubSkill(input)
+  )
+  ipcMain.handle(IPC.skillGithubCancel, (_event, query: GithubSkillQuery) =>
+    cancelGithubSkills(query)
+  )
 }

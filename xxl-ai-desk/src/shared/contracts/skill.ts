@@ -2,8 +2,8 @@
  * SKILL 技能域跨进程契约：本地技能元信息、导入结果、详情与「发现 SKILL」检索结果。
  */
 
-/* 技能来源：local 本地导入 / skillssh skills.sh 在线安装 */
-export type SkillSource = 'local' | 'skillssh'
+/* 技能来源：local 本地导入 / skillssh skills.sh 在线安装 / github GitHub 在线安装 */
+export type SkillSource = 'local' | 'skillssh' | 'github'
 
 /* 技能列表项（目录内容为权威，本结构为解析后的展示元信息） */
 export interface SkillDTO {
@@ -134,6 +134,48 @@ export interface SkillDiscoverQuery {
   board?: SkillLeaderboard
   /* 榜单页码（从 0 开始，每页 200 条） */
   page?: number
+}
+
+/* 从 GitHub 安装：扫描入参 */
+export interface GithubSkillQuery {
+  /* GitHub 仓库地址 / 仓库内技能地址 / owner/repo */
+  url: string
+  /* 分支、标签或提交（缺省使用仓库默认分支） */
+  ref?: string
+}
+
+/* 从 GitHub 安装：候选技能 */
+export interface GithubSkillCandidate {
+  /* 技能名（frontmatter） */
+  name: string
+  /* 技能描述（frontmatter） */
+  description: string
+  /* 仓库内技能目录（相对仓库根目录） */
+  path: string
+  /* 统一去重标识：owner/repo/slug */
+  sourceId: string
+  /* 是否已安装 */
+  installed: boolean
+}
+
+/* 从 GitHub 安装：扫描结果 */
+export interface GithubSkillInspectResult {
+  /* owner/repo */
+  repo: string
+  /* 实际使用的分支、标签或提交 */
+  ref: string
+  /* 候选技能列表 */
+  candidates: GithubSkillCandidate[]
+}
+
+/* 从 GitHub 安装：安装入参 */
+export interface GithubSkillInstallInput {
+  /* GitHub 仓库地址 / 仓库内技能地址 / owner/repo */
+  url: string
+  /* 分支、标签或提交（缺省使用仓库默认分支） */
+  ref?: string
+  /* 仓库内技能目录；为空表示单技能仓库根目录 */
+  path: string
 }
 
 /* 技能运行时配置：主进程产出，随对话下发到运行时进程（不含读写逻辑） */

@@ -10,6 +10,7 @@ import { ipcErrorMessage } from '@renderer/utils/ipcError'
 import { api } from '@renderer/api'
 import { t } from '@renderer/i18n'
 import SkillDiscoverDetailDrawer from './SkillDiscoverDetailDrawer.vue'
+import SkillGithubInstallDialog from './SkillGithubInstallDialog.vue'
 import type { SkillDiscoverItem, SkillDTO } from '@shared/ipc'
 
 const emit = defineEmits<{ installed: [id: string] }>()
@@ -20,6 +21,8 @@ const keyword = ref('')
 /* 详情抽屉 */
 const detailVisible = ref(false)
 const detailItem = ref<SkillDiscoverItem | null>(null)
+/* 从 GitHub 安装弹框 */
+const githubVisible = ref(false)
 /* 防抖计时器 */
 let timer: ReturnType<typeof setTimeout> | null = null
 
@@ -148,6 +151,9 @@ onUnmounted(() => {
         </template>
       </el-input>
       <div class="toolbar-actions">
+        <el-button @click="githubVisible = true">
+          <el-icon><Link /></el-icon>{{ t('plugin.skillCenter.installFromGithub') }}
+        </el-button>
         <span class="external-link" @click="openSkillsSh">
           skills.sh
           <el-icon><TopRight /></el-icon>
@@ -273,6 +279,8 @@ onUnmounted(() => {
       :installs-label="installsLabel"
       @install="onDetailInstall"
     />
+
+    <SkillGithubInstallDialog v-model:visible="githubVisible" @installed="emit('installed', $event)" />
   </div>
 </template>
 

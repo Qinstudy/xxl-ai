@@ -63,6 +63,16 @@ export function ensureSkillsDir(): void {
   mkdirSync(getSkillsDir(), { recursive: true })
 }
 
+/* 运行时临时目录（下载、解压等一次性文件统一放在这里，不隐藏便于人工清理） */
+export function getTempDir(): string {
+  return join(getDataDir(), 'tmp')
+}
+
+/* 确保运行时临时目录存在 */
+export function ensureTempDir(): void {
+  mkdirSync(getTempDir(), { recursive: true })
+}
+
 /*
  * 保存运行时数据目录：空值或等于默认目录时清除配置。
  * 仅持久化配置并创建目录，实际切换在应用重启后生效。

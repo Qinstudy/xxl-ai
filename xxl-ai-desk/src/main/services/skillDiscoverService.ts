@@ -12,14 +12,8 @@ import {
   type RemoteSkillItem,
   type RemoteSkillPage
 } from '../agent/host/community/skillsShAdapter'
-import { installGitHubSkill } from '../agent/host/skills/githubInstaller'
-import { resetAgents } from '../agent/host/runtimeHost'
-import {
-  findSkillBySourceId,
-  listInstalledSourceIds,
-  listSkills,
-  registerSkill
-} from './skillService'
+import { findSkillBySourceId, listInstalledSourceIds, listSkills } from './skillService'
+import { installFromGithub } from './skillInstallService'
 import { createTtlCache } from '../utils/ttlCache'
 import type {
   SkillDiscoverDetail,
@@ -128,9 +122,11 @@ export async function installDiscoveredSkill(id: string): Promise<SkillDTO> {
     return existing
   }
   const { source, skillId } = parseSourceId(sourceId)
-  const installed = await installGitHubSkill(source, skillId)
-  const saved = registerSkill(installed, 'skillssh', sourceId)
-  /* 新技能默认启用：清空运行时缓存，下一轮对话即可使用 */
-  resetAgents()
-  return saved
+  return installFromGithub({
+    repo: source,
+    ref: 'HEAD',
+    skillId,
+    origin: 'skillssh',
+    sourceId
+  })
 }

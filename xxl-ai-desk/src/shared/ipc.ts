@@ -61,6 +61,9 @@ import type {
   McpToolMeta
 } from './contracts/mcp'
 import type {
+  GithubSkillInspectResult,
+  GithubSkillInstallInput,
+  GithubSkillQuery,
   SkillContentChunk,
   SkillDetail,
   SkillDiscoverDetail,
@@ -279,6 +282,12 @@ export interface DeskApi {
     discoverDetail(id: string): Promise<SkillDiscoverDetail>
     /* 发现 SKILL：安装（仅 GitHub 来源） */
     install(id: string): Promise<SkillDTO>
+    /* 从 GitHub 安装：扫描仓库技能 */
+    githubInspect(query: GithubSkillQuery): Promise<GithubSkillInspectResult>
+    /* 从 GitHub 安装：安装指定技能 */
+    githubInstall(input: GithubSkillInstallInput): Promise<SkillDTO>
+    /* 从 GitHub 安装：释放扫描产生的临时归档 */
+    githubCancel(query: GithubSkillQuery): Promise<void>
   }
 }
 
@@ -381,5 +390,8 @@ export const IPC = {
   skillRefresh: 'desk:skill:refresh',
   skillDiscover: 'desk:skill:discover',
   skillDiscoverDetail: 'desk:skill:discover-detail',
-  skillInstall: 'desk:skill:install'
+  skillInstall: 'desk:skill:install',
+  skillGithubInspect: 'desk:skill:github-inspect',
+  skillGithubInstall: 'desk:skill:github-install',
+  skillGithubCancel: 'desk:skill:github-cancel'
 } as const

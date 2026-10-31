@@ -135,7 +135,9 @@ async function onReveal(): Promise<void> {
               {{
                 detail.source === 'local'
                   ? t('plugin.skillCenter.sourceLocal')
-                  : t('plugin.skillCenter.sourceRemote')
+                  : detail.source === 'github'
+                    ? t('plugin.skillCenter.sourceGithub')
+                    : t('plugin.skillCenter.sourceRemote')
               }}
             </el-tag>
             <span v-if="detail.version" class="meta-version">v{{ detail.version }}</span>

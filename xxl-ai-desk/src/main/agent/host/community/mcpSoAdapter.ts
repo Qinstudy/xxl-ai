@@ -24,23 +24,45 @@ const BASE_URL = 'https://mcp.so'
 /* 单页最大条目 */
 const PAGE_SIZE = 24
 
-/* 抓取 HTML（超时中断，失败抛出可读错误） */
-async function fetchHtml(url: string): Promise<string> {
-  try {
-    const response = await requestWithTimeout(url, {
-      headers: { 'User-Agent': USER_AGENT },
-      accept: 'text/html,application/xhtml+xml'
-    })
-    if (!response.ok) {
-      throw new Error(`社区访问失败（HTTP ${response.status}）`)
-    }
-    return await response.text()
-  } catch (error) {
-    if (isTimeoutError(error)) {
-      throw new Error('社区访问超时，请稍后重试')
-    }
-    throw error as Error
+/* 社区页面访问超时（毫秒）：站点偶发较慢，单独放宽 */
+const FETCH_TIMEOUT = 30000
+
+/* 网络类错误是否值得重试（HTTP 状态错误不重试） */
+function isRetryableError(error: unknown): boolean {
+  if (isTimeoutError(error)) {
+    return true
   }
+  const message = (error as Error)?.message ?? ''
+  return /fetch failed|network|ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN/i.test(message)
+}
+
+/* 抓取 HTML（超时中断 + 一次网络重试，失败抛出可读错误） */
+async function fetchHtml(url: string): Promise<string> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const response = await requestWithTimeout(url, {
+        headers: { 'User-Agent': USER_AGENT },
+        accept: 'text/html,application/xhtml+xml',
+        timeout: FETCH_TIMEOUT
+      })
+      if (!response.ok) {
+        throw new Error(`社区访问失败（HTTP ${response.status}）`)
+      }
+      return await response.text()
+    } catch (error) {
+      lastError = error
+      if (attempt === 0 && isRetryableError(error)) {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        continue
+      }
+      break
+    }
+  }
+  if (isTimeoutError(lastError)) {
+    throw new Error('社区访问超时，请稍后重试')
+  }
+  throw lastError as Error
 }
 
 /* 文本归一化：压缩空白 */

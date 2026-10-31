@@ -12,9 +12,9 @@ import { assertInside } from '../utils/pathGuard'
 import type { FileContent, FsEntry } from '@shared/ipc'
 
 /* 文本预览体积上限（超出仅截断展示） */
-const MAX_TEXT_BYTES = 2 * 1024 * 1024
+const MAX_TEXT_BYTES = 5 * 1024 * 1024
 /* 图片内联预览体积上限 */
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 /* 列出目录内容：目录在前、名称升序（不递归，子目录按需懒加载） */
 export async function listDir(root: string, dir: string): Promise<FsEntry[]> {
