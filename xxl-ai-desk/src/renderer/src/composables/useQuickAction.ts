@@ -24,7 +24,7 @@ export function useQuickAction(): (action: QuickAction) => void {
       /* 打开设置页 */
       router.push('/settings')
     } else if (action === 'terminal') {
-      /* 回到对话页并展开当前会话的底部终端 */
+      /* 回到对话页并在工具面板中打开终端 */
       router.push('/')
       workspace.openTerminal(workspaceKey())
     } else if (action === 'files') {

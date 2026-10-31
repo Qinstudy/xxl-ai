@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /*
- * 顶栏工作区操作：底部终端 / 右侧工具面板显隐开关（按当前会话隔离）
+ * 顶栏工作区操作：右侧工具面板显隐开关（按当前会话隔离）
  * @author xuxueli 2026-10-25
  */
 import { computed, watch } from 'vue'
 import { useChatStore } from '@renderer/stores/chat'
 import { DRAFT_SESSION_KEY, useWorkspaceStore } from '@renderer/stores/workspace'
-import { SidePanelIcon, TerminalIcon } from '@renderer/components/icons'
+import { SidePanelIcon } from '@renderer/components/icons'
 import { t } from '@renderer/i18n'
 
 const chat = useChatStore()
@@ -19,14 +19,8 @@ const workspaceState = computed(() => workspace.sliceOf(workspaceKey.value))
 
 watch(workspaceKey, (key) => workspace.ensure(key), { immediate: true })
 
-/* 当前会话终端/工具面板的显隐状态 */
-const terminalVisible = computed(() => workspaceState.value.terminalPanel.visible)
+/* 当前会话工具面板的显隐状态 */
 const toolPanelVisible = computed(() => workspaceState.value.toolPanel.visible)
-
-/* 切换当前会话的终端显隐 */
-function toggleTerminal(): void {
-  workspace.toggleTerminal(workspaceKey.value)
-}
 
 /* 切换当前会话的工具面板显隐 */
 function toggleToolPanel(): void {
@@ -35,14 +29,6 @@ function toggleToolPanel(): void {
 </script>
 
 <template>
-  <button
-    class="icon-button"
-    :class="{ active: terminalVisible }"
-    :title="terminalVisible ? t('workspace.hideTerminal') : t('workspace.showTerminal')"
-    @click="toggleTerminal"
-  >
-    <TerminalIcon class="panel-icon" />
-  </button>
   <button
     class="icon-button"
     :class="{ active: toolPanelVisible }"

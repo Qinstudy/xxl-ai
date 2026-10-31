@@ -8,10 +8,10 @@ export const DRAFT_SESSION_KEY = '__draft__'
 
 /* 持久化键前缀与结构版本 */
 export const STORAGE_PREFIX = 'desk:workspace:'
-export const STORAGE_VERSION = 2
+export const STORAGE_VERSION = 3
 
 /* 工具面板当前工具 */
-export type WorkspaceTool = 'files' | 'browser'
+export type WorkspaceTool = 'files' | 'browser' | 'terminal'
 
 /* 工具面板布局模式：dock = 与正文并排，focus = 占满正文 */
 export type ToolPanelMode = 'dock' | 'focus'
@@ -36,12 +36,8 @@ export interface ToolPanelState {
   mode: ToolPanelMode
 }
 
-/* 底部终端面板布局与运行时标签 */
+/* 终端标签运行时状态（终端作为工具面板的一个 Tab） */
 export interface TerminalPanelState {
-  /* 是否展示 */
-  visible: boolean
-  /* 面板高度 */
-  height: number
   /* 终端标签（运行时，不持久化） */
   tabs: TerminalTabState[]
   /* 当前激活标签（运行时，不持久化） */
@@ -81,8 +77,6 @@ export function createState(): WorkspaceState {
       mode: 'dock'
     },
     terminalPanel: {
-      visible: false,
-      height: LAYOUT.terminal.defaultHeight,
       tabs: [],
       activeId: ''
     },
@@ -103,11 +97,6 @@ export function toolWidthMax(): number {
   const available =
     window.innerWidth - LAYOUT.railWidth - sidebarWidth - LAYOUT.toolPanel.minChatWidth
   return Math.max(LAYOUT.toolPanel.minWidth, available)
-}
-
-/* 计算终端最大高度：为正文预留空间 */
-export function terminalHeightMax(): number {
-  return Math.max(LAYOUT.terminal.minHeight, window.innerHeight - LAYOUT.terminal.reservedHeight)
 }
 
 /* 读取布尔值（非法时回落默认值） */
@@ -132,7 +121,10 @@ export function normalizeState(raw: unknown): WorkspaceState {
   return {
     toolPanel: {
       visible: boolOf(parsed.toolPanel?.visible, base.toolPanel.visible),
-      activeTool: parsed.toolPanel?.activeTool === 'browser' ? 'browser' : 'files',
+      activeTool:
+        parsed.toolPanel?.activeTool === 'browser' || parsed.toolPanel?.activeTool === 'terminal'
+          ? parsed.toolPanel.activeTool
+          : 'files',
       width: clamp(
         Number(parsed.toolPanel?.width) || base.toolPanel.width,
         LAYOUT.toolPanel.minWidth,
@@ -141,12 +133,6 @@ export function normalizeState(raw: unknown): WorkspaceState {
       mode: parsed.toolPanel?.mode === 'focus' ? 'focus' : 'dock'
     },
     terminalPanel: {
-      visible: boolOf(parsed.terminalPanel?.visible, base.terminalPanel.visible),
-      height: clamp(
-        Number(parsed.terminalPanel?.height) || base.terminalPanel.height,
-        LAYOUT.terminal.minHeight,
-        terminalHeightMax()
-      ),
       /* 终端标签属于运行时资源：重启后不恢复，首次展示时按会话重新创建 */
       tabs: [],
       activeId: ''

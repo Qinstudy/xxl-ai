@@ -1,14 +1,16 @@
 <script setup lang="ts">
 /*
- * 会话工作区右侧「工具」面板：顶部横向 Tab（文件 / 浏览器）切换工具，
+ * 会话工作区右侧「工具」面板：顶部横向 Tab（文件 / 浏览器 / 终端）切换工具，
  * 选定后承载对应面板；显隐、宽度、当前工具与布局模式均按会话隔离。
  */
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import { useWorkspaceStore, type WorkspaceTool } from '@renderer/stores/workspace'
 import { t } from '@renderer/i18n'
 import FilePanel from './file/FilePanel.vue'
-import { GlobeIcon } from '@renderer/components/icons'
+import { GlobeIcon, TerminalIcon } from '@renderer/components/icons'
 import BrowserPanel from './browser/BrowserPanel.vue'
+/* 终端按需加载：未打开终端 Tab 时不加载 xterm */
+const TerminalPanel = defineAsyncComponent(() => import('./terminal/TerminalPanel.vue'))
 
 const props = defineProps<{ sessionId: string; root?: string; projectName?: string }>()
 
@@ -26,6 +28,7 @@ watch(() => props.sessionId, (sessionId) => workspace.ensure(sessionId), { immed
 /* 面板首次打开后保持挂载（切换工具用 v-show），保留文件树/浏览器页面状态 */
 const filesOpened = ref(false)
 const browserOpened = ref(false)
+const terminalOpened = ref(false)
 
 /* 标记已打开过的工具，使其面板首次打开后保持挂载（切换用 v-show） */
 watch(
@@ -35,6 +38,8 @@ watch(
       filesOpened.value = true
     } else if (tool === 'browser') {
       browserOpened.value = true
+    } else if (tool === 'terminal') {
+      terminalOpened.value = true
     }
   },
   { immediate: true }
@@ -77,6 +82,14 @@ function toggleFocus(): void {
           <GlobeIcon class="tool-tab-icon" />
           <span>{{ t('panel.browser') }}</span>
         </button>
+        <button
+          class="tool-tab"
+          :class="{ active: activeTool === 'terminal' }"
+          @click="openTool('terminal')"
+        >
+          <TerminalIcon class="tool-tab-icon" />
+          <span>{{ t('workspace.terminal') }}</span>
+        </button>
       </div>
       <div class="tool-actions">
         <button
@@ -102,6 +115,14 @@ function toggleFocus(): void {
         :project-name="props.projectName"
       />
       <BrowserPanel v-if="browserOpened" v-show="activeTool === 'browser'" :session-id="props.sessionId" />
+      <TerminalPanel
+        v-if="terminalOpened"
+        v-show="activeTool === 'terminal'"
+        :session-id="props.sessionId"
+        :cwd="props.root"
+        :title="props.projectName || t('workspace.terminal')"
+        :visible="toolPanel.visible && activeTool === 'terminal'"
+      />
     </div>
   </div>
 </template>

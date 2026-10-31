@@ -247,6 +247,15 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 
+/* 关闭按钮：默认隐藏，悬浮标签时展示（与终端标签一致） */
+.tab-close {
+  visibility: hidden;
+}
+
+.tab:hover .tab-close {
+  visibility: visible;
+}
+
 .tab-close:hover,
 .tab-add:hover {
   background: var(--desk-primary-soft);

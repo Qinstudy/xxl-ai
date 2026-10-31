@@ -1,9 +1,8 @@
-/* 工具面板与终端面板的布局动作：显隐、尺寸与布局模式 */
+/* 工具面板布局动作：显隐、尺寸、当前工具与布局模式 */
 
 import { LAYOUT } from '@renderer/config/layout'
 import {
   clamp,
-  terminalHeightMax,
   toolWidthMax,
   type ToolPanelMode,
   type WorkspaceState,
@@ -57,38 +56,9 @@ export function createPanelActions(stateOf: StateOf) {
     state.toolPanel.mode = state.toolPanel.mode === 'focus' ? 'dock' : 'focus'
   }
 
-  /* 设置终端显隐 */
-  function setTerminalVisible(key: string, visible: boolean): void {
-    stateOf(key).terminalPanel.visible = visible
-  }
-
-  /* 切换终端显隐 */
-  function toggleTerminal(key: string): void {
-    const state = stateOf(key)
-    state.terminalPanel.visible = !state.terminalPanel.visible
-  }
-
-  /* 打开终端（已打开则保持） */
+  /* 打开终端（工具面板切到终端 Tab） */
   function openTerminal(key: string): void {
-    stateOf(key).terminalPanel.visible = true
-  }
-
-  /* 设置终端高度（夹取到窗口可用范围） */
-  function setTerminalHeight(key: string, height: number): void {
-    stateOf(key).terminalPanel.height = clamp(
-      height,
-      LAYOUT.terminal.minHeight,
-      terminalHeightMax()
-    )
-  }
-
-  /* 恢复终端默认高度 */
-  function resetTerminalHeight(key: string): void {
-    stateOf(key).terminalPanel.height = clamp(
-      LAYOUT.terminal.defaultHeight,
-      LAYOUT.terminal.minHeight,
-      terminalHeightMax()
-    )
+    openTool(key, 'terminal')
   }
 
   return {
@@ -99,10 +69,6 @@ export function createPanelActions(stateOf: StateOf) {
     resetToolWidth,
     setToolMode,
     toggleToolFocus,
-    setTerminalVisible,
-    toggleTerminal,
-    openTerminal,
-    setTerminalHeight,
-    resetTerminalHeight
+    openTerminal
   }
 }

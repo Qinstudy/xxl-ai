@@ -47,8 +47,6 @@
   --desk-rail-width: var(--desk-header-height);
   /* 左侧子菜单栏默认宽度（实际宽度由布局 store 持久化） */
   --desk-sidebar-width: 240px;
-  /* 底部终端默认高度（实际高度由会话工作区状态持久化） */
-  --desk-terminal-height: 240px;
   /* 工具面板 / 终端标签栏高度 */
   --desk-panel-header-height: 40px;
   --desk-radius-sm: 10px;

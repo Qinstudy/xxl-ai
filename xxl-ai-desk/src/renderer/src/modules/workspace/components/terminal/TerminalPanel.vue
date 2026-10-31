@@ -1,11 +1,8 @@
 <script setup lang="ts">
 /*
- * 底部终端面板：终端标签与 PTY 按会话隔离（运行时逻辑见 useSessionTerminals）。
+ * 终端工具面板：作为右侧工具面板的一个 Tab，承载终端标签与 xterm（运行时逻辑见 useSessionTerminals）。
  * @author xuxueli 2026-10-25
  */
-import { computed } from 'vue'
-import { useWorkspaceStore } from '@renderer/stores/workspace'
-import PanelResizer from '@renderer/layout/components/PanelResizer/index.vue'
 import { TerminalIcon } from '@renderer/components/icons'
 import { t } from '@renderer/i18n'
 import { useSessionTerminals } from '../../composables/useSessionTerminals'
@@ -16,15 +13,6 @@ const props = defineProps<{
   title?: string
   visible?: boolean
 }>()
-const emit = defineEmits<{ close: [] }>()
-
-/* 会话工作区 store：终端高度按会话隔离 */
-const workspace = useWorkspaceStore()
-const terminalPanel = computed(() => workspace.sliceOf(props.sessionId).terminalPanel)
-const terminalHeight = computed({
-  get: () => terminalPanel.value.height,
-  set: (height: number) => workspace.setTerminalHeight(props.sessionId, height)
-})
 
 /* 终端运行时：标签、xterm 挂载与会话切换 */
 const { tabs, activeId, setContainer, activate, openTerminal, disposeTab } = useSessionTerminals({
@@ -36,42 +24,24 @@ const { tabs, activeId, setContainer, activate, openTerminal, disposeTab } = use
 </script>
 
 <template>
-  <div class="workspace-terminal" :style="{ height: `${terminalPanel.height}px` }">
-    <!-- 上边缘拖拽手柄：拖拽调整终端高度，双击恢复默认高度 -->
-    <PanelResizer
-      v-model:size="terminalHeight"
-      side="bottom"
-      :title="t('layout.resetPanelHeight')"
-      @reset="workspace.resetTerminalHeight(props.sessionId)"
-    />
-    <!-- 标签栏：切换/关闭终端标签，标签右侧为新建，最右侧为隐藏面板 -->
+  <div class="workspace-terminal">
+    <!-- 终端标签栏：切换/关闭终端标签，标签右侧为新建 -->
     <div class="terminal-header">
-      <div class="terminal-tabs-bar">
-        <div class="terminal-tabs">
-          <button
-            v-for="tab in tabs"
-            :key="tab.id"
-            class="terminal-tab"
-            :class="{ active: tab.id === activeId }"
-            :title="tab.title"
-            @click="activate(tab.id)"
-          >
-            <TerminalIcon class="panel-icon" />
-            <span class="terminal-tab-name">{{ tab.title }}</span>
-            <el-icon class="terminal-tab-close" @click.stop="disposeTab(tab.id)"><Close /></el-icon>
-          </button>
-        </div>
+      <div class="terminal-tabs">
         <button
-          class="icon-button terminal-new"
-          :title="t('workspace.newTerminal')"
-          @click="openTerminal"
+          v-for="tab in tabs"
+          :key="tab.id"
+          class="terminal-tab"
+          :class="{ active: tab.id === activeId }"
+          :title="tab.title"
+          @click="activate(tab.id)"
         >
-          <el-icon><Plus /></el-icon>
+          <TerminalIcon class="panel-icon" />
+          <span class="terminal-tab-name">{{ tab.title }}</span>
+          <el-icon class="terminal-tab-close" @click.stop="disposeTab(tab.id)"><Close /></el-icon>
         </button>
-      </div>
-      <div class="terminal-actions">
-        <button class="icon-button" :title="t('workspace.hideTerminal')" @click="emit('close')">
-          <el-icon><Close /></el-icon>
+        <button class="icon-button terminal-new" :title="t('workspace.newTerminal')" @click="openTerminal">
+          <el-icon><Plus /></el-icon>
         </button>
       </div>
     </div>
@@ -89,14 +59,12 @@ const { tabs, activeId, setContainer, activate, openTerminal, disposeTab } = use
 </template>
 
 <style scoped lang="scss">
-/* 底部终端面板：横跨主区底部（高度由会话工作区状态提供，可拖拽调整） */
+/* 终端工具：填满工具面板正文 */
 .workspace-terminal {
-  position: relative;
-  height: var(--desk-terminal-height);
-  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--desk-border);
+  height: 100%;
+  min-height: 0;
   background: var(--desk-bg);
 }
 
@@ -105,25 +73,17 @@ const { tabs, activeId, setContainer, activate, openTerminal, disposeTab } = use
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   padding: 0 10px 0 14px;
   border-bottom: 1px solid var(--desk-border);
 }
 
-/* 左侧分组：标签区 + 新建按钮，新建紧随标签右侧且不随标签滚动 */
-.terminal-tabs-bar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1;
-  min-width: 0;
-}
-
+/* 标签区 + 新建按钮：新建紧随标签右侧且不随标签滚动 */
 .terminal-tabs {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex: 1;
   min-width: 0;
   overflow-x: auto;
 }
@@ -182,13 +142,6 @@ const { tabs, activeId, setContainer, activate, openTerminal, disposeTab } = use
 
 .terminal-tab:hover .terminal-tab-close {
   visibility: visible;
-}
-
-.terminal-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
 }
 
 /* 终端画布容器：绝对铺满，交由 xterm 绘制 */

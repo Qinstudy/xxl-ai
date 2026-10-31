@@ -28,7 +28,7 @@ export interface SessionTerminalOptions {
 }
 
 export function useSessionTerminals(options: SessionTerminalOptions) {
-  /* 会话工作区 store：终端显隐/高度/标签均按会话隔离 */
+  /* 会话工作区 store：终端标签与激活项按会话隔离 */
   const workspace = useWorkspaceStore()
   /* 当前会话的终端状态 */
   const terminalPanel = computed(() => workspace.sliceOf(options.sessionId()).terminalPanel)

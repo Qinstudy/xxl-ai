@@ -158,8 +158,6 @@
     "newTerminal": "新建终端",
     "terminalExited": "终端已退出（代码 {0}）",
     "terminalLimit": "终端数量已达上限，请先关闭部分终端或会话",
-    "showTerminal": "显示终端",
-    "hideTerminal": "隐藏终端",
     "showToolPanel": "显示工具面板",
     "hideToolPanel": "隐藏工具面板"
   },

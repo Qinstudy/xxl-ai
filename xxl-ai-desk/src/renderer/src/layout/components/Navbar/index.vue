@@ -11,7 +11,7 @@ import {
   ChatTopbarTitle,
   useCommandPalette
 } from '@renderer/modules/chat'
-import { WorkspacePanelToggles } from '@renderer/modules/workspace'
+import { WorkspacePanelToggle } from '@renderer/modules/workspace'
 import { useChatStore } from '@renderer/stores/chat'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useLayoutStore } from '@renderer/stores/layout'
@@ -80,7 +80,7 @@ function goHome(): void {
     <!-- 对话页操作：搜索（chat）+ 终端/工具面板（workspace） -->
     <div v-if="isChat" class="desk-topbar-actions">
       <ChatSearchAction />
-      <WorkspacePanelToggles />
+      <WorkspacePanelToggle />
     </div>
 
     <!-- 会话搜索命令面板：由顶栏搜索入口唤起 -->

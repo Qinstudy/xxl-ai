@@ -158,8 +158,6 @@
     "newTerminal": "New terminal",
     "terminalExited": "Terminal exited (code {0})",
     "terminalLimit": "Terminal limit reached; close a terminal or session first",
-    "showTerminal": "Show terminal",
-    "hideTerminal": "Hide terminal",
     "showToolPanel": "Show tool panel",
     "hideToolPanel": "Hide tool panel"
   },
