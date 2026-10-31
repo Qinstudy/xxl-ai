@@ -43,7 +43,8 @@ const vertical = computed(() => props.side === 'top' || props.side === 'bottom')
 /* 视觉条保持 5px，实际命中区由 ::after 扩大，靠近分割线即可拖动 */
 .panel-resizer {
   position: absolute;
-  z-index: 10;
+  /* 高于浏览器宿主层（z-index: 20），保证分割条完整覆盖内容区 */
+  z-index: 30;
   -webkit-app-region: no-drag;
 }
 

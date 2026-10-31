@@ -20,6 +20,7 @@ export interface WebviewElement extends HTMLElement {
   reload(): void
   stop(): void
   focus(): void
+  openDevTools(): void
   remove(): void
   capturePage(): Promise<{ getSize(): { width: number; height: number }; toDataURL(): string }>
   executeJavaScript(code: string): Promise<unknown>

@@ -203,7 +203,11 @@
     "newTab": "新建标签页",
     "tabLimit": "当前会话标签页已达上限，已在当前标签页打开",
     "closeTab": "关闭标签页",
-    "untitled": "新标签页"
+    "untitled": "新标签页",
+    "openDevTools": "打开开发者工具",
+    "copyUrl": "复制网址",
+    "copiedUrl": "网址已复制",
+    "copyFail": "复制失败"
   },
   "project": {
     "label": "项目",

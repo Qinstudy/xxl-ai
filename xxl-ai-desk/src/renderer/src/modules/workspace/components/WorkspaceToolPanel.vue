@@ -90,7 +90,7 @@ function toggleFocus(): void {
           :title="toolPanel.mode === 'focus' ? t('panel.restore') : t('panel.maximize')"
           @click="toggleFocus"
         >
-          <el-icon v-if="toolPanel.mode === 'focus'"><ScaleToOriginal /></el-icon>
+          <el-icon v-if="toolPanel.mode === 'focus'"><Minus /></el-icon>
           <el-icon v-else><FullScreen /></el-icon>
         </button>
         <button class="icon-button" :title="t('panel.close')" @click="closePanel">

@@ -554,12 +554,31 @@ export function useBrowserPanel(sessionId: string) {
     }
   }
 
+  /* 复制当前页地址 */
+  async function copyAddress(): Promise<void> {
+    const url = activeTabOf(state.value)?.currentUrl
+    if (!url) {
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(url)
+      ElMessage.success(t('panel.copiedUrl'))
+    } catch {
+      ElMessage.error(t('panel.copyFail'))
+    }
+  }
+
   /* 更多操作分发 */
   function onMore(command: string): void {
     if (command === 'external') {
       openExternal()
-    } else if (command === 'reload') {
-      webviews.get(state.value.activeId)?.reload()
+    } else if (command === 'copy') {
+      void copyAddress()
+    } else if (command === 'devtools') {
+      const tab = activeTabOf(state.value)
+      if (tab) {
+        webviews.get(tab.id)?.openDevTools()
+      }
     }
   }
 

@@ -27,7 +27,6 @@ const {
   forward,
   reloadOrStop,
   go,
-  openExternal,
   onMore,
   onAddressFocus,
   onAddressBlur
@@ -150,26 +149,23 @@ onBeforeUnmount(() => {
           @focus="onAddressFocus"
           @blur="onAddressBlur"
         />
-        <button
-          v-if="activeTab?.hasPage"
-          class="address-external"
-          :title="t('panel.openExternal')"
-          @click="openExternal"
-        >
-          <el-icon><TopRight /></el-icon>
-        </button>
       </div>
 
-      <!-- 更多操作：在系统浏览器打开 / 刷新 -->
+      <!-- 更多操作：页面操作与开发者工具 -->
       <el-dropdown trigger="click" @command="onMore">
-        <button class="nav-btn"><el-icon><MoreFilled /></el-icon></button>
+        <button class="nav-btn" :title="t('common.actions')">
+          <el-icon><MoreFilled /></el-icon>
+        </button>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item command="external" :disabled="!activeTab?.hasPage">
               <el-icon><TopRight /></el-icon>{{ t('panel.openExternal') }}
             </el-dropdown-item>
-            <el-dropdown-item command="reload">
-              <el-icon><Refresh /></el-icon>{{ t('panel.reload') }}
+            <el-dropdown-item command="copy" :disabled="!activeTab?.hasPage">
+              <el-icon><CopyDocument /></el-icon>{{ t('panel.copyUrl') }}
+            </el-dropdown-item>
+            <el-dropdown-item command="devtools" divided :disabled="!activeTab?.hasPage">
+              <el-icon><Tools /></el-icon>{{ t('panel.openDevTools') }}
             </el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -323,7 +319,7 @@ onBeforeUnmount(() => {
   cursor: not-allowed;
 }
 
-/* 地址栏：圆角胶囊，右侧内嵌「外部打开」按钮 */
+/* 地址栏：圆角胶囊 */
 .address {
   position: relative;
   flex: 1;
@@ -355,26 +351,6 @@ onBeforeUnmount(() => {
 
 .address-input::placeholder {
   color: var(--desk-text-tertiary);
-}
-
-.address-external {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--desk-text-tertiary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.address-external:hover {
-  background: var(--desk-primary-soft);
-  color: var(--desk-text);
 }
 
 .browser-body {

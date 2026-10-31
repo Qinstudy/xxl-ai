@@ -203,7 +203,11 @@
     "newTab": "New tab",
     "tabLimit": "Tab limit reached for this session; opened in the current tab",
     "closeTab": "Close tab",
-    "untitled": "New tab"
+    "untitled": "New tab",
+    "openDevTools": "Open DevTools",
+    "copyUrl": "Copy URL",
+    "copiedUrl": "URL copied",
+    "copyFail": "Copy failed"
   },
   "project": {
     "label": "Projects",
