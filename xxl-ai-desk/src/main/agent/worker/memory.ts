@@ -57,7 +57,8 @@ function textOf(message: { content: Array<{ type: string; text?: string }> }): s
 
 /* 生成记忆：低温度、固定模板，输出截断到固定上限；开发者模式开启时记录本次模型调用 trace */
 export async function generateMemoryContent(input: MemoryGenerateInput): Promise<string> {
-  const models = await buildModels([{ ...input.provider, sessionId: '' }])
+  /* 记忆生成沿用当前会话：{session} 请求头（如 x-opencode-session）不能为空，否则供应商直接 400 */
+  const models = await buildModels([{ ...input.provider, sessionId: input.sessionId }])
   const model = models.getModel(input.provider.id, input.modelId)
   if (!model) {
     throw new Error(`模型未找到：${input.provider.id}/${input.modelId}`)

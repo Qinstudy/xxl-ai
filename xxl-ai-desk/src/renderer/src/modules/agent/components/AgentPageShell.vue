@@ -60,8 +60,9 @@ defineProps<{ titleKey: string; tipKey: string; wide?: boolean }>()
   padding: 20px 28px 32px;
 }
 
-/* 列表类页面使用更宽的内容区，避免表格列被过度压缩 */
+/* 列表类页面使用更宽的内容区：与「插件中心 → MCP 管理」保持一致的满宽与内边距 */
 .agent-page-inner.is-wide {
-  max-width: 1080px;
+  max-width: none;
+  padding: 16px 28px 32px;
 }
 </style>
