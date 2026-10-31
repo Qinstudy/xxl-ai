@@ -8,6 +8,7 @@ import { katex } from '@mdit/plugin-katex'
 import taskLists from 'markdown-it-task-lists'
 import footnote from 'markdown-it-footnote'
 import { t } from '@renderer/i18n'
+import { mediaKindOf } from '@shared/fileTypes'
 import { toLocalFileUrl } from '@renderer/utils/localFileUrl'
 import { sanitizeMarkdown } from '@renderer/utils/markdownSanitize'
 import {
@@ -138,21 +139,99 @@ function normalizeImageSrc(src: string, baseDir?: string): string {
   return value
 }
 
+/* 原始 HTML 音视频标签：markdown-it 不会处理 raw HTML 属性，需在消毒后归一地址并补控件 */
+const RAW_MEDIA_TAG = /<(?:video|audio|source|track)\b/i
+
 /* 图片渲染：归一化地址并补充懒加载/异步解码，避免长文图片阻塞首屏 */
 md.renderer.rules.image = (tokens, index, _options, env) => {
   const token = tokens[index]
   const alt = token.content || ''
   const title = String(token.attrGet('title') ?? '')
-  const src = normalizeImageSrc(
-    String(token.attrGet('src') ?? ''),
-    env?.baseDir as string | undefined
-  )
+  const rawSrc = String(token.attrGet('src') ?? '')
+  const src = normalizeImageSrc(rawSrc, env?.baseDir as string | undefined)
   /* 无可用地址时不渲染，避免出现破图占位 */
   if (!src) {
     return ''
   }
   const titleAttr = title ? ` title="${escapeHtml(title)}"` : ''
+  const labelAttr = alt ? ` aria-label="${escapeHtml(alt)}"` : ''
+  /* 音视频文件按类别渲染原生播放器（不自动播放） */
+  const mediaKind = mediaKindOf(rawSrc)
+  if (mediaKind === 'video') {
+    return `<video class="md-video" src="${escapeHtml(src)}"${titleAttr}${labelAttr} controls preload="metadata" playsinline></video>`
+  }
+  if (mediaKind === 'audio') {
+    return `<audio class="md-audio" src="${escapeHtml(src)}"${titleAttr}${labelAttr} controls preload="metadata"></audio>`
+  }
   return `<img class="md-image" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}"${titleAttr} loading="lazy" decoding="async">`
+}
+
+/*
+ * 独占整段的媒体链接（如 `[视频](clip.mp4)`）直接渲染为播放器；
+ * 混在句子中的链接保持链接语义，避免误伤普通链接。
+ */
+md.core.ruler.push('media_link_player', (state) => {
+  const tokens = state.tokens
+  for (let index = 0; index < tokens.length; index += 1) {
+    if (tokens[index].type !== 'paragraph_open') {
+      continue
+    }
+    const inline = tokens[index + 1]
+    const close = tokens[index + 2]
+    if (inline?.type !== 'inline' || close?.type !== 'paragraph_close') {
+      continue
+    }
+    const children = inline.children
+    if (!children || children.length !== 3) {
+      continue
+    }
+    const [open, text, end] = children
+    if (open.type !== 'link_open' || text.type !== 'text' || end.type !== 'link_close') {
+      continue
+    }
+    const href = String(open.attrGet('href') ?? '')
+    const kind = mediaKindOf(href)
+    if (!kind) {
+      continue
+    }
+    const src = escapeHtml(href)
+    const label = escapeHtml(text.content || href)
+    const player =
+      kind === 'video'
+        ? `<video class="md-video" src="${src}" aria-label="${label}" controls preload="metadata" playsinline></video>`
+        : `<audio class="md-audio" src="${src}" aria-label="${label}" controls preload="metadata"></audio>`
+    const playerToken = new state.Token('html_inline', '', 0)
+    playerToken.content = player
+    inline.children = [playerToken]
+  }
+})
+
+/*
+ * 原始 HTML 的媒体地址归一：`<video>/<audio>/<source>` 的相对路径按基准目录转 desk-file；
+ * 同时补齐 controls，避免手写标签漏掉控件导致无法播放。
+ */
+function normalizeMediaHtml(html: string, baseDir?: string): string {
+  if (!RAW_MEDIA_TAG.test(html)) {
+    return html
+  }
+  const template = document.createElement('template')
+  template.innerHTML = html
+  template.content.querySelectorAll<HTMLElement>('video, audio, source, track').forEach((el) => {
+    const src = el.getAttribute('src')
+    if (src) {
+      el.setAttribute('src', normalizeImageSrc(src, baseDir))
+    }
+    if (el.tagName === 'VIDEO' || el.tagName === 'AUDIO') {
+      if (!el.hasAttribute('controls')) {
+        el.setAttribute('controls', '')
+      }
+      const poster = el.getAttribute('poster')
+      if (poster) {
+        el.setAttribute('poster', normalizeImageSrc(poster, baseDir))
+      }
+    }
+  })
+  return template.innerHTML
 }
 
 /* 渲染结果缓存：历史消息回滚、重复渲染时直接复用（流式刷新同样受益） */
@@ -188,7 +267,7 @@ export function renderMarkdown(text: string, baseDir?: string): string {
   }
   let html: string
   try {
-    html = sanitizeMarkdown(md.render(text, { baseDir }))
+    html = normalizeMediaHtml(sanitizeMarkdown(md.render(text, { baseDir })), baseDir)
   } catch {
     /* 解析/消毒异常时退化为纯文本，避免整块渲染失败导致界面空白 */
     html = `<pre class="md-render-fallback">${escapeHtml(text.slice(0, RENDER_CACHE_MAX_LENGTH))}</pre>`

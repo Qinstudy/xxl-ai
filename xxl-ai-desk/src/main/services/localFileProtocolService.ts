@@ -10,28 +10,14 @@ import { net, protocol } from 'electron'
 import { createReadStream } from 'fs'
 import { stat } from 'fs/promises'
 import { Readable } from 'stream'
-import { extname, normalize } from 'path'
+import { normalize } from 'path'
 import { isWithinRoot } from '../utils/pathGuard'
 import { pathToFileURL } from 'url'
 import { listProjects } from './projectService'
+import { mimeOf } from '@shared/fileTypes'
 
 /* 协议名：与渲染层拼接 URL、CSP 白名单保持一致 */
 export const LOCAL_FILE_SCHEME = 'desk-file'
-
-/* 常见音视频 MIME（Range 响应需显式声明 Content-Type） */
-const MEDIA_MIME: Record<string, string> = {
-  '.mp4': 'video/mp4',
-  '.m4v': 'video/x-m4v',
-  '.webm': 'video/webm',
-  '.ogv': 'video/ogg',
-  '.mov': 'video/quicktime',
-  '.mp3': 'audio/mpeg',
-  '.wav': 'audio/wav',
-  '.ogg': 'audio/ogg',
-  '.m4a': 'audio/mp4',
-  '.aac': 'audio/aac',
-  '.flac': 'audio/flac'
-}
 
 /* 注册协议特性（必须在 app ready 前执行）：标准 URL 解析 + 安全来源 + 流式响应 */
 protocol.registerSchemesAsPrivileged([
@@ -103,7 +89,7 @@ async function serveRange(file: string, range: string): Promise<Response> {
   return new Response(Readable.toWeb(stream) as unknown as ReadableStream, {
     status: 206,
     headers: {
-      'Content-Type': MEDIA_MIME[extname(file).toLowerCase()] ?? 'application/octet-stream',
+      'Content-Type': mimeOf(file) || 'application/octet-stream',
       'Content-Length': String(end - start + 1),
       'Content-Range': `bytes ${start}-${end}/${size}`,
       'Accept-Ranges': 'bytes'

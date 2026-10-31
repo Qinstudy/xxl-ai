@@ -145,6 +145,24 @@ body.resizing-vertical {
   cursor: zoom-in;
 }
 
+/* 正文音视频：等比自适应，视频限高避免撑满对话区 */
+.markdown-body video,
+.markdown-body audio {
+  display: block;
+  max-width: 100%;
+  margin: 0.6em 0;
+  border-radius: var(--desk-radius-sm);
+}
+
+.markdown-body video {
+  max-height: 480px;
+  background: #000;
+}
+
+.markdown-body audio {
+  width: min(520px, 100%);
+}
+
 /*
  * 图片预览（ElImageViewer 传送到 body，只能全局命中）：
  * contain 模式只限制上限、不设固定宽高 —— 大图缩到舒适尺寸、小图保持原始像素不失真。

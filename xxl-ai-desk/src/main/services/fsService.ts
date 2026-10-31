@@ -5,7 +5,8 @@
  */
 
 import { open, readdir, stat, writeFile as writeFileFs } from 'fs/promises'
-import { extname, resolve } from 'path'
+import { resolve } from 'path'
+import { imageMimeOf } from '@shared/fileTypes'
 import { shell } from 'electron'
 import { assertInside } from '../utils/pathGuard'
 import type { FileContent, FsEntry } from '@shared/ipc'
@@ -14,17 +15,6 @@ import type { FileContent, FsEntry } from '@shared/ipc'
 const MAX_TEXT_BYTES = 2 * 1024 * 1024
 /* 图片内联预览体积上限 */
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024
-
-/* 扩展名 → 图片 MIME（可内联预览） */
-const IMAGE_MIME: Record<string, string> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif',
-  '.webp': 'image/webp',
-  '.bmp': 'image/bmp',
-  '.svg': 'image/svg+xml'
-}
 
 /* 列出目录内容：目录在前、名称升序（不递归，子目录按需懒加载） */
 export async function listDir(root: string, dir: string): Promise<FsEntry[]> {
@@ -46,7 +36,7 @@ export async function listDir(root: string, dir: string): Promise<FsEntry[]> {
 
 /* 读取图片为 data URL（超限返回空串） */
 async function readImageDataUrl(file: string, size: number): Promise<string | undefined> {
-  const mime = IMAGE_MIME[extname(file).toLowerCase()]
+  const mime = imageMimeOf(file)
   if (!mime || size > MAX_IMAGE_BYTES) {
     return undefined
   }

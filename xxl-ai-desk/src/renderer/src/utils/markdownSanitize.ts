@@ -1,12 +1,13 @@
 /*
  * Markdown HTML 消毒策略：内容开启了原始 HTML（html: true），所有输出统一经此消毒。
- * 默认拦截脚本/内联框架/文档级标签与 on* 事件；此处补充表单、媒体、模板、样式拦截与内联样式白名单。
+ * 默认拦截脚本/内联框架/文档级标签与 on* 事件；此处补充表单/模板/样式拦截与内联样式白名单。
+ * 媒体（video/audio/source/track）放行，但禁用自动播放（autoplay）。
  * @author xuxueli 2026-10-31
  */
 
 import DOMPurify from 'dompurify'
 
-/* 表单 / 媒体 / 模板 / 样式 / 动画类标签：内容不可伪造交互控件或注入全局样式 */
+/* 表单 / 模板 / 样式 / 动画类标签：内容不可伪造交互控件或注入全局样式 */
 const FORBID_TAGS = [
   'style',
   'form',
@@ -22,10 +23,6 @@ const FORBID_TAGS = [
   'meter',
   'progress',
   'dialog',
-  'video',
-  'audio',
-  'source',
-  'track',
   'canvas',
   'map',
   'area',
@@ -45,13 +42,8 @@ const FORBID_TAGS = [
 /* 外链资源 / 焦点抢占 / DOM 覆盖相关属性（on* 由 DOMPurify 默认剔除） */
 const FORBID_ATTR = [
   'srcset',
-  'poster',
-  'controls',
-  'controlslist',
   'autoplay',
-  'preload',
-  'loop',
-  'playsinline',
+  'controlslist',
   'background',
   'draggable',
   'tabindex',
@@ -75,7 +67,7 @@ const UNSAFE_STYLE = /(?:^|;)\s*(?:position|z-index|inset|pointer-events|cursor|
 
 const PURIFY_OPTIONS = {
   ALLOWED_URI_REGEXP:
-    /^(?:(?:https?|desk-file|blob|mailto|tel):|data:image\/|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+    /^(?:(?:https?|desk-file|blob|mailto|tel):|data:(?:image|video|audio)\/|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
   /* 懒加载、外链安全属性与交互按钮的无障碍属性需显式放行 */
   ADD_ATTR: ['loading', 'decoding', 'rel', 'target', 'aria-label', 'aria-expanded'],
   /* KaTeX 的 MathML 标注（公式原文，供读屏使用）默认会被剔除，显式放行 */

@@ -13,6 +13,7 @@ import { api } from '@renderer/api'
 import { t } from '@renderer/i18n'
 import { useWorkspaceStore } from '@renderer/stores/workspace'
 import { normalizePath, parentDir } from '../../utils/path'
+import { imageMimeOf, mediaKindOf } from '@shared/fileTypes'
 import FileToolbar from './FileToolbar.vue'
 import FileViewer from './FileViewer.vue'
 import FileTreePanel from './FileTreePanel.vue'
@@ -83,16 +84,9 @@ function extOf(name: string): string {
   return index >= 0 ? name.slice(index).toLowerCase() : ''
 }
 
-/* 可预览图片扩展名 */
-const IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg']
-/* 可预览视频扩展名（Chromium 原生支持的主流容器） */
-const VIDEO_EXTS = ['.mp4', '.m4v', '.webm', '.ogv', '.mov']
-/* 可预览音频扩展名 */
-const AUDIO_EXTS = ['.mp3', '.wav', '.ogg', '.m4a', '.aac', '.flac']
-
 /* 是否为可预览的图片文件 */
 function isImageName(name: string): boolean {
-  return IMAGE_EXTS.includes(extOf(name))
+  return Boolean(imageMimeOf(name))
 }
 
 /* 当前文件的图片 / Markdown / 音视频判定、是否可预览、预览是否生效 */
@@ -100,12 +94,8 @@ const isImage = computed(() => Boolean(file.value) && isImageName(file.value?.na
 const isMarkdown = computed(
   () => Boolean(file.value) && ['.md', '.markdown'].includes(extOf(file.value?.name ?? ''))
 )
-const isVideo = computed(
-  () => Boolean(file.value) && VIDEO_EXTS.includes(extOf(file.value?.name ?? ''))
-)
-const isAudio = computed(
-  () => Boolean(file.value) && AUDIO_EXTS.includes(extOf(file.value?.name ?? ''))
-)
+const isVideo = computed(() => Boolean(file.value) && mediaKindOf(file.value?.name ?? '') === 'video')
+const isAudio = computed(() => Boolean(file.value) && mediaKindOf(file.value?.name ?? '') === 'audio')
 const canPreview = computed(() => isImage.value || isMarkdown.value)
 const showPreview = computed(() => preview.value && canPreview.value)
 
