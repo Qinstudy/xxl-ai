@@ -33,12 +33,9 @@ export interface GithubArchive {
   tempDir: string
   /* 解压后的仓库根目录 */
   rootDir: string
-  /* 过期时间 */
-  expireAt: number
 }
 
-/* 缓存、进行中的下载与取消控制器 */
-const cache = new Map<string, GithubArchive>()
+/* 进行中的下载与取消控制器（不缓存已完成结果，文件系统是唯一缓存源） */
 const pending = new Map<string, Promise<GithubArchive>>()
 const controllers = new Map<string, AbortController>()
 
@@ -67,15 +64,18 @@ interface DownloadMeta {
   createdAt: number
 }
 
-/* 读取目录元信息（缺失或非法返回 null） */
+/* 读取目录元信息（缺失或字段非法返回 null） */
 function readDownloadMeta(tempDir: string): DownloadMeta | null {
   try {
     const parsed = JSON.parse(readFileSync(join(tempDir, META_FILE), 'utf-8')) as DownloadMeta
     if (
       parsed &&
       typeof parsed.repo === 'string' &&
+      parsed.repo !== '' &&
       typeof parsed.ref === 'string' &&
-      Number.isFinite(parsed.createdAt)
+      parsed.ref !== '' &&
+      Number.isFinite(parsed.createdAt) &&
+      parsed.createdAt > 0
     ) {
       return parsed
     }
@@ -90,33 +90,25 @@ function writeDownloadMeta(tempDir: string, repo: string, ref: string, createdAt
   writeFileSync(join(tempDir, META_FILE), JSON.stringify({ repo, ref, createdAt }), 'utf-8')
 }
 
-/* 目录是否已超过缓存时间 */
+/* 目录是否过期；非法时间同样按过期处理 */
 function isExpired(createdAt: number): boolean {
-  return Date.now() - createdAt > CACHE_TTL
-}
-
-/* 读取目录创建时间：优先 meta，其次文件系统创建时间 */
-function dirCreatedAt(dir: string): number {
-  const meta = readDownloadMeta(dir)
-  if (meta) {
-    return meta.createdAt
+  if (!Number.isFinite(createdAt) || createdAt <= 0) {
+    return true
   }
-  try {
-    const info = statSync(dir)
-    return info.birthtimeMs || info.mtimeMs || Date.now()
-  } catch {
-    return Date.now()
-  }
-}
-
-/* 清理过期缓存 */
-function pruneCache(): void {
   const now = Date.now()
-  for (const [key, item] of cache) {
-    if (item.expireAt <= now) {
-      cache.delete(key)
-      rmSync(item.tempDir, { recursive: true, force: true })
-    }
+  /* 未来时间超过 1 分钟视为非法，避免时钟异常导致永久缓存 */
+  if (createdAt > now + 60 * 1000) {
+    return true
+  }
+  return now - createdAt > CACHE_TTL
+}
+
+/* 解压目录是否可用：必须是存在且非空的目录 */
+function isArchiveRootUsable(rootDir: string): boolean {
+  try {
+    return statSync(rootDir).isDirectory() && readdirSync(rootDir).length > 0
+  } catch {
+    return false
   }
 }
 
@@ -133,17 +125,18 @@ function removeDownloadDirs(dir: string, match: (name: string) => boolean): void
   }
 }
 
-/* 清理启动时已过期的下载目录，并兼容旧版临时目录 */
+/* 清理启动时已过期或不合法的下载目录，并兼容旧版临时目录 */
 export function cleanupGithubArchiveTemps(): void {
   ensureTempDir()
-  /* 当前 tmp：只删除超过 30 分钟的 github-owner-repo */
+  /* 当前 tmp：没有有效 meta 或已过期的 github-owner-repo 全部删除 */
   try {
     for (const entry of readdirSync(getTempDir(), { withFileTypes: true })) {
       if (!entry.isDirectory() || !entry.name.startsWith(DOWNLOAD_DIR_PREFIX)) {
         continue
       }
       const target = join(getTempDir(), entry.name)
-      if (isExpired(dirCreatedAt(target))) {
+      const meta = readDownloadMeta(target)
+      if (!meta || isExpired(meta.createdAt) || !isArchiveRootUsable(join(target, 'root'))) {
         rmSync(target, { recursive: true, force: true })
       }
     }
@@ -173,20 +166,27 @@ function reuseArchive(repo: string, ref: string): GithubArchive | null {
     return null
   }
   const meta = readDownloadMeta(tempDir)
-  const createdAt = meta?.createdAt ?? dirCreatedAt(tempDir)
-  if (!meta || meta.repo !== repo || meta.ref !== ref || isExpired(createdAt)) {
+  /* 元信息缺失或损坏：无法确认版本，直接重建 */
+  if (!meta) {
     rmSync(tempDir, { recursive: true, force: true })
     return null
   }
-  if (!existsSync(rootDir) || readdirSync(rootDir).length === 0) {
+  /* 仓库或 ref 变化：不能复用旧内容 */
+  if (meta.repo !== repo || meta.ref !== ref) {
     rmSync(tempDir, { recursive: true, force: true })
     return null
   }
-  return {
-    tempDir,
-    rootDir,
-    expireAt: createdAt + CACHE_TTL
+  /* 超过 30 分钟缓存时间：删除后重新下载 */
+  if (isExpired(meta.createdAt)) {
+    rmSync(tempDir, { recursive: true, force: true })
+    return null
   }
+  /* 解压目录缺失、不是目录或为空：同样按过期处理 */
+  if (!isArchiveRootUsable(rootDir)) {
+    rmSync(tempDir, { recursive: true, force: true })
+    return null
+  }
+  return { tempDir, rootDir }
 }
 
 /* 下载并解压归档 */
@@ -203,38 +203,22 @@ async function prepareArchive(
   try {
     await downloadGithubArchive(repo, ref, tempDir, signal)
     writeDownloadMeta(tempDir, repo, ref, createdAt)
-    return {
-      tempDir,
-      rootDir,
-      expireAt: createdAt + CACHE_TTL
-    }
+    return { tempDir, rootDir }
   } catch (error) {
     rmSync(tempDir, { recursive: true, force: true })
     throw error
   }
 }
 
-/* 获取归档：内存缓存 → 30 分钟内磁盘缓存 → 重新下载 */
+/* 获取归档：文件系统 30 分钟内可复用则直接返回，否则下载 */
 export async function acquireGithubArchive(
   repo: string,
   ref: string,
   signal?: AbortSignal
 ): Promise<GithubArchive> {
   const key = archiveKey(repo, ref)
-  pruneCache()
-  const cached = cache.get(key)
-  if (cached && existsSync(cached.rootDir)) {
-    return cached
-  }
-  if (cached) {
-    cache.delete(key)
-    rmSync(cached.tempDir, { recursive: true, force: true })
-  }
-
   const reused = reuseArchive(repo, ref)
   if (reused) {
-    cache.set(key, reused)
-    pruneCache()
     return reused
   }
 
@@ -257,8 +241,6 @@ export async function acquireGithubArchive(
         rmSync(archive.tempDir, { recursive: true, force: true })
         throw new Error('已取消 GitHub 归档下载')
       }
-      cache.set(key, archive)
-      pruneCache()
       return archive
     })
     .finally(() => {
@@ -281,15 +263,12 @@ export function cancelGithubArchive(repo: string, ref: string): void {
   pending.delete(key)
 }
 
-/* 删除指定仓库的归档缓存（含正在进行的下载） */
+/* 删除指定仓库的下载目录（含正在进行的下载） */
 export function disposeGithubArchive(repo: string, ref: string): void {
   const key = archiveKey(repo, ref)
   controllers.get(key)?.abort()
   controllers.delete(key)
   pending.delete(key)
-  const item = cache.get(key)
-  cache.delete(key)
-  if (item) {
-    rmSync(item.tempDir, { recursive: true, force: true })
-  }
+  const { tempDir } = archivePaths(repo)
+  rmSync(tempDir, { recursive: true, force: true })
 }
