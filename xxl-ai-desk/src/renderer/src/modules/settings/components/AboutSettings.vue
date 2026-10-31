@@ -5,7 +5,7 @@
  */
 import { useSettingsStore } from '@renderer/stores/settings'
 import { t } from '@renderer/i18n'
-import logo from '@renderer/assets/icon.png'
+import logo from '@resources/icon.png'
 
 const settings = useSettingsStore()
 </script>

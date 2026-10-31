@@ -31,8 +31,14 @@ export default defineConfig({
       alias: {
         '@renderer': resolve('src/renderer/src'),
         '@shared': resolve('src/shared'),
+        /* 项目级静态资源（图标等），需与 electron-builder 打包资源保持一致 */
+        '@resources': resolve('resources'),
         '@': resolve('src/renderer/src')
       }
+    },
+    /* 渲染根目录为 src/renderer，允许读取项目根下的 resources 目录 */
+    server: {
+      fs: { allow: [resolve('.')] }
     },
     plugins: [vue()]
   }

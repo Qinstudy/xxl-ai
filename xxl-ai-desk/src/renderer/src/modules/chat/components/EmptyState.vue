@@ -8,7 +8,7 @@ let typingPlayed = false
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { t } from '@renderer/i18n'
 import { useSettingsStore } from '@renderer/stores/settings'
-import logo from '@renderer/assets/icon.png'
+import logo from '@resources/icon.png'
 
 const settings = useSettingsStore()
 

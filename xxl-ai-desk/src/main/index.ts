@@ -18,11 +18,11 @@ import { disposeBrowserActions } from './agent/host/browserBridge'
 /* 主窗口引用（未创建或已关闭时为 null） */
 let mainWindow: BrowserWindow | null = null
 
-/* 运行期应用图标路径：开发期取渲染层图标源 src/renderer/src/assets/icon.png；打包后取 resources/icon.png（由 electron-builder extraResources 注入） */
+/* 运行期应用图标路径：开发期取项目 resources/icon.png；打包后取 resources/icon.png（由 electron-builder extraResources 注入） */
 function resolveAppIconPath(): string | null {
   const iconPath = app.isPackaged
     ? join(process.resourcesPath, 'icon.png')
-    : join(app.getAppPath(), 'src', 'renderer', 'src', 'assets', 'icon.png')
+    : join(app.getAppPath(), 'resources', 'icon.png')
   return existsSync(iconPath) ? iconPath : null
 }
 

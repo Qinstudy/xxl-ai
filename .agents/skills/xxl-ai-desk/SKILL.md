@@ -49,7 +49,7 @@ src/
     ├── components/             跨模块通用件（ApprovalDialog / MarkdownBlock / PanelResizer / Sidebar*）
     │   ├── shell/              外壳：AppTopbar / AppSidebar / ActivityRail / SectionMenu
     │   └── icons/
-    ├── composables/            跨模块组合式函数（usePanelResize / useSessionLifecycle / useQuickAction）
+    ├── composables/            跨模块组合式函数（useAppBootstrap / usePanelResize / useSessionLifecycle / useQuickAction）
     ├── utils/                  无 Vue / 组件依赖的纯工具（ipcError / shortcut / localFileUrl）
     ├── stores/*.ts             根 store（project/settings/workspace/mcp/skill/chatUi/shell/browserSession）
     │   └── stores/chat/        会话域拆分：index / stream / messageMapping / lastSession
@@ -58,9 +58,10 @@ src/
     ├── config/nav.ts           板块 ↔ 路由 ↔ 标题 ↔ 子菜单（唯一导航来源）
     ├── router/index.ts         Hash 路由（直接 import 模块 pages）
     ├── styles/{tokens,index}.scss   设计令牌 / 全局样式
-    ├── assets/                 图标等静态资源
     └── types/index.ts          全局基础类型
 ```
+
+项目根 `resources/` 存放应用级静态资源（`icon.png` 同时用于 electron-builder 安装包图标与 `extraResources` 注入）；渲染层经 `@resources/*` 引用，不放在 `renderer/src` 内。
 
 模块目录构成（按实际）：
 
@@ -295,6 +296,7 @@ desk-shell（纵向）
 - **顶栏**：左侧依次为首页入口（回到对话模块新建对话页）与软件名称（`appName` 优先、回落 `app.name`），其后为板块图标 + 标题/操作，标题随路由（首页=会话标题，插件=「插件」，设置=「系统设置」）；软件名称与标题间的细线仅在有标题时展示；交互控件 `no-drag`。
 - **子菜单**：标题 18px/600，条目 14px/400，选中项 600 + 浅底；不展示 Logo；点击当前板块按钮切换子菜单栏折叠/展开，图标栏常驻。
 - **shell 不承载域逻辑**：域内逻辑下沉 `modules/{module}`。
+- **shell 不承载启动逻辑**：`App.vue` 只组装外壳；全局快捷键、设置/项目/会话初始化、会话生命周期与更新检查在 `composables/useAppBootstrap.ts`。
 - **面板交互统一复用**：拖拽用 `composables/usePanelResize.ts` + `components/PanelResizer.vue`；宽度持久化左侧栏用 `utils/persistedWidth.ts`，终端等会话级尺寸走 `stores/workspace.ts`（按会话持久化）。
 - **共享选中态归属域**：跨「子菜单 ↔ 页面」的选中态放所属域 store（如 `settings.activeTab`），不塞进 `layout`。
 - **配色分层**：`--desk-chrome-bg`（顶栏+图标栏）> `--desk-panel-bg`（子菜单栏）> `--desk-bg`（正文）；不加分隔线，仅「子菜单栏 ↔ 正文」保留 1px `--desk-border`。

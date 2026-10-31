@@ -17,6 +17,7 @@
     "paths": {
       "@renderer/*": ["./src/renderer/src/*"], /* 渲染进程路径别名，与 electron.vite.config.ts 一致 */
       "@shared/*": ["./src/shared/*"],         /* 跨进程共享契约别名 */
+      "@resources/*": ["./resources/*"],       /* 项目级静态资源（图标等） */
       "@/*": ["./src/renderer/src/*"]
     }
   },
