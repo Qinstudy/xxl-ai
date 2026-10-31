@@ -1,6 +1,6 @@
 /*
  * Agent 运行时管理（主进程侧）：
- * 拉起并托管 Agent 运行时进程（utilityProcess），转发流式事件与越界审批，
+ * 拉起并托管 Agent 运行时进程（utilityProcess），转发流式事件与人机交互，
  * 使主进程只做 IPC 网关，不再承担模型调用与工具执行。对外 API 与旧 host 对齐。
  */
 
@@ -8,7 +8,7 @@ import { join } from 'path'
 import { execFileSync, spawn } from 'child_process'
 import { utilityProcess, type UtilityProcess } from 'electron'
 import log from 'electron-log/main'
-import { confirmOutside } from './approval'
+import { openInteraction, cancelInteraction, clearInteractions } from './interaction'
 import { requestBrowserAction } from './browserBridge'
 import type {
   HostEvent,
@@ -76,6 +76,8 @@ function ensureWorker(): Promise<UtilityProcess> {
       pending.resolve({ ok: false, message: 'Agent 运行时进程异常退出，请重试' })
       pendingRuns.delete(sessionId)
     }
+    /* 交互请求随 worker 失效：清理挂起项，避免后续误回传 */
+    clearInteractions()
     /* 未结算的 MCP 请求同样统一失败 */
     for (const [requestId, pending] of pendingMcp) {
       clearTimeout(pending.timer)
@@ -118,11 +120,18 @@ async function handleMessage(message: WorkerMessage): Promise<void> {
       pending?.resolve({ ok: false, message: message.message })
       break
     }
-    case 'approval-request': {
-      const choice = await confirmOutside(message)
-      worker?.postMessage({ type: 'approval-response', requestId: message.requestId, choice })
+    case 'interaction-request': {
+      openInteraction(
+        { requestId: message.requestId, sessionId: message.sessionId, request: message.request },
+        (requestId, result) => {
+          worker?.postMessage({ type: 'interaction-response', requestId, result })
+        }
+      )
       break
     }
+    case 'interaction-cancel':
+      cancelInteraction(message.requestId)
+      break
     case 'mcp-test-result':
     case 'mcp-tools-result': {
       const pending = pendingMcp.get(message.requestId)

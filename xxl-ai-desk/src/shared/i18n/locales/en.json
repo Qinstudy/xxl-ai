@@ -88,6 +88,7 @@
       "screenshotBrowser": "Page screenshot",
       "inspectBrowser": "Page diagnostics",
       "browserTabs": "Manage browser tabs",
+      "askUser": "Ask user",
       "mcp": "MCP tool",
       "generic": "Tool"
     },
@@ -117,18 +118,29 @@
     "noModel": "No model configured yet. Add a provider and model in Settings.",
     "goSettings": "Go to Settings",
     "scrollToBottom": "Scroll to bottom",
-    "approvalTitle": "Outside access",
-    "approvalRead": "read",
-    "approvalWrite": "write",
-    "approvalCommand": "access",
-    "approvalMessage": "Tool \"{0}\" requests to {1} a file outside the project directory",
-    "approvalMessageCommand": "Tool \"{0}\" requests to access a path outside the project directory",
-    "approvalPath": "Target path",
-    "approvalRoot": "Project directory",
-    "approvalQuestion": "Allow this operation?",
-    "approvalOnce": "Allow once",
-    "approvalSession": "Allow all for session",
-    "approvalDeny": "Deny",
+    "interaction": {
+      "submit": "Submit",
+      "cancel": "Cancel",
+      "required": "Please select an option",
+      "multiHint": "Select one or more",
+      "other": "Other",
+      "otherPlaceholder": "Enter your option",
+      "queue": "{0} more pending request(s)",
+      "permission": {
+        "title": "Outside access",
+        "read": "read",
+        "write": "write",
+        "command": "access",
+        "message": "Tool \"{0}\" requests to {1} a file outside the project directory",
+        "messageCommand": "Tool \"{0}\" requests to access a path outside the project directory",
+        "path": "Target path",
+        "root": "Project directory",
+        "question": "Allow this operation?",
+        "once": "Allow once",
+        "session": "Allow all for session",
+        "deny": "Deny"
+      }
+    },
     "requestFailed": "Request failed",
     "toolFields": "{0} fields",
     "browser": {
@@ -525,13 +537,15 @@
         "fs": "File Operations",
         "shell": "Terminal",
         "browser": "Browser",
-        "general": "General"
+        "general": "General",
+        "interaction": "Human interaction"
       },
       "categoryDesc": {
         "fs": "Read, search, edit, delete and move files inside the project directory. Writes require Build mode; out-of-scope access needs approval.",
         "shell": "Run shell commands inside the project directory. Dangerous commands are blocked; Build mode only.",
         "browser": "Open pages, read content and structure, click and fill forms, take screenshots and run diagnostics. When disabled, the model no longer receives browser tools.",
-        "general": "General, side-effect-free capabilities such as the current time."
+        "general": "General, side-effect-free capabilities such as the current time.",
+        "interaction": "The Agent asks the user to confirm an action, choose an option or provide input during a task. Always enabled and cannot be turned off."
       },
       "desc": {
         "readFile": "Read a text file by line range inside the project directory",
@@ -556,7 +570,8 @@
         "screenshotBrowser": "Capture the visible page for layout and visual verification",
         "inspectBrowser": "Read console warnings/errors and failed page loads",
         "browserTabs": "List, switch or close browser tabs",
-        "time": "Get the current local date and time, with an optional IANA timezone"
+        "time": "Get the current local date and time, with an optional IANA timezone",
+        "askUser": "Let the user pick among 2-20 candidate options, with single or multiple selection and an \"Other\" free-form entry"
       }
     }
   },
@@ -675,6 +690,17 @@
       "skillReadFailed": "Failed to read skill file: {0}",
       "mcpAborted": "[Stopped] MCP tool call was stopped by the user ({0}/{1})",
       "mcpFailed": "MCP tool call failed ({0}/{1}): {2}"
+    },
+    "hitl": {
+      "invalidParams": "Invalid parameters: {0}",
+      "invalidTitle": "title cannot be empty",
+      "invalidOptions": "choice requires 2-20 options",
+      "invalidOption": "Option is missing label or value",
+      "duplicateOption": "Duplicate option value: {0}",
+      "rejected": "User declined.",
+      "selected": "User selected: {0}",
+      "noSelection": "User did not select any option.",
+      "cancelled": "Interaction cancelled; the user provided no input."
     }
   },
   "git": {

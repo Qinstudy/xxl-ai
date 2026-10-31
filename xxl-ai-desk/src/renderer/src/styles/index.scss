@@ -710,6 +710,26 @@ html.dark .el-button--primary {
   --el-switch-off-color: var(--desk-border-strong);
 }
 
+/*
+ * --- 输入类控件：hover / focus 统一柔和描边 ---
+ * Element Plus 在组件内部把 focus 边框写死为 --el-color-primary，黑白主题下接近纯黑，
+ * 且悬浮边框默认取 disabled 文字色（偏深）。这里在组件层覆盖变量，避免出现突兀黑框；
+ * el-select 的聚焦态直接使用主色，需单独覆盖其 wrapper 阴影。
+ */
+.el-input,
+.el-textarea {
+  --el-input-hover-border-color: var(--desk-input-border-hover);
+  --el-input-focus-border-color: var(--desk-input-border-focus);
+}
+
+.el-select__wrapper.is-hovering:not(.is-focused) {
+  box-shadow: 0 0 0 1px var(--desk-input-border-hover) inset;
+}
+
+.el-select__wrapper.is-focused {
+  box-shadow: 0 0 0 1px var(--desk-input-border-focus) inset;
+}
+
 /* --- 表格：表面色 / 边框 / 悬浮态统一走主题令牌，避免组件默认灰与主题脱节 --- */
 .el-table {
   --el-table-bg-color: transparent;

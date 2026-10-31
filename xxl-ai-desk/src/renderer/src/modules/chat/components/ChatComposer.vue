@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* 输入框：Enter 发送，Shift+Enter 换行；底部选择对话模式与模型 */
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useProjectStore } from '@renderer/stores/project'
@@ -20,8 +20,34 @@ const project = useProjectStore()
 const chat = useChatStore()
 const settings = useSettingsStore()
 const inputRef = ref()
+const boxRef = ref<HTMLElement | null>(null)
 /* 新建对话草稿模式：会话创建时随会话落库，默认 Build */
 const draftMode = ref<ChatMode>('build')
+
+/* 输入框宽度变化（窗口 / 侧栏 / 工具面板调整）后重算 autosize，避免占位文案换行后高度不更新 */
+let resizeObserver: ResizeObserver | null = null
+let lastWidth = 0
+
+onMounted(() => {
+  if (!boxRef.value) {
+    return
+  }
+  lastWidth = boxRef.value.clientWidth
+  resizeObserver = new ResizeObserver((entries) => {
+    const width = entries[0]?.contentRect.width ?? 0
+    if (width === lastWidth) {
+      return
+    }
+    lastWidth = width
+    inputRef.value?.resizeTextarea?.()
+  })
+  resizeObserver.observe(boxRef.value)
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+})
 
 /* 编辑历史消息：回填内容并聚焦输入框（供对话页调用） */
 function editText(content: string): void {
@@ -57,7 +83,7 @@ async function onModeChange(mode: ChatMode): Promise<void> {
   }
 }
 
-/* 选择模型（命令格式 providerId::modelId）；顶部入口跳转供应商设置 */
+/* 选择模型（命令格式 providerId::modelId）：全局记忆最近选择，并同步当前会话 */
 async function onModelChange(command: string): Promise<void> {
   if (command === '__new_provider__') {
     router.push({ path: '/settings', query: { tab: 'providers' } })
@@ -67,13 +93,7 @@ async function onModelChange(command: string): Promise<void> {
   if (index < 0) {
     return
   }
-  const providerId = command.slice(0, index)
-  const modelId = command.slice(index + 2)
-  if (locked.value) {
-    await chat.updateSessionModel(providerId, modelId)
-  } else {
-    await settings.saveSettings({ providerId, modelId })
-  }
+  await chat.selectModel(command.slice(0, index), command.slice(index + 2))
 }
 
 /* 发送消息：校验内容与运行状态、要求新建对话已选项目，随后交由父组件提交 */
@@ -102,7 +122,7 @@ function onKeydown(event: KeyboardEvent): void {
 
 <template>
   <div class="composer">
-    <div class="composer-box">
+    <div ref="boxRef" class="composer-box">
       <el-input
         ref="inputRef"
         v-model="draft"
@@ -212,16 +232,25 @@ function onKeydown(event: KeyboardEvent): void {
   background: var(--desk-surface-elevated);
   border: 1px solid var(--desk-border);
   border-radius: var(--desk-radius);
-  box-shadow: var(--desk-shadow);
+  box-shadow: var(--desk-shadow-soft);
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;
 }
 
-/* 聚焦态：品牌色描边 + 柔和光晕，突出当前输入 */
+/* 悬浮：轻微加深，提示可输入，不叠加位移或发光 */
+.composer-box:hover {
+  border-color: var(--desk-input-border-hover);
+}
+
+/*
+ * 聚焦态：只做极轻的边框提亮 + 若有若无的光晕。
+ * 黑白主题的品牌色接近纯黑，高比例混色会让边框发黑、发脏；
+ * 焦点主要交给输入光标与文字本身表达。
+ */
 .composer-box:focus-within {
-  border-color: color-mix(in srgb, var(--desk-primary) 45%, var(--desk-border));
-  box-shadow: var(--desk-shadow), var(--desk-focus-ring);
+  border-color: var(--desk-input-border-focus);
+  box-shadow: var(--desk-shadow-soft), 0 0 0 3px color-mix(in srgb, var(--desk-primary) 6%, transparent);
 }
 
 .composer-box :deep(.el-textarea__inner) {
@@ -229,7 +258,16 @@ function onKeydown(event: KeyboardEvent): void {
   box-shadow: none;
   padding: 8px 0;
   font-size: var(--desk-font-base);
+  /* 用整数行高：小数行高会让 autosize 算出的高度比内容少不足 1px，空白输入框也会常驻滚动条 */
+  line-height: 22px;
   color: var(--desk-text);
+  /* 聊天输入框不需要常驻滚动条：8 行内自动撑高，超出后仍可滚轮 / 键盘滚动 */
+  scrollbar-width: none;
+}
+
+.composer-box :deep(.el-textarea__inner)::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 /* 底部操作行：左下选择项目/模型，右下发送/停止 */

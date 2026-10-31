@@ -4,7 +4,7 @@
  * @author xuxueli 2026-10-25
  */
 
-export { default as ChatApprovalDialog } from './components/ApprovalDialog.vue'
+export { default as ChatInteractionDialog } from './components/interaction/InteractionDialog.vue'
 export { default as ChatSidebarPanel } from './components/ChatSidebarPanel.vue'
 export { default as ChatTopbarTitle } from './components/ChatTopbarTitle.vue'
 export { default as ChatSearchAction } from './components/ChatSearchAction.vue'

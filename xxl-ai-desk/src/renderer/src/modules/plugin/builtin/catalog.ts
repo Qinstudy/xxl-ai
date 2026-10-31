@@ -8,8 +8,8 @@
 
 import type { ChatMode } from '@shared/ipc'
 
-/* 内置工具分类：fs 文件 / shell 终端 / browser 浏览器（可开关）/ general 通用（可开关） */
-export type BuiltinToolCategoryKey = 'fs' | 'shell' | 'browser' | 'general'
+/* 内置工具分类：fs 文件 / shell 终端 / browser 浏览器（可开关）/ general 通用（可开关）/ interaction 人机交互 */
+export type BuiltinToolCategoryKey = 'fs' | 'shell' | 'browser' | 'general' | 'interaction'
 
 /* 工具目录项 */
 export interface BuiltinToolCatalogItem {
@@ -64,6 +64,12 @@ export const BUILTIN_TOOL_CATEGORIES: BuiltinToolCategory[] = [
     titleKey: 'plugin.builtinTool.category.general',
     descriptionKey: 'plugin.builtinTool.categoryDesc.general',
     switchable: true
+  },
+  {
+    key: 'interaction',
+    titleKey: 'plugin.builtinTool.category.interaction',
+    descriptionKey: 'plugin.builtinTool.categoryDesc.interaction',
+    switchable: false
   }
 ]
 
@@ -253,6 +259,14 @@ export const BUILTIN_TOOL_CATALOG: BuiltinToolCatalogItem[] = [
     category: 'general',
     titleKey: 'chat.tool.time',
     descriptionKey: 'plugin.builtinTool.desc.time',
+    readOnly: true,
+    modes: ALL_MODES
+  },
+  {
+    name: 'ask_user',
+    category: 'interaction',
+    titleKey: 'chat.tool.askUser',
+    descriptionKey: 'plugin.builtinTool.desc.askUser',
     readOnly: true,
     modes: ALL_MODES
   }

@@ -37,6 +37,9 @@
   --desk-border: var(--theme-border);
   --desk-border-strong: color-mix(in srgb, var(--theme-border) 42%, var(--theme-text-tertiary));
   --desk-border-soft: color-mix(in srgb, var(--theme-border) 55%, transparent);
+  /* 输入控件 hover / focus 边框：只掺入少量品牌色，避免黑白主题下主色偏黑形成黑框 */
+  --desk-input-border-hover: color-mix(in srgb, var(--theme-brand) 10%, var(--theme-border));
+  --desk-input-border-focus: color-mix(in srgb, var(--theme-brand) 20%, var(--theme-border));
 
   /* 文本 */
   --desk-text: var(--theme-text);
@@ -50,7 +53,8 @@
   --desk-primary-soft: color-mix(in srgb, var(--theme-brand) 9%, transparent);
   --desk-selected-bg: color-mix(in srgb, var(--theme-brand) 15%, transparent);
   --desk-primary-contrast: var(--theme-brand-contrast);
-  --desk-focus-ring: 0 0 0 3px color-mix(in srgb, var(--theme-brand) 20%, transparent);
+  /* 聚焦光晕：只做极淡提示，深色/黑白主题下避免形成第二圈灰边 */
+  --desk-focus-ring: 0 0 0 3px color-mix(in srgb, var(--theme-brand) 10%, transparent);
 
   /* 功能色 */
   --desk-success: var(--theme-success);
@@ -85,6 +89,10 @@
   --el-border-color: var(--desk-border);
   --el-border-color-light: var(--desk-border);
   --el-border-color-lighter: var(--desk-border-soft);
+  /* 输入控件悬浮边框：Element 默认取 text-color-disabled（偏深），统一换成柔和混色 */
+  --el-border-color-hover: var(--desk-input-border-hover);
+  --el-input-hover-border-color: var(--desk-input-border-hover);
+  --el-input-focus-border-color: var(--desk-input-border-focus);
   --el-fill-color-light: var(--desk-primary-soft);
   --el-fill-color-lighter: var(--desk-surface-elevated);
   --el-fill-color-blank: var(--desk-surface-content);
@@ -131,6 +139,10 @@
   --code-subst: #1f2328;
 
   --desk-shadow: 0 10px 30px color-mix(in srgb, var(--theme-shadow) 8%, transparent);
+  /* 输入框 / 轻量卡片：贴近表面的柔和投影，避免大范围灰雾 */
+  --desk-shadow-soft:
+    0 1px 2px color-mix(in srgb, var(--theme-shadow) 4%, transparent),
+    0 4px 12px color-mix(in srgb, var(--theme-shadow) 5%, transparent);
   --desk-overlay: color-mix(in srgb, var(--theme-text) 38%, transparent);
   /* 终端选区：中性半透明，避免主题色在代码背景上过重 */
   --desk-terminal-selection: rgba(24, 24, 27, 0.18);
@@ -178,6 +190,9 @@
   --code-subst: #e6edf3;
 
   --desk-shadow: 0 12px 32px color-mix(in srgb, var(--theme-shadow) 55%, transparent);
+  --desk-shadow-soft:
+    0 1px 2px color-mix(in srgb, var(--theme-shadow) 35%, transparent),
+    0 6px 18px color-mix(in srgb, var(--theme-shadow) 45%, transparent);
   --desk-overlay: rgba(0, 0, 0, 0.55);
   --desk-terminal-selection: rgba(255, 255, 255, 0.24);
 }

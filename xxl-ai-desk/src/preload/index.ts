@@ -7,9 +7,10 @@ import type {
   BrowserActionRequest,
   BrowserActionResult,
   BrowserOpenTabRequest,
-  ChatApprovalChoice,
-  ChatApprovalPrompt,
   ChatEvent,
+  ChatInteractionCancel,
+  ChatInteractionPrompt,
+  InteractionResult,
   DeskApi,
   FileContent,
   FsEntry,
@@ -138,7 +139,7 @@ const api: DeskApi = {
     removeMessages: (sessionId: string, ids: string[]) =>
       ipcRenderer.invoke(IPC.sessionDeleteMessages, sessionId, ids)
   },
-  /* 对话：发送 / 中止 / 事件订阅 / 越界审批 */
+  /* 对话：发送 / 中止 / 事件订阅 / 人机交互 */
   chat: {
     /* 发送用户消息并启动流式生成 */
     send: (input: { sessionId: string; text: string }) => ipcRenderer.invoke(IPC.chatSend, input),
@@ -150,15 +151,21 @@ const api: DeskApi = {
       ipcRenderer.on(IPC.chatEvent, listener)
       return () => ipcRenderer.removeListener(IPC.chatEvent, listener)
     },
-    /* 订阅越界审批请求（返回取消订阅函数） */
-    onApproval: (callback: (prompt: ChatApprovalPrompt) => void) => {
-      const listener = (_event: unknown, payload: ChatApprovalPrompt): void => callback(payload)
-      ipcRenderer.on(IPC.chatApprovalRequest, listener)
-      return () => ipcRenderer.removeListener(IPC.chatApprovalRequest, listener)
+    /* 订阅人机交互请求（返回取消订阅函数） */
+    onInteraction: (callback: (prompt: ChatInteractionPrompt) => void) => {
+      const listener = (_event: unknown, payload: ChatInteractionPrompt): void => callback(payload)
+      ipcRenderer.on(IPC.chatInteractionRequest, listener)
+      return () => ipcRenderer.removeListener(IPC.chatInteractionRequest, listener)
     },
-    /* 回传越界审批选择 */
-    respondApproval: (requestId: string, choice: ChatApprovalChoice) =>
-      ipcRenderer.invoke(IPC.chatApprovalRespond, requestId, choice)
+    /* 订阅人机交互取消（返回取消订阅函数） */
+    onInteractionCancel: (callback: (payload: ChatInteractionCancel) => void) => {
+      const listener = (_event: unknown, payload: ChatInteractionCancel): void => callback(payload)
+      ipcRenderer.on(IPC.chatInteractionCancel, listener)
+      return () => ipcRenderer.removeListener(IPC.chatInteractionCancel, listener)
+    },
+    /* 回传用户交互结果 */
+    respondInteraction: (requestId: string, result: InteractionResult) =>
+      ipcRenderer.invoke(IPC.chatInteractionRespond, requestId, result)
   },
   /* 终端管理 */
   terminal: {

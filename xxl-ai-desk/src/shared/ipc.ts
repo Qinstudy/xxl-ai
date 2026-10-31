@@ -29,7 +29,12 @@ import type {
 import type { ProviderDTO, ProviderModelQuery } from './contracts/provider'
 import type { ProjectCreateInput, ProjectDTO } from './contracts/project'
 import type { SessionDTO, StoredMessage } from './contracts/session'
-import type { ChatApprovalChoice, ChatApprovalPrompt, ChatEvent } from './contracts/chat'
+import type {
+  ChatEvent,
+  ChatInteractionCancel,
+  ChatInteractionPrompt,
+  InteractionResult
+} from './contracts/chat'
 import type {
   TerminalAttachResult,
   TerminalCreateInput,
@@ -166,7 +171,7 @@ export interface DeskApi {
     /* 按 ID 删除指定消息 */
     removeMessages(sessionId: string, ids: string[]): Promise<void>
   }
-  /* 对话（发送 / 中止 / 事件订阅 / 越界审批） */
+  /* 对话（发送 / 中止 / 事件订阅 / 人机交互） */
   chat: {
     /* 发送用户消息并启动流式生成 */
     send(input: { sessionId: string; text: string }): Promise<void>
@@ -174,10 +179,12 @@ export interface DeskApi {
     abort(sessionId: string): Promise<void>
     /* 订阅对话流式事件（返回取消订阅函数） */
     onEvent(cb: (event: ChatEvent) => void): () => void
-    /* 越界审批：主进程推送请求，渲染进程回传选择 */
-    onApproval(cb: (prompt: ChatApprovalPrompt) => void): () => void
-    /* 回传越界审批选择（once / session / deny） */
-    respondApproval(requestId: string, choice: ChatApprovalChoice): Promise<void>
+    /* 订阅人机交互请求（返回取消订阅函数） */
+    onInteraction(cb: (prompt: ChatInteractionPrompt) => void): () => void
+    /* 订阅人机交互取消（会话终止/删除后关闭弹窗） */
+    onInteractionCancel(cb: (payload: ChatInteractionCancel) => void): () => void
+    /* 回传用户交互结果（提交 / 拒绝 / 取消） */
+    respondInteraction(requestId: string, result: InteractionResult): Promise<void>
   }
   /* 终端（本地 PTY）管理 */
   terminal: {
@@ -339,8 +346,9 @@ export const IPC = {
   chatSend: 'desk:chat:send',
   chatAbort: 'desk:chat:abort',
   chatEvent: 'desk:chat:event',
-  chatApprovalRequest: 'desk:chat:approval-request',
-  chatApprovalRespond: 'desk:chat:approval-respond',
+  chatInteractionRequest: 'desk:chat:interaction-request',
+  chatInteractionRespond: 'desk:chat:interaction-respond',
+  chatInteractionCancel: 'desk:chat:interaction-cancel',
   /* 终端 */
   terminalCreate: 'desk:terminal:create',
   terminalList: 'desk:terminal:list',

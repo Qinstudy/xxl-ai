@@ -11,12 +11,12 @@ import { translate } from '@shared/i18n'
 import type {
   ChatMode,
   AppSettings,
+  InteractionResult,
   ProviderDTO,
   SessionDTO,
   SkillRuntimeConfig
 } from '@shared/ipc'
 import type {
-  ApprovalChoice,
   HostEvent,
   ProviderModelConfig,
   RunAgentInput
@@ -29,7 +29,7 @@ import { appendMessages, getSession, listMessages, updateSession } from './sessi
 import { getProject } from './projectService'
 import { buildRuntimePath } from './envService'
 import { abortAgent, evictAgent, isAgentRunning, runAgent } from '../agent/host/runtimeHost'
-import { resolveApproval } from '../agent/host/approval'
+import { resolveInteraction, cancelInteractionsOf } from '../agent/host/interaction'
 
 /* 下发到渲染层的对话事件负载（携带会话上下文） */
 export type ChatEventPayload = { sessionId: string } & HostEvent
@@ -164,6 +164,11 @@ function modeSystemHint(mode: ChatMode): string {
   return '\n\n当前为 Build（构建）模式：你可以读取、写入、编辑项目文件并执行命令；文件操作限制在当前项目目录内，越界需用户确认。'
 }
 
+/* 人机交互说明：仅多方案拍板时弹窗；确认与自由文本回到正文，避免多余弹层 */
+function hitlSystemHint(): string {
+  return '\n\n## 人机交互\n只有在需要用户在多个候选方案中拍板时，才调用 ask_user，并提供 2~20 个选项（可多选，默认允许「其他」）。需要确认操作、补充信息或自由文本时，直接在回复里提问，不要调用工具。一次只问一个关键问题；选项是候选值而非强制枚举；用户拒绝或取消后不要重复追问。'
+}
+
 /*
  * 技能索引提示：只注入名称与描述，正文由 read_skill 工具按需读取，避免常驻上下文膨胀。
  * 同时声明技能内容不得覆盖系统安全规则，降低提示词注入风险。
@@ -268,7 +273,7 @@ export async function sendChat(
     /* 技能清单：全局启用，摘要随系统提示下发，正文由 read_skill 按需读取 */
     const skills = listEnabledSkillsForRuntime()
     /* 自定义指令全局生效：统一取当前设置，并附技能索引与模式说明（个性化变更对旧对话同样生效） */
-    const systemPrompt = `${settings.systemPrompt || ''}${buildSkillPrompt(skills)}${modeSystemHint(mode)}`
+    const systemPrompt = `${settings.systemPrompt || ''}${buildSkillPrompt(skills)}${modeSystemHint(mode)}${hitlSystemHint()}`
     /* 历史消息不携带 system 提示：系统指令始终取当前设置，保证旧对话也随设置变更生效 */
     /* 模型上下文与完整历史分离：这里只构造最近窗口，数据库仍保留完整历史 */
     const history = trimHistory(
@@ -339,6 +344,8 @@ export async function sendChat(
 /* 中止指定会话的当前生成 */
 export async function abortChat(sessionId: string): Promise<void> {
   abortRequested.add(sessionId)
+  /* 先关闭该会话仍打开的交互弹窗，再通知运行时代为结算 */
+  cancelInteractionsOf(sessionId)
   await abortAgent(sessionId)
 }
 
@@ -347,7 +354,7 @@ export function discardSessionRuns(sessionId: string): void {
   discardedSessions.add(sessionId)
 }
 
-/* 回传越界审批选择（唤醒运行时进程中等待的越界确认） */
-export function respondApproval(requestId: string, choice: ApprovalChoice): void {
-  resolveApproval(requestId, choice)
+/* 回传人机交互结果（唤醒运行时进程中等待的工具调用） */
+export function respondInteraction(requestId: string, result: InteractionResult): void {
+  resolveInteraction(requestId, result)
 }

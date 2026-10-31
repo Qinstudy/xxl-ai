@@ -21,9 +21,14 @@ import {
   setMcpRuntimePath,
   testMcpServer
 } from './mcp/client'
-import { clearSessionPermissions, setApprovalRequester } from './sandbox'
+import { clearSessionPermissions } from './sandbox'
+import {
+  cancelAllInteractions,
+  cancelSessionInteractions,
+  respondInteraction,
+  setInteractionSender
+} from './hitl'
 import type {
-  ApprovalChoice,
   HostEvent,
   RunAgentInput,
   WorkerMessage,
@@ -38,9 +43,6 @@ const port = process.parentPort
 /* 增量事件合批窗口（毫秒）：把高频 token 合并后再跨进程，降低 IPC 与主进程转发开销 */
 const COALESCE_MS = 40
 
-/* 待审批请求：requestId → resolve（等待主进程弹窗结果回传） */
-const pendingApprovals = new Map<string, (choice: ApprovalChoice) => void>()
-
 /* 各会话的增量缓冲（delta/thinking 合并发送） */
 interface DeltaBuffer {
   delta: string
@@ -53,6 +55,9 @@ const deltaBuffers = new Map<string, DeltaBuffer>()
 function post(message: WorkerMessage): void {
   port.postMessage(message)
 }
+
+/* 人机交互桥：统一经 post 发送请求/取消，等待主进程回传应答 */
+setInteractionSender(post)
 
 /* open_browser 工具：把待打开地址转交主进程，由渲染层在对应会话的浏览器面板打开 */
 setBrowserOpener((sessionId, url, newTab) =>
@@ -113,19 +118,6 @@ function emitEvent(sessionId: string, event: HostEvent): void {
   flushDelta(sessionId)
   post({ type: 'event', sessionId, event })
 }
-
-/*
- * 越界审批：转发主进程弹应用内对话框，等待 approval-response 回传。
- * requestId 用于并发审批场景下的请求配对。
- */
-setApprovalRequester(
-  (request) =>
-    new Promise<ApprovalChoice>((resolve) => {
-      const requestId = `ap_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`
-      pendingApprovals.set(requestId, resolve)
-      post({ type: 'approval-request', requestId, ...request })
-    })
-)
 
 /* 执行一轮对话：流式事件回传主进程，结束后回传完整上下文（供主进程落库） */
 async function handleRun(input: RunAgentInput): Promise<void> {
@@ -197,6 +189,7 @@ async function handleRun(input: RunAgentInput): Promise<void> {
   } catch (error) {
     /* 运行时构建/执行异常（如模型未找到）：清理该会话缓存并回传错误，由主进程落库提示 */
     flushDelta(input.sessionId)
+    cancelSessionInteractions(input.sessionId)
     evictAgent(input.sessionId)
     post({ type: 'run-error', sessionId: input.sessionId, message: (error as Error).message })
   }
@@ -252,6 +245,7 @@ function handleRequest(message: WorkerRequest): void {
       break
     }
     case 'abort':
+      cancelSessionInteractions(message.sessionId)
       void abortAgent(message.sessionId)
       break
     case 'evict': {
@@ -260,6 +254,7 @@ function handleRequest(message: WorkerRequest): void {
         clearTimeout(buffer.timer)
       }
       deltaBuffers.delete(message.sessionId)
+      cancelSessionInteractions(message.sessionId)
       evictAgent(message.sessionId)
       break
     }
@@ -273,20 +268,18 @@ function handleRequest(message: WorkerRequest): void {
         }
       }
       deltaBuffers.clear()
+      cancelAllInteractions()
       resetAgents()
       /* 配置变更/退出：关闭全部 MCP 连接，释放 stdio 子进程 */
       void closeAllMcpClients()
       break
     }
     case 'shutdown':
+      cancelAllInteractions()
       void shutdownWorker()
       break
-    case 'approval-response': {
-      const resolve = pendingApprovals.get(message.requestId)
-      if (resolve) {
-        pendingApprovals.delete(message.requestId)
-        resolve(message.choice)
-      }
+    case 'interaction-response': {
+      respondInteraction(message.requestId, message.result)
       break
     }
     default:

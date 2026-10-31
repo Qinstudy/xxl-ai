@@ -9,11 +9,11 @@ import { IPC } from '@shared/ipc'
 import type {
   AppSettings,
   BrowserAction,
-  ChatApprovalChoice,
   GitCommitInput,
   GitDiffInput,
   GithubSkillInstallInput,
   GithubSkillQuery,
+  InteractionResult,
   McpDTO,
   McpDiscoverQuery,
   ProviderDTO,
@@ -75,7 +75,7 @@ import {
   unwatchGitProject,
   watchGitProject
 } from './services/gitService'
-import { abortChat, discardSessionRuns, respondApproval, sendChat } from './services/chatService'
+import { abortChat, discardSessionRuns, respondInteraction, sendChat } from './services/chatService'
 import { deleteMcp, listMcps, saveMcp } from './services/mcpService'
 import { listMcpTools, testMcp } from './services/mcpRuntimeService'
 import { discoverMcp, discoverMcpDetail, listMcpCategories } from './services/mcpDiscoverService'
@@ -291,9 +291,11 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     })
   )
   ipcMain.handle(IPC.chatAbort, (_event, sessionId: string) => abortChat(sessionId))
-  /* 越界审批：渲染进程回传选择，唤醒等待中的越界确认 */
-  ipcMain.handle(IPC.chatApprovalRespond, (_event, requestId: string, choice: ChatApprovalChoice) =>
-    respondApproval(requestId, choice)
+  /* 人机交互：渲染进程回传用户结果，唤醒等待中的工具调用 */
+  ipcMain.handle(
+    IPC.chatInteractionRespond,
+    (_event, requestId: string, result: InteractionResult) =>
+      respondInteraction(requestId, result)
   )
 
   /* --- Git 工具（项目空间维度） --- */

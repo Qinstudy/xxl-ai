@@ -12,6 +12,7 @@ import { createFsTools } from './fs'
 import { createShellTools } from './shell'
 import { createBrowserTools } from './browser'
 import { createSkillTools } from './skill'
+import { createInteractionTools } from './interaction'
 
 /* 按域聚合的工具工厂（新增域在此登记） */
 const FACTORIES: Array<(context: ToolContext) => Promise<ToolEntry[]>> = [
@@ -19,7 +20,8 @@ const FACTORIES: Array<(context: ToolContext) => Promise<ToolEntry[]>> = [
   createFsTools,
   createShellTools,
   createBrowserTools,
-  createSkillTools
+  createSkillTools,
+  createInteractionTools
 ]
 
 /* 按 meta.maxOutput 统一裁剪工具输出（声明与实现同源，避免各处各自裁剪） */

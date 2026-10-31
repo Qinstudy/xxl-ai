@@ -77,11 +77,11 @@ function onKeydown(event: KeyboardEvent): void {
 }
 
 .shortcut-input:hover {
-  border-color: var(--desk-border-strong);
+  border-color: var(--desk-input-border-hover);
 }
 
 .shortcut-input.recording {
-  border-color: var(--desk-border-strong);
+  border-color: var(--desk-input-border-focus);
   box-shadow: 0 0 0 2px var(--desk-primary-soft);
 }
 

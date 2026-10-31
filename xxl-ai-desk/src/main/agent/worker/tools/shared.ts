@@ -29,7 +29,7 @@ export interface ToolContext {
 }
 
 /* 工具分组：便于按域拆分文件与后续扩展 */
-export type ToolGroup = 'fs' | 'shell' | 'browser' | 'general' | 'skill'
+export type ToolGroup = 'fs' | 'shell' | 'browser' | 'general' | 'skill' | 'interaction'
 
 /* 工具元信息：能力声明与装配策略（模式过滤由 registry 统一执行） */
 export interface ToolMeta {

@@ -129,7 +129,8 @@ const TOOL_VIEWS: Record<string, ToolViewMeta> = {
       const operation = pick(args, 'operation')
       return clip(operation === 'list' ? 'list' : `${operation} ${pick(args, 'tab_id')}`)
     }
-  }
+  },
+  ask_user: { titleKey: 'askUser', icon: 'ChatDotRound', detail: (args) => clip(pick(args, 'title')) }
 }
 
 /* 生成工具调用的展示视图 */

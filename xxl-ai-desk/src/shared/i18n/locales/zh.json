@@ -88,6 +88,7 @@
       "screenshotBrowser": "页面截图",
       "inspectBrowser": "页面诊断",
       "browserTabs": "管理浏览器标签页",
+      "askUser": "询问用户",
       "mcp": "MCP 工具",
       "generic": "调用工具"
     },
@@ -117,18 +118,29 @@
     "noModel": "尚未配置模型，请前往设置添加供应商与模型",
     "goSettings": "前往设置",
     "scrollToBottom": "回到底部",
-    "approvalTitle": "越界访问确认",
-    "approvalRead": "读取",
-    "approvalWrite": "写入",
-    "approvalCommand": "执行",
-    "approvalMessage": "工具「{0}」请求{1}项目目录之外的文件",
-    "approvalMessageCommand": "工具「{0}」请求访问项目目录之外的路径",
-    "approvalPath": "目标路径",
-    "approvalRoot": "项目目录",
-    "approvalQuestion": "是否允许本次操作？",
-    "approvalOnce": "允许本次",
-    "approvalSession": "本会话全部允许",
-    "approvalDeny": "拒绝",
+    "interaction": {
+      "submit": "提交",
+      "cancel": "取消",
+      "required": "请选择一项",
+      "multiHint": "可多选",
+      "other": "其他",
+      "otherPlaceholder": "输入你的选项",
+      "queue": "还有 {0} 个待处理请求",
+      "permission": {
+        "title": "越界访问确认",
+        "read": "读取",
+        "write": "写入",
+        "command": "执行",
+        "message": "工具「{0}」请求{1}项目目录之外的文件",
+        "messageCommand": "工具「{0}」请求访问项目目录之外的路径",
+        "path": "目标路径",
+        "root": "项目目录",
+        "question": "是否允许本次操作？",
+        "once": "允许本次",
+        "session": "本会话全部允许",
+        "deny": "拒绝"
+      }
+    },
     "requestFailed": "请求失败",
     "toolFields": "{0} 个字段",
     "browser": {
@@ -525,13 +537,15 @@
         "fs": "文件操作",
         "shell": "终端命令",
         "browser": "浏览器",
-        "general": "通用工具"
+        "general": "通用工具",
+        "interaction": "人机交互"
       },
       "categoryDesc": {
         "fs": "读取、查找、编辑、删除与移动项目目录内的文件；写操作仅在 Build 模式可用，越界需审批。",
         "shell": "在项目目录内执行 shell 命令；危险命令会被拦截，仅 Build 模式可用。",
         "browser": "打开网页、读取正文与页面结构、点击与填写表单、截图与诊断；关闭后模型不再获得浏览器工具。",
-        "general": "获取当前时间等通用、无副作用的能力。"
+        "general": "获取当前时间等通用、无副作用的能力。",
+        "interaction": "Agent 在任务执行中主动询问用户：确认操作、选择方案或补充输入；固定启用，不支持关闭。"
       },
       "desc": {
         "readFile": "按行范围读取项目目录内的文本文件",
@@ -556,7 +570,8 @@
         "screenshotBrowser": "截取当前可见页面，用于核对布局与视觉结果",
         "inspectBrowser": "读取控制台告警/错误与页面加载失败记录",
         "browserTabs": "列出、切换或关闭浏览器标签页",
-        "time": "获取本地当前日期与时间，支持指定 IANA 时区"
+        "time": "获取本地当前日期与时间，支持指定 IANA 时区",
+        "askUser": "在多个候选方案中让用户拍板：提供 2~20 个选项，支持单选/多选，并默认允许填写「其他」"
       }
     }
   },
@@ -674,6 +689,17 @@
       "skillReadFailed": "读取技能文件失败：{0}",
       "mcpAborted": "[已终止] MCP 工具调用被用户终止（{0}/{1}）",
       "mcpFailed": "MCP 工具调用失败（{0}/{1}）：{2}"
+    },
+    "hitl": {
+      "invalidParams": "参数不合法：{0}",
+      "invalidTitle": "title 不能为空",
+      "invalidOptions": "choice 需要 2~20 个候选选项",
+      "invalidOption": "选项缺少 label 或 value",
+      "duplicateOption": "选项值重复：{0}",
+      "rejected": "用户已拒绝。",
+      "selected": "用户选择：{0}",
+      "noSelection": "用户未选择任何选项。",
+      "cancelled": "交互已取消，用户未提供信息。"
     }
   },
   "git": {

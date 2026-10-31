@@ -6,6 +6,7 @@
 
 import type { ChatMode, McpRuntimeConfig, McpTestResult, McpToolMeta, SkillRuntimeConfig } from './ipc'
 import type { BrowserAction, BrowserActionResult } from './contracts/browser'
+import type { InteractionRequest, InteractionResult } from './contracts/chat'
 
 /* 供应商运行时配置（主进程解密后传给运行时，与 Pi Models 构建入参一致） */
 export interface ProviderModelConfig {
@@ -37,23 +38,6 @@ export type HostEvent =
 
 /* 越界访问动作类型（文案区分用）：command 表示 shell 命令访问目录外路径 */
 export type PathAction = 'read' | 'write' | 'command'
-
-/* 越界审批结果：允许本次 / 本会话允许 / 拒绝 */
-export type ApprovalChoice = 'once' | 'session' | 'deny'
-
-/* 越界审批请求（运行时进程 → 主进程 → 渲染进程，由渲染进程弹应用内对话框） */
-export interface ApprovalRequest {
-  /* 所属会话主键 */
-  sessionId: string
-  /* 触发审批的工具名 */
-  tool: string
-  /* 动作类型：read 读 / write 写 */
-  action: PathAction
-  /* 越界目标的绝对路径 */
-  abs: string
-  /* 沙箱根目录 */
-  root: string
-}
 
 /* 一次对话运行入参 */
 export interface RunAgentInput {
@@ -95,7 +79,7 @@ export type WorkerRequest =
   | { type: 'clear-permissions'; sessionId: string } /* 清空会话越界白名单 */
   | { type: 'reset' } /* 重置全部运行时状态 */
   | { type: 'shutdown' } /* 退出前优雅关闭：释放 MCP 子进程后自行退出 */
-  | { type: 'approval-response'; requestId: string; choice: ApprovalChoice } /* 回传越界审批结果 */
+  | { type: 'interaction-response'; requestId: string; result: InteractionResult } /* 回传用户交互结果 */
   | { type: 'mcp-test'; requestId: string; server: McpRuntimeConfig; runtimePath: string } /* 连通测试（临时连接） */
   | { type: 'mcp-tools'; requestId: string; server: McpRuntimeConfig; runtimePath: string } /* 列举工具（复用连接缓存） */
   | { type: 'browser-action-result'; requestId: string; result: BrowserActionResult } /* 页面动作结果回传 */
@@ -107,7 +91,8 @@ export type WorkerMessage =
   | { type: 'browser-action'; requestId: string; sessionId: string; action: BrowserAction } /* 执行页面动作（跨进程请求渲染层） */
   | { type: 'run-done'; sessionId: string; messages: unknown[] } /* 运行完成（只返回本轮新增消息） */
   | { type: 'run-error'; sessionId: string; message: string } /* 运行失败 */
-  | ({ type: 'approval-request'; requestId: string } & ApprovalRequest) /* 越界审批请求 */
+  | { type: 'interaction-request'; requestId: string; sessionId: string; request: InteractionRequest } /* 人机交互请求 */
+  | { type: 'interaction-cancel'; requestId: string } /* 交互取消（关闭渲染层弹窗） */
   | { type: 'mcp-test-result'; requestId: string; result: McpTestResult } /* 连通测试结果 */
   | { type: 'mcp-tools-result'; requestId: string; tools: McpToolMeta[] } /* 工具列表结果 */
   | { type: 'mcp-result-error'; requestId: string; message: string } /* MCP 操作失败 */

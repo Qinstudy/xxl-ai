@@ -172,8 +172,10 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  /* 切换当前会话使用的供应商与模型 */
-  async function updateSessionModel(providerId: string, modelId: string): Promise<void> {
+  /* 选择模型：写入全局默认值（下次新建对话沿用），并同步当前会话配置 */
+  async function selectModel(providerId: string, modelId: string): Promise<void> {
+    const settings = useSettingsStore()
+    await settings.saveSettings({ providerId, modelId })
     if (!currentId.value) {
       return
     }
@@ -304,7 +306,7 @@ export const useChatStore = defineStore('chat', () => {
     startNewChat,
     removeSession,
     renameSession,
-    updateSessionModel,
+    selectModel,
     updateSessionMode,
     removeMessages,
     send,
