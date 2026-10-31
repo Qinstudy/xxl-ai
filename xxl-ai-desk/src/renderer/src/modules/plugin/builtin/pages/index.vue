@@ -3,7 +3,7 @@
  * 内置工具页：按分类展示内置工具能力；浏览器 / 通用 / 人机交互支持开关启用。
  * @author xuxueli 2026-10-25
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { ipcErrorMessage } from '@renderer/utils/ipcError'
@@ -25,49 +25,6 @@ const groups = computed(() =>
     tools: BUILTIN_TOOL_CATALOG.filter((tool) => tool.category === category.key)
   }))
 )
-
-/* 表格容器宽度：用于按 36% / 21% / 13% / 17% / 13% 换算像素列宽 */
-const tableHost = ref<HTMLElement | null>(null)
-const tableWidth = ref(0)
-let resizeObserver: ResizeObserver | null = null
-
-/* 监听表格容器宽度变化，保证各列比例稳定且不出现横向滚动 */
-onMounted(() => {
-  if (!tableHost.value) {
-    return
-  }
-  resizeObserver = new ResizeObserver((entries) => {
-    tableWidth.value = entries[0]?.contentRect.width ?? 0
-  })
-  resizeObserver.observe(tableHost.value)
-})
-
-/* 卸载时释放监听 */
-onBeforeUnmount(() => {
-  resizeObserver?.disconnect()
-  resizeObserver = null
-})
-
-/* 列宽（首帧未知宽度时交由表格自适应，测量后按比例接管） */
-const columnWidths = computed(() => {
-  const total = tableWidth.value
-  if (!total) {
-    return {
-      tool: undefined,
-      identifier: undefined,
-      permission: undefined,
-      modes: undefined,
-      status: undefined
-    }
-  }
-  return {
-    tool: Math.round(total * 0.36),
-    identifier: Math.round(total * 0.21),
-    permission: Math.round(total * 0.13),
-    modes: Math.round(total * 0.17),
-    status: Math.round(total * 0.13)
-  }
-})
 
 /* 分类 → 开关设置字段（固定启用分类无此字段） */
 const TOGGLE_FIELDS = new Map(
@@ -123,7 +80,7 @@ function modeLabel(modes: ChatMode[]): string {
       <div class="page-tip">{{ t('plugin.builtinTool.intro') }}</div>
     </template>
 
-    <div ref="tableHost" class="builtin-body">
+    <div class="builtin-body">
       <section v-for="group in groups" :key="group.key" class="tool-group">
         <div class="group-head" @click="toggleGroup(group.key)">
           <div class="group-main">
@@ -142,36 +99,33 @@ function modeLabel(modes: ChatMode[]): string {
               :model-value="isEnabled(group.key)"
               @update:model-value="(value: boolean) => onToggle(group.key, value)"
             />
-            <el-tag v-else size="small" type="info">
-              {{ t('plugin.builtinTool.fixedEnabled') }}
-            </el-tag>
           </div>
         </div>
 
         <div v-if="isExpanded(group.key)" class="group-detail">
           <el-table :data="group.tools" style="width: 100%" row-key="name">
-            <el-table-column :label="t('plugin.builtinTool.tool')" :width="columnWidths.tool">
+            <el-table-column :label="t('plugin.builtinTool.tool')" min-width="260">
               <template #default="{ row }">
                 <div class="tool-name">{{ t(row.titleKey) }}</div>
                 <div class="tool-desc">{{ t(row.descriptionKey) }}</div>
               </template>
             </el-table-column>
-            <el-table-column :label="t('plugin.builtinTool.identifier')" :width="columnWidths.identifier">
+            <el-table-column :label="t('plugin.builtinTool.identifier')" min-width="140">
               <template #default="{ row }">
                 <span class="tool-id">{{ row.name }}</span>
               </template>
             </el-table-column>
-            <el-table-column :label="t('plugin.builtinTool.permission')" :width="columnWidths.permission">
+            <el-table-column :label="t('plugin.builtinTool.permission')" min-width="96">
               <template #default="{ row }">
                 <el-tag size="small" :type="row.readOnly ? 'info' : 'warning'">
                   {{ row.readOnly ? t('plugin.builtinTool.readOnly') : t('plugin.builtinTool.writable') }}
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column :label="t('plugin.builtinTool.modes')" :width="columnWidths.modes">
+            <el-table-column :label="t('plugin.builtinTool.modes')" min-width="110">
               <template #default="{ row }">{{ modeLabel(row.modes) }}</template>
             </el-table-column>
-            <el-table-column :label="t('common.status')" :width="columnWidths.status">
+            <el-table-column :label="t('common.status')" min-width="100">
               <template #default>
                 <el-tag v-if="isEnabled(group.key)" size="small" type="success">
                   {{ t('common.enabled') }}

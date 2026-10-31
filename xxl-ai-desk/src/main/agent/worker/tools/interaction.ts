@@ -185,11 +185,8 @@ async function buildAskUserTool(context: ToolContext): Promise<AgentTool> {
   }
 }
 
-/* 构建人机交互工具：关闭时不装配 ask_user，模型改为在正文询问 */
+/* 构建人机交互工具 */
 export async function createInteractionTools(context: ToolContext): Promise<ToolEntry[]> {
-  if (!context.interactionToolsEnabled) {
-    return []
-  }
   return [
     {
       meta: {

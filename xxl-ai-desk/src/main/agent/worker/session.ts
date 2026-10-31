@@ -10,6 +10,7 @@ import { createMcpTools } from './mcp/tools'
 import { setMcpRuntimePath } from './mcp/client'
 import type { ChatMode } from '@shared/ipc'
 import type { HostEvent } from '@shared/agentProtocol'
+import type { BuiltinToolSwitches } from '@shared/agentProtocol'
 import { contentBlocks } from '@shared/ipc'
 import { translate, type AppLanguage } from '@shared/i18n'
 import type { McpRuntimeConfig, SkillRuntimeConfig } from '@shared/ipc'
@@ -32,12 +33,8 @@ export interface AgentRuntimeOptions {
   mcpServers: McpRuntimeConfig[]
   /* 已启用的技能索引 */
   skills: SkillRuntimeConfig[]
-  /* 浏览器类内置工具是否启用 */
-  browserToolsEnabled: boolean
-  /* 通用类内置工具是否启用 */
-  generalToolsEnabled: boolean
-  /* 人机交互工具是否启用 */
-  interactionToolsEnabled: boolean
+  /* 内置工具分类开关 */
+  tools: BuiltinToolSwitches
   /* 会话是否已被终止（Agent 创建阶段用于提前跳出） */
   isAborted?: () => boolean
 }
@@ -167,9 +164,7 @@ async function createAgent(options: AgentRuntimeOptions): Promise<Agent> {
     sessionId: options.sessionId,
     language: options.language,
     skills: options.skills,
-    browserToolsEnabled: options.browserToolsEnabled,
-    generalToolsEnabled: options.generalToolsEnabled,
-    interactionToolsEnabled: options.interactionToolsEnabled
+    tools: options.tools
   })
   const tools = entries.map((entry) => entry.tool)
   /* MCP 工具：先等一个短预算（已连接/缓存命中即刻就绪），未就绪也不阻塞首字 */

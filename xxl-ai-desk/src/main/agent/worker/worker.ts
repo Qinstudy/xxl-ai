@@ -140,9 +140,7 @@ async function handleRun(input: RunAgentInput): Promise<void> {
       runtimePath: input.runtimePath,
       mcpServers: input.mcpServers ?? [],
       skills: input.skills ?? [],
-      browserToolsEnabled: input.browserToolsEnabled !== false,
-      generalToolsEnabled: input.generalToolsEnabled !== false,
-      interactionToolsEnabled: input.interactionToolsEnabled !== false,
+      tools: input.tools,
       isAborted: () => isSessionAborted(input.sessionId)
     })
     /* 模型上下文由主进程提供：覆盖 Agent 状态，Worker 不持有完整历史 */

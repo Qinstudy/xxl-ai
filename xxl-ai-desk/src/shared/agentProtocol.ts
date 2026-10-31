@@ -39,6 +39,20 @@ export type HostEvent =
 /* 越界访问动作类型（文案区分用）：command 表示 shell 命令访问目录外路径 */
 export type PathAction = 'read' | 'write' | 'command'
 
+/* 内置工具分类开关：主进程按设置组装，运行时据 domain 决定装配哪些工具 */
+export interface BuiltinToolSwitches {
+  /* 文件类工具 */
+  fs: boolean
+  /* 终端类工具 */
+  shell: boolean
+  /* 浏览器类工具 */
+  browser: boolean
+  /* 通用工具 */
+  general: boolean
+  /* 人机交互工具 */
+  interaction: boolean
+}
+
 /* 一次对话运行入参 */
 export interface RunAgentInput {
   /* 会话主键 */
@@ -63,12 +77,8 @@ export interface RunAgentInput {
   mcpServers: McpRuntimeConfig[]
   /* 已启用的技能清单（只下发索引，正文由 read_skill 按需读取） */
   skills: SkillRuntimeConfig[]
-  /* 浏览器类内置工具是否启用（关闭时不装配 open_browser / read_browser） */
-  browserToolsEnabled: boolean
-  /* 通用类内置工具是否启用（关闭时不装配时间等通用能力） */
-  generalToolsEnabled: boolean
-  /* 人机交互工具是否启用（关闭时不装配 ask_user） */
-  interactionToolsEnabled: boolean
+  /* 内置工具分类开关（关闭的分类不装配） */
+  tools: BuiltinToolSwitches
   /* 本轮用户输入 */
   text: string
 }

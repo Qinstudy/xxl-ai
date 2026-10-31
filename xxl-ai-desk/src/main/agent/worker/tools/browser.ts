@@ -495,10 +495,6 @@ const BROWSER_TOOL_DEFINITIONS: Array<{
 
 /* 浏览器类工具构建 */
 export async function createBrowserTools(context: ToolContext): Promise<ToolEntry[]> {
-  /* 内置工具开关关闭时不装配任何浏览器工具（保留开关语义在浏览器域内） */
-  if (!context.browserToolsEnabled) {
-    return []
-  }
   const { Type } = await import('@earendil-works/pi-ai')
   return BROWSER_TOOL_DEFINITIONS.map(({ meta, create }) => ({
     meta,

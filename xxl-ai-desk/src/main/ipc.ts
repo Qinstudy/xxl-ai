@@ -196,6 +196,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     if (
       patch.systemPrompt !== undefined ||
       patch.builtinToolBrowserEnabled !== undefined ||
+      patch.builtinToolFsEnabled !== undefined ||
+      patch.builtinToolShellEnabled !== undefined ||
       patch.builtinToolGeneralEnabled !== undefined ||
       patch.builtinToolInteractionEnabled !== undefined
     ) {

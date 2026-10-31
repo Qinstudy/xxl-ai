@@ -307,10 +307,14 @@ export async function sendChat(
       mcpServers: listEnabledMcpServers(),
       /* SKILL：已启用技能索引，运行时进程据此装配 read_skill */
       skills,
-      /* 内置工具：浏览器 / 通用 / 人机交互类按设置开关决定是否下发 */
-      browserToolsEnabled: settings.builtinToolBrowserEnabled,
-      generalToolsEnabled: settings.builtinToolGeneralEnabled,
-      interactionToolsEnabled: settings.builtinToolInteractionEnabled,
+      /* 内置工具：按分类开关决定下发的工具域 */
+      tools: {
+        fs: settings.builtinToolFsEnabled,
+        shell: settings.builtinToolShellEnabled,
+        browser: settings.builtinToolBrowserEnabled,
+        general: settings.builtinToolGeneralEnabled,
+        interaction: settings.builtinToolInteractionEnabled
+      },
       text
     }
     const result = await runAgent(runInput, emitEvent)

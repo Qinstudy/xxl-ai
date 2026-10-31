@@ -520,8 +520,7 @@
       "loadedCount": "Loaded {0} / {1}"
     },
     "builtinTool": {
-      "intro": "This page displays the built-in tools currently available and their capabilities. Always-on tools cannot be disabled; switchable tools can be enabled or disabled as needed, with changes taking effect on the next chat turn.",
-      "fixedEnabled": "Always on",
+      "intro": "This page displays the built-in tools currently available and their capabilities. Each category can be enabled or disabled as needed, with changes taking effect on the next chat turn.",
       "enabledOn": "Enabled for subsequent turns",
       "enabledOff": "Disabled for subsequent turns",
       "tool": "Tool",
@@ -541,8 +540,8 @@
         "interaction": "Human interaction"
       },
       "categoryDesc": {
-        "fs": "Read, search, edit, delete and move files inside the project directory. Writes require Build mode; out-of-scope access needs approval.",
-        "shell": "Run shell commands inside the project directory. Dangerous commands are blocked; Build mode only.",
+        "fs": "Read, search, edit, delete and move files inside the project directory. Writes require Build mode; out-of-scope access needs approval. When disabled, the model no longer receives file tools.",
+        "shell": "Run shell commands inside the project directory. Dangerous commands are blocked; Build mode only. When disabled, the model can no longer run commands.",
         "browser": "Open pages, read content and structure, click and fill forms, take screenshots and run diagnostics. When disabled, the model no longer receives browser tools.",
         "general": "General, side-effect-free capabilities such as the current time.",
         "interaction": "The Agent asks the user to pick among candidate options during a task. When disabled, the model asks directly in chat."

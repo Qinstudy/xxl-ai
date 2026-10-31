@@ -7,10 +7,6 @@ import { ALL_MODES, describe, text, type ToolContext, type ToolEntry } from './s
 
 /* 构建通用类工具 */
 export async function createGeneralTools(context: ToolContext): Promise<ToolEntry[]> {
-  /* 通用工具开关关闭时不装配任何通用工具 */
-  if (!context.generalToolsEnabled) {
-    return []
-  }
   const { Type } = await import('@earendil-works/pi-ai')
 
   /* 获取当前时间：本地日期时间，可选 IANA 时区 */

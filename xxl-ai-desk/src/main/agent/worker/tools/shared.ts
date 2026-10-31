@@ -10,6 +10,7 @@ import type { Dirent } from 'fs'
 import { basename, relative, resolve, sep } from 'path'
 import type { ChatMode } from '@shared/ipc'
 import type { SkillRuntimeConfig } from '@shared/ipc'
+import type { BuiltinToolSwitches } from '@shared/agentProtocol'
 import { translate, type AppLanguage } from '@shared/i18n'
 import { guardPath, type PathAction } from '../sandbox'
 
@@ -22,12 +23,8 @@ export interface ToolContext {
   language: AppLanguage
   /* 已启用的技能索引（正文由 read_skill 按需读取） */
   skills?: SkillRuntimeConfig[]
-  /* 浏览器类内置工具是否启用（关闭时浏览器工具工厂直接返回空集） */
-  browserToolsEnabled: boolean
-  /* 通用类内置工具是否启用（关闭时通用工具工厂直接返回空集） */
-  generalToolsEnabled: boolean
-  /* 人机交互工具是否启用（关闭时交互工具工厂直接返回空集） */
-  interactionToolsEnabled: boolean
+  /* 内置工具分类开关（由注册表统一过滤，工具工厂不再各自判断） */
+  tools: BuiltinToolSwitches
 }
 
 /* 工具分组：便于按域拆分文件与后续扩展 */

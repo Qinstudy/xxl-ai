@@ -30,6 +30,8 @@ export interface BuiltinToolCatalogItem {
 /* 可开关分类对应的设置字段（与 AppSettings 同名，供页面读写） */
 type BuiltinToolToggleField =
   | 'builtinToolBrowserEnabled'
+  | 'builtinToolFsEnabled'
+  | 'builtinToolShellEnabled'
   | 'builtinToolGeneralEnabled'
   | 'builtinToolInteractionEnabled'
 
@@ -50,12 +52,14 @@ export const BUILTIN_TOOL_CATEGORIES: BuiltinToolCategory[] = [
   {
     key: 'fs',
     titleKey: 'plugin.builtinTool.category.fs',
-    descriptionKey: 'plugin.builtinTool.categoryDesc.fs'
+    descriptionKey: 'plugin.builtinTool.categoryDesc.fs',
+    toggleField: 'builtinToolFsEnabled'
   },
   {
     key: 'shell',
     titleKey: 'plugin.builtinTool.category.shell',
-    descriptionKey: 'plugin.builtinTool.categoryDesc.shell'
+    descriptionKey: 'plugin.builtinTool.categoryDesc.shell',
+    toggleField: 'builtinToolShellEnabled'
   },
   {
     key: 'browser',

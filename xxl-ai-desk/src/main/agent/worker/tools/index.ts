@@ -6,7 +6,8 @@
  */
 
 import type { AgentTool } from '@earendil-works/pi-agent-core'
-import { clipToolResult, MAX_OUTPUT, type ToolContext, type ToolEntry } from './shared'
+import { clipToolResult, MAX_OUTPUT, type ToolContext, type ToolEntry, type ToolGroup } from './shared'
+import type { BuiltinToolSwitches } from '@shared/agentProtocol'
 import { createGeneralTools } from './general'
 import { createFsTools } from './fs'
 import { createShellTools } from './shell'
@@ -14,15 +15,26 @@ import { createBrowserTools } from './browser'
 import { createSkillTools } from './skill'
 import { createInteractionTools } from './interaction'
 
-/* 按域聚合的工具工厂（新增域在此登记） */
-const FACTORIES: Array<(context: ToolContext) => Promise<ToolEntry[]>> = [
-  createGeneralTools,
-  createFsTools,
-  createShellTools,
-  createBrowserTools,
-  createSkillTools,
-  createInteractionTools
+/* 工具域 → 工厂（新增域在此登记） */
+interface ToolFactory {
+  group: ToolGroup
+  create: (context: ToolContext) => Promise<ToolEntry[]>
+}
+
+/* 按域聚合的工具工厂；顺序即装配顺序 */
+const FACTORIES: ToolFactory[] = [
+  { group: 'general', create: createGeneralTools },
+  { group: 'fs', create: createFsTools },
+  { group: 'shell', create: createShellTools },
+  { group: 'browser', create: createBrowserTools },
+  { group: 'skill', create: createSkillTools },
+  { group: 'interaction', create: createInteractionTools }
 ]
+
+/* 域是否启用：skill 无用户开关，恒启用；其余按设置开关过滤 */
+function isGroupEnabled(group: ToolGroup, switches: BuiltinToolSwitches): boolean {
+  return group === 'skill' ? true : switches[group]
+}
 
 /* 按 meta.maxOutput 统一裁剪工具输出（声明与实现同源，避免各处各自裁剪） */
 function withOutputLimit(entry: ToolEntry): ToolEntry {
@@ -40,7 +52,9 @@ function withOutputLimit(entry: ToolEntry): ToolEntry {
 
 /* 构建当前模式下的工具条目（含元信息，供提示生成使用） */
 export async function createBuiltinToolEntries(context: ToolContext): Promise<ToolEntry[]> {
-  const groups = await Promise.all(FACTORIES.map((factory) => factory(context)))
+  /* 关闭的分类不调用工厂：既不装配工具，也避免无谓的动态导入 */
+  const enabled = FACTORIES.filter((item) => isGroupEnabled(item.group, context.tools))
+  const groups = await Promise.all(enabled.map((item) => item.create(context)))
   return groups
     .flat()
     .filter((entry) => entry.meta.modes.includes(context.mode))

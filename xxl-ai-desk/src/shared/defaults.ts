@@ -28,6 +28,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   runtimePythonPath: '',
   updateAutoCheck: true,
   builtinToolBrowserEnabled: true,
+  builtinToolFsEnabled: true,
+  builtinToolShellEnabled: true,
   builtinToolGeneralEnabled: true,
   builtinToolInteractionEnabled: true
 }
