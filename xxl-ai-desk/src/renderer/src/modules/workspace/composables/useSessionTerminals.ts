@@ -11,6 +11,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
 import { api } from '@renderer/api'
 import { useWorkspaceStore } from '@renderer/stores/workspace'
+import { useSettingsStore } from '@renderer/stores/settings'
 import { t } from '@renderer/i18n'
 import { ipcErrorMessage } from '@renderer/utils/ipcError'
 import type { TerminalEvent } from '@shared/ipc'
@@ -30,6 +31,8 @@ export interface SessionTerminalOptions {
 export function useSessionTerminals(options: SessionTerminalOptions) {
   /* 会话工作区 store：终端标签与激活项按会话隔离 */
   const workspace = useWorkspaceStore()
+  /* 设置 store：主题 / 外观变化时同步 xterm 配色 */
+  const settings = useSettingsStore()
   /* 当前会话的终端状态 */
   const terminalPanel = computed(() => workspace.sliceOf(options.sessionId()).terminalPanel)
   /* 当前会话的终端标签与激活项 */
@@ -55,23 +58,32 @@ export function useSessionTerminals(options: SessionTerminalOptions) {
   /* 当前已挂载标签的会话：会话切换时先卸载旧会话的 xterm（PTY 保留） */
   let mountedSessionId = ''
 
+  /* 读取设计令牌的实际值（自定义属性计算值） */
+  function token(name: string, fallback: string): string {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+    return value || fallback
+  }
+
   /* 按当前主题选择 xterm 配色（深浅色与设计令牌一致） */
   function xtermTheme(): ITheme {
-    const dark = document.documentElement.classList.contains('dark')
-    return dark
-      ? {
-          background: '#1e1e1e',
-          foreground: '#ececec',
-          cursor: '#ececec',
-          selectionBackground: '#3a3a3a',
-        }
-      : {
-          background: '#ffffff',
-          foreground: '#0d0d0d',
-          cursor: '#0d0d0d',
-          selectionBackground: '#d8d8d8',
-        }
+    return {
+      background: token('--theme-content', '#ffffff'),
+      foreground: token('--theme-text', '#0d0d0d'),
+      cursor: token('--theme-brand', '#0d0d0d'),
+      selectionBackground: token('--desk-terminal-selection', 'rgba(0, 0, 0, 0.18)')
+    }
   }
+
+  /* 主题 / 外观切换后同步所有已创建终端的配色 */
+  watch(
+    () => [settings.settings.themePreset, settings.settings.appearance],
+    () => {
+      const theme = xtermTheme()
+      for (const runtime of runtimes.values()) {
+        runtime.term.options.theme = theme
+      }
+    }
+  )
 
   /* 容器 ref 回调：记录/清理标签 DOM */
   function setContainer(id: string, el: Element | ComponentPublicInstance | null): void {

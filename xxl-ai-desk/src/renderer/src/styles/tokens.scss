@@ -69,10 +69,38 @@
   --desk-segment-bg: color-mix(in srgb, var(--theme-brand) 12%, var(--theme-content));
   --desk-segment-text: var(--theme-brand-strong);
   --desk-segment-border: color-mix(in srgb, var(--theme-brand) 22%, var(--theme-content));
-  --desk-btn-bg: color-mix(in srgb, var(--theme-brand) 10%, var(--theme-content));
-  --desk-btn-bg-hover: color-mix(in srgb, var(--theme-brand) 16%, var(--theme-content));
+  /* 主按钮：浅品牌底 + 品牌边框 + 品牌字，清晰但不抢戏 */
+  --desk-btn-bg: color-mix(in srgb, var(--theme-brand) 8%, var(--theme-content));
+  --desk-btn-bg-hover: color-mix(in srgb, var(--theme-brand) 14%, var(--theme-content));
+  --desk-btn-border: color-mix(in srgb, var(--theme-brand) 22%, var(--theme-content));
   --desk-btn-text: var(--theme-brand-strong);
   --desk-switch-on: var(--theme-brand);
+
+  /* Element Plus 文本 / 边框 / 填充对齐主题，避免组件默认灰与主题色脱节 */
+  --el-text-color-primary: var(--desk-text);
+  --el-text-color-regular: var(--desk-text);
+  --el-text-color-secondary: var(--desk-text-secondary);
+  --el-text-color-placeholder: var(--desk-text-tertiary);
+  --el-text-color-disabled: var(--desk-text-tertiary);
+  --el-border-color: var(--desk-border);
+  --el-border-color-light: var(--desk-border);
+  --el-border-color-lighter: var(--desk-border-soft);
+  --el-fill-color-light: var(--desk-primary-soft);
+  --el-fill-color-lighter: var(--desk-surface-elevated);
+  --el-fill-color-blank: var(--desk-surface-content);
+  --el-bg-color: var(--desk-surface-content);
+  --el-bg-color-overlay: var(--desk-surface-elevated);
+  --el-mask-color: var(--desk-overlay);
+
+  /* Element Plus 功能色：与主题功能色保持同一色相 */
+  --el-color-success: var(--theme-success);
+  --el-color-warning: var(--theme-warning);
+  --el-color-danger: var(--theme-danger);
+  --el-color-info: var(--theme-info);
+  --el-color-success-light-9: color-mix(in srgb, var(--theme-success) 12%, var(--desk-surface-content));
+  --el-color-warning-light-9: color-mix(in srgb, var(--theme-warning) 12%, var(--desk-surface-content));
+  --el-color-danger-light-9: color-mix(in srgb, var(--theme-danger) 12%, var(--desk-surface-content));
+  --el-color-info-light-9: color-mix(in srgb, var(--theme-info) 12%, var(--desk-surface-content));
 
   /* Element Plus 主色族：浅色向白混合，深色向黑混合 */
   --el-color-primary: var(--theme-brand);
@@ -103,7 +131,9 @@
   --code-subst: #1f2328;
 
   --desk-shadow: 0 10px 30px color-mix(in srgb, var(--theme-shadow) 8%, transparent);
-  --desk-overlay: rgba(23, 32, 58, 0.38);
+  --desk-overlay: color-mix(in srgb, var(--theme-text) 38%, transparent);
+  /* 终端选区：中性半透明，避免主题色在代码背景上过重 */
+  --desk-terminal-selection: rgba(24, 24, 27, 0.18);
 
   /* 尺寸与字体 */
   --desk-header-height: 38px;
@@ -149,4 +179,5 @@
 
   --desk-shadow: 0 12px 32px color-mix(in srgb, var(--theme-shadow) 55%, transparent);
   --desk-overlay: rgba(0, 0, 0, 0.55);
+  --desk-terminal-selection: rgba(255, 255, 255, 0.24);
 }

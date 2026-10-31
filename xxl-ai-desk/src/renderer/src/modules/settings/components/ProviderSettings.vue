@@ -140,6 +140,13 @@ async function toggleProvider(row: ProviderDTO, value: boolean): Promise<void> {
   flex-shrink: 0;
 }
 
+/* 模型标签：中性底 + 主题边框，降低表格内高亮色噪声 */
+.model-tags :deep(.el-tag.model-tag) {
+  --el-tag-bg-color: var(--desk-surface-elevated);
+  --el-tag-border-color: var(--desk-border);
+  --el-tag-text-color: var(--desk-text-secondary);
+}
+
 .model-tooltip {
   display: flex;
   flex-direction: column;

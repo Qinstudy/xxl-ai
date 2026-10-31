@@ -707,21 +707,33 @@ html.dark .el-button--primary {
 /* --- 开关激活色：柔和中性灰，非纯黑，且与关闭态可区分 --- */
 .el-switch {
   --el-switch-on-color: var(--desk-switch-on);
+  --el-switch-off-color: var(--desk-border-strong);
 }
 
-/* --- 浅色主按钮：弱化黑色，全局统一柔和观感 --- */
+/* --- 表格：表面色 / 边框 / 悬浮态统一走主题令牌，避免组件默认灰与主题脱节 --- */
+.el-table {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: var(--desk-surface-panel);
+  --el-table-header-text-color: var(--desk-text-secondary);
+  --el-table-text-color: var(--desk-text);
+  --el-table-row-hover-bg-color: color-mix(in srgb, var(--desk-primary) 6%, transparent);
+  --el-table-border-color: var(--desk-border);
+}
+
+/* --- 主按钮：浅品牌底 + 明确边框，兼顾可点击感与克制感 --- */
 .el-button--primary:not(.is-text):not(.is-link) {
   --el-button-bg-color: var(--desk-btn-bg);
-  --el-button-border-color: var(--desk-btn-bg);
+  --el-button-border-color: var(--desk-btn-border);
   --el-button-text-color: var(--desk-btn-text);
   --el-button-hover-bg-color: var(--desk-btn-bg-hover);
-  --el-button-hover-border-color: var(--desk-btn-bg-hover);
+  --el-button-hover-border-color: var(--desk-btn-border);
   --el-button-hover-text-color: var(--desk-btn-text);
   --el-button-active-bg-color: var(--desk-btn-bg-hover);
-  --el-button-active-border-color: var(--desk-btn-bg-hover);
+  --el-button-active-border-color: var(--desk-btn-border);
   --el-button-active-text-color: var(--desk-btn-text);
   --el-button-disabled-bg-color: var(--desk-btn-bg);
-  --el-button-disabled-border-color: var(--desk-btn-bg);
+  --el-button-disabled-border-color: var(--desk-border);
   --el-button-disabled-text-color: var(--desk-text-tertiary);
 }
 
