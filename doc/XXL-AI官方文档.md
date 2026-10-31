@@ -1434,6 +1434,79 @@ MCP（Model Context Protocol）负责把**外部工具**接进会话：远程服
 - **主动询问（`ask_user`）**：`worker/tools/interaction.ts` 提供 `ask_user` 工具，支持 `confirm` 确认、`select` 单选 / 多选（可带选项说明、「其他」输入）、`input` 文本输入（可多行、可设默认值）；信息不足、存在多个合理方案或需要用户拍板时调用，**本轮挂起**等待用户在应用内弹窗应答，再按结果回填模型继续执行；权限校验类交互不开放给该工具，只能由系统沙箱发起；
 - **标准化组件**：渲染层提供权限确认、多选项选择、用户输入三类标准人机交互组件，Agent 集成后自动启用；应答结果（确认 / 选择值 / 输入文本 / 拒绝 / 取消）经协议回传并转为模型可读文本。
 
+#### 6.4.7、长期记忆
+
+本地版记忆以**项目**为唯一维度（一个项目一条，`desk_agent_memory`，项目 1:1），跨会话沉淀。与云版「Agent × 访客」的实体模型同构，只是维度换成「项目」——项目绑定本地目录，偏好与事实天然以项目为单位积累。设计沿用同一条铁律：**生成与消费解耦**，对话只「读」记忆，压缩在后台异步完成，绝不阻塞生成。
+
+**触发与游标**（`services/agentMemoryService.ts`）：
+
+- 每轮对话结束调用 `maybeGenerateAgentMemory(sessionId)`，统计项目内自上次生成后新增的消息数，达到 `AGENT_MEMORY_MESSAGE_LIMIT`（50，与上下文历史窗口一致）即触发压缩；未达阈值直接返回；
+- 游标为项目级 `last_time`（ISO 时间）：消息 `seq` 是会话内序号，无法跨会话累计，按时间游标才能覆盖项目内全部会话；
+- 加载时按项目下**每个会话独立查询** `add_time > 游标` 的消息，再按各会话首条新增消息时间排序；转录按「## 会话：标题」分节，多会话交替时顺序接近真实发生顺序；
+- 同一项目用 `generatingProjects` 去重，生成期间不重复触发；项目或记忆被删除时直接跳过。
+
+**压缩模型**（`agent/worker/memory.ts`）：
+
+- 主进程组装提示词（旧记忆 + 最近对话转录），转录只取用户 / 助手正文，排除 thinking 与工具结果，上限 60k 字符，超长从最旧截断；
+- 生成运行在运行时进程：低温度（0.2）、`max_tokens` 3000、超时 120s 调用一次模型；输出固定四个二级标题「用户偏好 / 项目事实 / 关键决策 / 待办与风险」，总长截断到 2000 字符；
+- 提示词显式要求「保留仍然有效的信息、覆盖已过期内容、不得编造、不得记录密钥口令」，无内容章节写「暂无」；
+- **失败隔离**：生成失败只记日志并保留旧记忆，游标不推进，下一轮达到阈值自动重试；密钥、口令等敏感内容由提示词约束，不额外做内容过滤；
+- 记忆生成同样沿用当前会话 ID 构建模型，保证 `{session}` 占位请求头（如 `x-opencode-session`）被正确填充，避免网关因缺会话头直接 400。
+
+**注入与生效**（`services/chatService.ts`）：
+
+- 记忆开启且会话归属项目时，项目记忆追加到系统指令，并明确「可能过时的历史事实，与当前指令冲突时以当前指令为准」；
+- 系统指令在会话 Agent 创建时固化，因此生成成功后调用 `evictProjectAgents(projectId)` 清理项目下会话运行时，下一轮重新装配，新记忆立即生效；
+- 手动保存 / 删除记忆同样触发运行时重建，避免继续使用旧提示词。
+
+**手动管理**（Agent → 长期记忆）：启用开关、按项目名筛选与查询、查看编辑、删除；删除仅清空记忆内容并保留项目，列表按项目维度展示记忆摘要与更新时间。
+
+#### 6.4.8、Agent可观测
+
+可观测定位为**开发者模式下的本地排障能力**，不是常驻监控：默认关闭，开启后采集模型通讯并开放「诊断」入口，关闭时零采集、零写入。
+
+**术语边界**（同一产品里三种「记录」各有明确名字，代码与界面统一使用，不再混称「日志」）：
+
+| 术语 | 含义 | 落位 |
+|---|---|---|
+| 运行日志 | 进程级排障日志，落磁盘文件 `log-yyyy-mm-dd.log` | `main/utils/logger.ts`、`agent/worker/logger.ts`、`shared/runtimeLog.ts` |
+| 模型通讯（trace） | 一次模型 HTTP 请求的入参、响应、工具调用与用量 | `desk_llm_trace`、`worker/trace.ts`、`diagnosticsService` |
+| 会话消息 | 会话内持久化的对话消息 | `desk_message`、`sessionService` |
+| 诊断 | 面向开发者的只读视图，聚合「会话消息 + 模型通讯」 | `contracts/diagnostics.ts`、`services/diagnosticsService.ts`、`components/diagnostics/*` |
+
+**入口与开关**：
+
+- 设置 →「高级设置」→ 开发者模式；开启后右侧工具面板出现「诊断」Tab，关闭后 Tab 隐藏，若正停留在该 Tab 自动回退到文件面板；
+- 每轮对话通过 `RunAgentInput.traceEnabled` 下发开关，worker 侧钩子常驻但只有本轮 `beginTraceRun` 后才建采集状态，关闭时回调直接空转；主进程 `recordTrace()` 再校验一次，双重保护；
+- 关闭不清历史数据，面板可手动「清空本会话通讯记录」。
+
+**两类视图**：
+
+| 视图 | 数据源 | 内容 |
+|---|---|---|
+| 会话消息 | `desk_message`（直接分页读取，不复制） | 角色、`seq`、正文、原始 `data` |
+| 模型通讯 | `desk_llm_trace` | 单次模型请求的请求体、响应体、工具调用、状态、耗时、token |
+
+**记录粒度**：一次模型 HTTP 请求 = 一条记录，同一轮 `run_id` 串联、`step` 递增。工具循环会产生多次模型调用，按请求记录才能还原「模型看到了什么、返回了什么、调用了哪些工具、结果如何」；按 run 记一条会丢失中间过程。
+
+**采集链路**：
+
+```text
+worker（唯一能看到 provider payload 的进程）
+  onPayload / onResponse + message_end / tool_execution_start|end
+        │ parentPort.postMessage({ type:'llm-trace' })
+        ▼
+主进程 runtimeHost → diagnosticsService.recordTrace()   ← 唯一 getDb 出口
+        ▼
+desk_llm_trace
+```
+
+- 采集状态按「会话 + 来源（chat / memory）」隔离，记忆生成与对话并发时互不覆盖；
+- `onPayload` 收尾上一条并开启新一条——此时上一轮工具已执行完，工具结果可安全归属；
+- 工具结果按 `toolCallId` 挂到当前记录，`tool_execution_end` 回填结果、耗时与失败标记；
+- run 正常结束、异常、用户中止分别以 `success / error / aborted` 收尾；未拿到响应的一律按 `error` 落库，避免出现「空成功」；
+- 回传为 fire-and-forget：worker 不访问数据库，落库失败只记运行日志，不阻断对话。
+
 ### 6.5、重点设计
 
 #### 6.5.1、权限设计
@@ -1456,9 +1529,10 @@ MCP（Model Context Protocol）负责把**外部工具**接进会话：远程服
 | `desk_setting` | 设置（`key / value`） |
 | `desk_skill` | 技能状态（`id` 目录名 / `name / description / version / source / source_id / enabled`，目录内容为权威） |
 | `desk_mcp` | MCP 服务（`name / type / transport / url / headers / command / args / env / cwd / config / remark / enabled / health`） |
+| `desk_agent_memory` | 项目长期记忆（`project_id / content / last_time / add_time / update_time`，项目 1:1） |
+| `desk_llm_trace` | 模型通讯 trace（`session_id / run_id / step / phase / status / http_status / duration_ms / tokens / request / response / tool_calls / error / add_time`，仅开发者模式写入） |
 
 - **系统配置项**：应用名称 / Slogan / 自定义指令、主题（浅色 / 深色 / 自定义）、语言（中 / 英）、Node / Python 运行环境 PATH、浏览器工具开关等，统一存 `desk_setting`；
-- **旧库兼容**：`PRAGMA table_info` 检测缺列后 `ALTER TABLE` 补齐（SQLite 无 `ADD COLUMN IF NOT EXISTS`）；
 - **数据目录**：默认 `app.getPath('userData')/xxl-ai-desk.sqlite`，可自定义（`userData/desk-config.json`），修改后重启生效。
 
 ## 七、版本更新日志

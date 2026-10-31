@@ -1,29 +1,33 @@
 /*
- * 会话日志契约：对话记录与模型通讯 trace 的分页查询、明细结构。
- *   - 仅开发者模式开启时写入 trace；对话记录直接读取 desk_message。
+ * 会话诊断契约：会话消息与模型通讯（trace）的分页查询、明细结构。
+ *   - 诊断视图只读聚合，不复制数据：会话消息读 desk_message，模型通讯读 desk_llm_trace；
+ *   - 模型通讯仅在开发者模式开启时写入。
  *
  * @author xuxueli 2026-11-01
  */
 
-/* 分页查询入参 */
-export interface LogPageQuery {
+import type { PageQuery } from './pagination'
+
+/* 模型通讯 trace：请求体字符上限（worker 采集与主进程落库共用） */
+export const TRACE_REQUEST_MAX_CHARS = 256 * 1024
+
+/* 模型通讯 trace：响应体字符上限 */
+export const TRACE_RESPONSE_MAX_CHARS = 64 * 1024
+
+/* 模型通讯 trace：单个工具结果字符上限 */
+export const TRACE_TOOL_RESULT_MAX_CHARS = 32 * 1024
+
+/* 模型通讯 trace：工具调用明细总量字符上限 */
+export const TRACE_TOOL_CALLS_MAX_CHARS = 256 * 1024
+
+/* 模型通讯 trace：错误信息字符上限 */
+export const TRACE_ERROR_MAX_CHARS = 4000
+
+/* 诊断分页查询：会话 + 通用分页参数 */
+export interface DiagnosticsQuery extends PageQuery {
   /* 会话主键 */
   sessionId: string
-  /* 页码（从 1 开始） */
-  page: number
-  /* 每页条数（上限 100） */
-  pageSize: number
 }
-
-/* 分页结果 */
-export interface PageResult<T> {
-  items: T[]
-  total: number
-  page: number
-  pageSize: number
-}
-
-/* 对话记录直接复用 StoredMessage（分页查询在 sessionLogService） */
 
 /* 单次工具调用明细 */
 export interface ToolCallTraceDTO {

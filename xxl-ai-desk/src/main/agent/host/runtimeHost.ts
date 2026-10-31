@@ -9,7 +9,7 @@ import { execFileSync, spawn } from 'child_process'
 import { utilityProcess, type UtilityProcess } from 'electron'
 import log from 'electron-log/main'
 import { getTempDir } from '../../config/paths'
-import { recordTrace } from '../../services/sessionLogService'
+import { recordTrace } from '../../services/diagnosticsService'
 import { openInteraction, cancelInteraction, clearInteractions } from './interaction'
 import { requestBrowserAction } from './browserBridge'
 import type {
@@ -67,10 +67,10 @@ function ensureWorker(): Promise<UtilityProcess> {
   }
   const proc = utilityProcess.fork(join(__dirname, 'agent/worker/worker.js'), [], {
     serviceName: 'xxl-ai-desk-agent',
-    /* 运行时进程与主进程写入同一目录的按天日志；开发标记用于打开请求上下文调试日志 */
+    /* 运行时进程与主进程写入同一目录的运行日志（按天分片） */
     env: {
       ...process.env,
-      XXL_AI_LOG_DIR: getTempDir()
+      XXL_AI_RUNTIME_LOG_DIR: getTempDir()
     }
   })
   worker = proc

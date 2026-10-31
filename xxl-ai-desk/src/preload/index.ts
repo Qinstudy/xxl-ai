@@ -25,8 +25,8 @@ import type {
   GitDiffResult,
   GitOperationResult,
   GitStatus,
+  DiagnosticsQuery,
   LlmTraceDTO,
-  LogPageQuery,
   McpDTO,
   McpDiscoverQuery,
   OpenWithApp,
@@ -324,15 +324,15 @@ const api: DeskApi = {
     githubCancel: (query: GithubSkillQuery) =>
       ipcRenderer.invoke(IPC.skillGithubCancel, query)
   },
-  /* 会话日志（开发者模式） */
-  sessionLog: {
-    /* 对话记录分页 */
-    messages: (query: LogPageQuery) => ipcRenderer.invoke(IPC.sessionLogMessages, query),
+  /* 会话诊断（开发者模式） */
+  diagnostics: {
+    /* 会话消息分页 */
+    messages: (query: DiagnosticsQuery) => ipcRenderer.invoke(IPC.diagnosticsMessages, query),
     /* 模型通讯分页 */
-    traces: (query: LogPageQuery): Promise<PageResult<LlmTraceDTO>> =>
-      ipcRenderer.invoke(IPC.sessionLogTraces, query),
+    traces: (query: DiagnosticsQuery): Promise<PageResult<LlmTraceDTO>> =>
+      ipcRenderer.invoke(IPC.diagnosticsTraces, query),
     /* 清空本会话通讯记录 */
-    clearTraces: (sessionId: string) => ipcRenderer.invoke(IPC.sessionLogClear, sessionId)
+    clearTraces: (sessionId: string) => ipcRenderer.invoke(IPC.diagnosticsClear, sessionId)
   }
 }
 

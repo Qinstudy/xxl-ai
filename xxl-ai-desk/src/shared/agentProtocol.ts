@@ -7,7 +7,7 @@
 import type { ChatMode, McpRuntimeConfig, McpTestResult, McpToolMeta, SkillRuntimeConfig } from './ipc'
 import type { BrowserAction, BrowserActionResult } from './contracts/browser'
 import type { InteractionRequest, InteractionResult } from './contracts/chat'
-import type { LlmTraceInput } from './contracts/log'
+import type { LlmTraceInput } from './contracts/diagnostics'
 
 /* 供应商运行时配置（主进程解密后传给运行时，与 Pi Models 构建入参一致） */
 export interface ProviderModelConfig {

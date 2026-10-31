@@ -10,7 +10,7 @@ export const STORAGE_PREFIX = 'desk:workspace:'
 export const STORAGE_VERSION = 3
 
 /* 工具面板当前工具 */
-export type WorkspaceTool = 'files' | 'browser' | 'terminal' | 'git' | 'logs'
+export type WorkspaceTool = 'files' | 'browser' | 'terminal' | 'git' | 'diagnostics'
 
 /* 工具面板布局模式：dock = 与正文并排，focus = 占满正文 */
 export type ToolPanelMode = 'dock' | 'focus'
@@ -111,6 +111,16 @@ function expandedOf(value: unknown): Record<string, boolean> {
   return value && typeof value === 'object' ? (value as Record<string, boolean>) : {}
 }
 
+/* 解析当前工具：旧版日志 Tab（logs）归一为新命名，非法值回落到文件 */
+function activeToolOf(value: unknown): WorkspaceTool {
+  if (value === 'logs') {
+    return 'diagnostics'
+  }
+  return value === 'browser' || value === 'terminal' || value === 'git' || value === 'diagnostics'
+    ? value
+    : 'files'
+}
+
 /*
  * 默认目录树宽度：按工具面板宽度自适应。
  *   - 目标宽度为工具面板的 45%；
@@ -126,18 +136,10 @@ export function defaultTreeWidth(toolPanelWidth: number): number {
   )
 }
 
-/* 解析目录树宽度：兼容旧版占比字段，非法时回落默认值 */
+/* 解析目录树宽度：非法时回落默认值 */
 function treeWidthOf(value: unknown, toolPanelWidth: number): number {
-  const fileExplorer = value as { treeWidth?: unknown; treeWidthRatio?: unknown } | undefined
-  const width = Number(fileExplorer?.treeWidth)
-  if (Number.isFinite(width) && width > 0) {
-    return Math.round(width)
-  }
-  const ratio = Number(fileExplorer?.treeWidthRatio)
-  if (Number.isFinite(ratio) && ratio > 0) {
-    return Math.round(ratio * Math.max(1, toolPanelWidth))
-  }
-  return defaultTreeWidth(toolPanelWidth)
+  const width = Number((value as { treeWidth?: unknown } | undefined)?.treeWidth)
+  return Number.isFinite(width) && width > 0 ? Math.round(width) : defaultTreeWidth(toolPanelWidth)
 }
 
 /* 归一化持久化数据：结构非法时逐字段回落默认值 */
@@ -147,13 +149,7 @@ export function normalizeState(raw: unknown): WorkspaceState {
   return {
     toolPanel: {
       visible: boolOf(parsed.toolPanel?.visible, base.toolPanel.visible),
-      activeTool:
-        parsed.toolPanel?.activeTool === 'browser' ||
-        parsed.toolPanel?.activeTool === 'terminal' ||
-        parsed.toolPanel?.activeTool === 'git' ||
-        parsed.toolPanel?.activeTool === 'logs'
-          ? parsed.toolPanel.activeTool
-          : 'files',
+      activeTool: activeToolOf(parsed.toolPanel?.activeTool),
       width: Math.max(
         LAYOUT.toolPanel.minWidth,
         Math.round(Number(parsed.toolPanel?.width) || base.toolPanel.width)

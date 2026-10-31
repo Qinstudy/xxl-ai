@@ -252,6 +252,7 @@ onMounted(loadMemories)
 
 .memory-switch-label {
   font-size: var(--desk-font-base);
+  line-height: 22px;
   color: var(--desk-text);
 }
 

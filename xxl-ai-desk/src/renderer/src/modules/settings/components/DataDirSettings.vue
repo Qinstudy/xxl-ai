@@ -56,8 +56,8 @@ function onRelaunch(): void {
 
 <template>
   <div class="data-dir">
-    <div class="data-dir-title">{{ t('settings.dataDir') }}</div>
-    <div class="data-dir-tip">{{ t('settings.dataDirTip') }}</div>
+    <div class="settings-block-title">{{ t('settings.dataDir') }}</div>
+    <div class="settings-block-tip data-dir-tip">{{ t('settings.dataDirTip') }}</div>
     <div class="data-dir-row">
       <el-input
         v-model="dataDirInput"
@@ -77,6 +77,8 @@ function onRelaunch(): void {
 </template>
 
 <style scoped lang="scss">
+@use './settingsBlock.scss';
+
 /* 运行时数据目录 */
 .data-dir {
   margin-top: 28px;
@@ -84,15 +86,8 @@ function onRelaunch(): void {
   border-top: 1px solid var(--desk-border);
 }
 
-.data-dir-title {
-  font-size: var(--desk-font-base);
-  color: var(--el-text-color-regular);
-  margin-bottom: 6px;
-}
-
+/* 说明与下方目录行的间距 */
 .data-dir-tip {
-  font-size: var(--desk-font-xs);
-  color: var(--desk-text-tertiary);
   margin-bottom: 12px;
 }
 

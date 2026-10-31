@@ -6,7 +6,13 @@
  * @author xuxueli 2026-11-01
  */
 
-import type { LlmTraceInput, ToolCallTraceDTO } from '@shared/ipc'
+import {
+  TRACE_REQUEST_MAX_CHARS,
+  TRACE_RESPONSE_MAX_CHARS,
+  TRACE_TOOL_RESULT_MAX_CHARS,
+  type LlmTraceInput,
+  type ToolCallTraceDTO
+} from '@shared/ipc'
 
 /* 回传通道：由 worker 入口注入（parentPort.postMessage） */
 export type TraceSink = (sessionId: string, trace: LlmTraceInput) => void
@@ -18,11 +24,6 @@ export interface TraceTarget {
   /* 对话 / 记忆生成 */
   phase: 'chat' | 'memory'
 }
-
-/* 单字段上限：与主进程兜底一致，避免超长内容撑爆 IPC / 数据库 */
-const REQUEST_MAX_CHARS = 256 * 1024
-const RESPONSE_MAX_CHARS = 64 * 1024
-const TOOL_RESULT_MAX_CHARS = 32 * 1024
 
 /* 运行时消息最小结构（只取 trace 需要的字段） */
 interface TraceMessage {
@@ -206,7 +207,7 @@ export function handleTracePayload(
     startedAt: Date.now(),
     endedAt: 0,
     httpStatus: 0,
-    request: clip(serialize(payload), REQUEST_MAX_CHARS),
+    request: clip(serialize(payload), TRACE_REQUEST_MAX_CHARS),
     response: '',
     status: 'success',
     error: '',
@@ -235,7 +236,7 @@ export function handleTraceMessageEnd(target: TraceTarget, message: unknown): vo
   if (item.role && item.role !== 'assistant') {
     return
   }
-  current.response = clip(serialize(item), RESPONSE_MAX_CHARS)
+  current.response = clip(serialize(item), TRACE_RESPONSE_MAX_CHARS)
   current.endedAt = Date.now()
   current.inputTokens = Number(item.usage?.input) || 0
   current.outputTokens = Number(item.usage?.output) || 0
@@ -290,7 +291,7 @@ export function handleTraceToolEnd(
     return
   }
   tool.isError = Boolean(result.isError)
-  tool.result = clip(String(result.text ?? ''), TOOL_RESULT_MAX_CHARS)
+  tool.result = clip(String(result.text ?? ''), TRACE_TOOL_RESULT_MAX_CHARS)
   tool.durationMs = Number(result.durationMs) || Date.now() - tool.startedAt
 }
 

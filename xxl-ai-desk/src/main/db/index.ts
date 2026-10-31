@@ -122,7 +122,7 @@ CREATE INDEX IF NOT EXISTS i_desk_llm_trace_session ON desk_llm_trace (session_i
 CREATE INDEX IF NOT EXISTS i_desk_llm_trace_run ON desk_llm_trace (run_id, step);
 `
 
-/* 原生 better-sqlite3 连接（迁移直接执行 SQL 用） */
+/* 原生 better-sqlite3 连接（建表与种子直接执行 SQL 用） */
 let sqlite: Database.Database | null = null
 /* Drizzle 实例（业务读写用） */
 let database: BetterSQLite3Database<typeof schema> | null = null
@@ -136,36 +136,8 @@ export function initDatabase(): void {
   sqlite = new Database(file)
   sqlite.pragma('journal_mode = WAL')
   sqlite.exec(DDL)
-  migrateAgentMemoryCursor(sqlite)
   seedMcpServers(sqlite)
   database = drizzle(sqlite, { schema })
-}
-
-/*
- * 记忆游标列迁移：last_message_id（会话内 ID）→ last_time（项目级时间）。
- *   - 仅存量库需要；新库由 DDL 直接建新列；
- *   - 先用旧 ID 回填新列，避免已纳入内容被重复压缩，再删除废弃列。
- */
-function migrateAgentMemoryCursor(db: Database.Database): void {
-  const columns = db.prepare('PRAGMA table_info(desk_agent_memory)').all() as Array<{
-    name?: string
-  }>
-  const names = new Set(columns.map((column) => column.name ?? ''))
-  if (!names.has('last_time')) {
-    db.exec("ALTER TABLE desk_agent_memory ADD COLUMN last_time TEXT NOT NULL DEFAULT ''")
-  }
-  if (!names.has('last_message_id')) {
-    return
-  }
-  db.exec(`
-    UPDATE desk_agent_memory
-    SET last_time = COALESCE(
-      (SELECT add_time FROM desk_message WHERE id = desk_agent_memory.last_message_id),
-      last_time
-    )
-    WHERE last_message_id <> ''
-  `)
-  db.exec('ALTER TABLE desk_agent_memory DROP COLUMN last_message_id')
 }
 
 /* 内置 MCP 初始化标记：写入成功后不再重置，避免用户删除后被重新写回 */

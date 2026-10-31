@@ -15,7 +15,7 @@ import {
   writeFileSync
 } from 'fs'
 import { join } from 'path'
-import { ensureTempDir, getDataDir, getSkillsDir, getTempDir } from '../../../config/paths'
+import { ensureTempDir, getTempDir } from '../../../config/paths'
 import { downloadGithubArchive } from './githubDownload'
 
 /* 归档缓存有效期（毫秒）：同仓库重复下载复用 30 分钟 */
@@ -112,20 +112,7 @@ function isArchiveRootUsable(rootDir: string): boolean {
   }
 }
 
-/* 删除指定目录下匹配前缀 / 时间戳命名的下载目录 */
-function removeDownloadDirs(dir: string, match: (name: string) => boolean): void {
-  try {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (entry.isDirectory() && match(entry.name)) {
-        rmSync(join(dir, entry.name), { recursive: true, force: true })
-      }
-    }
-  } catch {
-    /* 目录不存在时无需清理 */
-  }
-}
-
-/* 清理启动时已过期或不合法的下载目录，并兼容旧版临时目录 */
+/* 清理启动时已过期或不合法的下载目录 */
 export function cleanupGithubArchiveTemps(): void {
   ensureTempDir()
   /* 当前 tmp：没有有效 meta 或已过期的 github-owner-repo 全部删除 */
@@ -143,14 +130,6 @@ export function cleanupGithubArchiveTemps(): void {
   } catch {
     /* 临时目录不存在时无需清理 */
   }
-
-  /* 兼容旧版 .tmp 与 skills/.tmp-github-* 遗留目录 */
-  const legacyTmp = join(getDataDir(), '.tmp')
-  removeDownloadDirs(
-    legacyTmp,
-    (name) => name.startsWith(DOWNLOAD_DIR_PREFIX) || /^\d{8}-\d{6}-\d{3}-/.test(name)
-  )
-  removeDownloadDirs(getSkillsDir(), (name) => name.startsWith('.tmp-github-'))
 }
 
 /* 仓库对应的下载目录 */

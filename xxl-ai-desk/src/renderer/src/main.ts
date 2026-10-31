@@ -130,7 +130,7 @@ function formatError(error: unknown): string {
   return error instanceof Error ? error.stack || error.message : String(error)
 }
 
-/* 全局异常上报：Vue 渲染异常与未处理 Promise 统一写入主进程日志 */
+/* 全局异常上报：Vue 渲染异常与未处理 Promise 统一写入主进程运行日志 */
 app.config.errorHandler = (error, _instance, info) => {
   api.app.logError(`[vue] ${info}: ${formatError(error)}`)
 }

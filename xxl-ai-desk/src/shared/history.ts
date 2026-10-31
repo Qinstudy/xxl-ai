@@ -8,7 +8,12 @@
  */
 
 import { isAutoContinuePrompt, translate } from './i18n'
-import { HISTORY_MAX_CHARS, HISTORY_MAX_MESSAGES } from './limits'
+
+/* 历史窗口：最多保留的最近消息条数 */
+export const HISTORY_MAX_MESSAGES = 50
+
+/* 历史窗口：总字符上限（超过后从最旧轮次继续丢弃） */
+export const HISTORY_MAX_CHARS = 120_000
 
 /* 运行期消息最小结构 */
 interface HistoryMessage {

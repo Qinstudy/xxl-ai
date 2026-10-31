@@ -1,11 +1,11 @@
 /*
- * 会话日志列表通用样式：对话记录与模型通讯共用的列表骨架。
- *   - 仅被 log 目录下的列表组件 @use，不进入全局样式；
+ * 诊断列表通用样式：会话消息与模型通讯共用的列表骨架。
+ *   - 仅被 diagnostics 目录下的列表组件 @use，不进入全局样式；
  *   - 尺寸与字号统一走 tokens，避免两个列表各写一套。
  */
 
 /* 列表容器：占满面板高度，列表滚动、表头/分页固定 */
-.log-list {
+.diagnostics-list {
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -13,7 +13,7 @@
 }
 
 /* 行区域：唯一滚动容器 */
-.log-rows {
+.diagnostics-rows {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
@@ -21,7 +21,7 @@
 }
 
 /* 单行：整行可点击，悬浮高亮 */
-.log-row {
+.diagnostics-row {
   display: block;
   width: 100%;
   padding: 8px 10px;
@@ -32,12 +32,12 @@
   cursor: pointer;
 }
 
-.log-row:hover {
+.diagnostics-row:hover {
   background: var(--desk-primary-soft);
 }
 
 /* 行首元信息：角色 / 步骤 / 模型 / 状态 / 时间 */
-.log-row-head {
+.diagnostics-row-head {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -46,12 +46,12 @@
   color: var(--desk-text-tertiary);
 }
 
-.log-meta {
+.diagnostics-meta {
   font-variant-numeric: tabular-nums;
 }
 
 /* 摘要行：标签 + 单行省略正文 */
-.log-text {
+.diagnostics-text {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -62,7 +62,7 @@
   line-height: 1.5;
 }
 
-.log-text-body {
+.diagnostics-text-body {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -70,7 +70,7 @@
 }
 
 /* 摘要类型标签：思考 / 工具 / 图片 / 失败 */
-.log-tag {
+.diagnostics-tag {
   flex-shrink: 0;
   padding: 0 5px;
   border-radius: 4px;
@@ -81,7 +81,7 @@
 }
 
 /* 空态 / 加载态 */
-.log-empty {
+.diagnostics-empty {
   flex: 1;
   display: flex;
   align-items: center;
@@ -91,7 +91,7 @@
 }
 
 /* 分页栏 */
-.log-footer {
+.diagnostics-footer {
   flex-shrink: 0;
   display: flex;
   justify-content: center;

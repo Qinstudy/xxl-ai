@@ -51,8 +51,9 @@ async function toggleProvider(row: ProviderDTO, value: boolean): Promise<void> {
 
 <template>
   <div>
+    <div class="settings-block-title">{{ t('settings.providerListTitle') }}</div>
     <div class="provider-toolbar">
-      <span class="provider-tip">{{ t('settings.providerTip') }}</span>
+      <span class="settings-block-tip">{{ t('settings.providerTip') }}</span>
       <el-button type="primary" @click="openAdd">
         <el-icon><Plus /></el-icon>
         {{ t('settings.addProvider') }}
@@ -111,17 +112,14 @@ async function toggleProvider(row: ProviderDTO, value: boolean): Promise<void> {
 </template>
 
 <style scoped lang="scss">
+@use './settingsBlock.scss';
+
 .provider-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 14px;
-}
-
-.provider-tip {
-  font-size: var(--desk-font-xs);
-  color: var(--desk-text-tertiary);
 }
 
 /* 模型列表：单行展示、溢出省略，悬浮 tooltip 查看全部 */

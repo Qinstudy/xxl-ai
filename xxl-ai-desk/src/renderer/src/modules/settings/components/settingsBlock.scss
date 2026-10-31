@@ -1,0 +1,20 @@
+/*
+ * 设置区块通用样式：区块标题与说明文字。
+ *   - 仅被 settings/components 下的组件 @use，不进入全局样式；
+ *   - 只统一字体与颜色，上下间距由各组件按所处位置补充。
+ */
+
+/* 区块标题：与 Element 表单标签同一字号行高，切换区块时不跳动 */
+.settings-block-title {
+  font-size: var(--desk-font-base);
+  line-height: 22px;
+  color: var(--desk-text);
+  margin-bottom: 6px;
+}
+
+/* 区块说明 */
+.settings-block-tip {
+  font-size: var(--desk-font-xs);
+  line-height: 1.5;
+  color: var(--desk-text-tertiary);
+}

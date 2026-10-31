@@ -17,8 +17,8 @@ export * from './contracts/mcp'
 export * from './contracts/skill'
 export * from './contracts/browser'
 export * from './contracts/agent'
-export * from './contracts/log'
-export * from './limits'
+export * from './contracts/pagination'
+export * from './contracts/diagnostics'
 export * from './defaults'
 export * from './history'
 
@@ -60,11 +60,8 @@ import type {
   BrowserOpenTabRequest
 } from './contracts/browser'
 import type { AgentMemoryDTO, AgentMemorySaveInput } from './contracts/agent'
-import type {
-  LlmTraceDTO,
-  LogPageQuery,
-  PageResult
-} from './contracts/log'
+import type { DiagnosticsQuery, LlmTraceDTO } from './contracts/diagnostics'
+import type { PageResult } from './contracts/pagination'
 import type {
   McpCategory,
   McpDiscoverDetail,
@@ -316,12 +313,12 @@ export interface DeskApi {
     /* 从 GitHub 安装：释放扫描产生的临时归档 */
     githubCancel(query: GithubSkillQuery): Promise<void>
   }
-  /* 会话日志（开发者模式）：对话记录与模型通讯 trace */
-  sessionLog: {
-    /* 对话记录分页（复用 StoredMessage） */
-    messages(query: LogPageQuery): Promise<PageResult<StoredMessage>>
+  /* 会话诊断（开发者模式）：会话消息与模型通讯 trace */
+  diagnostics: {
+    /* 会话消息分页（复用 StoredMessage） */
+    messages(query: DiagnosticsQuery): Promise<PageResult<StoredMessage>>
     /* 模型通讯分页 */
-    traces(query: LogPageQuery): Promise<PageResult<LlmTraceDTO>>
+    traces(query: DiagnosticsQuery): Promise<PageResult<LlmTraceDTO>>
     /* 清空指定会话的通讯记录 */
     clearTraces(sessionId: string): Promise<void>
   }
@@ -436,8 +433,8 @@ export const IPC = {
   skillGithubInspect: 'desk:skill:github-inspect',
   skillGithubInstall: 'desk:skill:github-install',
   skillGithubCancel: 'desk:skill:github-cancel',
-  /* 会话日志（开发者模式） */
-  sessionLogMessages: 'desk:session-log:messages',
-  sessionLogTraces: 'desk:session-log:traces',
-  sessionLogClear: 'desk:session-log:clear'
+  /* 会话诊断（开发者模式） */
+  diagnosticsMessages: 'desk:diagnostics:messages',
+  diagnosticsTraces: 'desk:diagnostics:traces',
+  diagnosticsClear: 'desk:diagnostics:clear'
 } as const

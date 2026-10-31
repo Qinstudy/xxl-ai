@@ -18,7 +18,7 @@ import type {
   GithubSkillInstallInput,
   GithubSkillQuery,
   InteractionResult,
-  LogPageQuery,
+  DiagnosticsQuery,
   McpDTO,
   McpDiscoverQuery,
   ProviderDTO,
@@ -90,7 +90,7 @@ import {
   clearTraces,
   listMessagePage,
   listTraces
-} from './services/sessionLogService'
+} from './services/diagnosticsService'
 import { deleteMcp, listMcps, saveMcp } from './services/mcpService'
 import { listMcpTools, testMcp } from './services/mcpRuntimeService'
 import { discoverMcp, discoverMcpDetail, listMcpCategories } from './services/mcpDiscoverService'
@@ -462,8 +462,8 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
     cancelGithubSkills(query)
   )
 
-  /* --- 会话日志（开发者模式） --- */
-  handle(IPC.sessionLogMessages, (_event, query: LogPageQuery) => listMessagePage(query))
-  handle(IPC.sessionLogTraces, (_event, query: LogPageQuery) => listTraces(query))
-  handle(IPC.sessionLogClear, (_event, sessionId: string) => clearTraces(sessionId))
+  /* --- 会话诊断（开发者模式） --- */
+  handle(IPC.diagnosticsMessages, (_event, query: DiagnosticsQuery) => listMessagePage(query))
+  handle(IPC.diagnosticsTraces, (_event, query: DiagnosticsQuery) => listTraces(query))
+  handle(IPC.diagnosticsClear, (_event, sessionId: string) => clearTraces(sessionId))
 }

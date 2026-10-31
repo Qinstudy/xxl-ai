@@ -6,7 +6,7 @@
 import { computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { t } from '@renderer/i18n'
-import { prettyJson, prettyValue, tracePhaseText, traceStatusText } from '../../utils/logDisplay'
+import { prettyJson, prettyValue, tracePhaseText, traceStatusText } from '../../utils/diagnosticsDisplay'
 import type { LlmTraceDTO } from '@shared/ipc'
 
 const props = defineProps<{
@@ -39,21 +39,21 @@ async function copy(text: string): Promise<void> {
 <template>
   <el-dialog
     v-model="visible"
-    :title="t('workspace.log.traceDetail')"
+    :title="t('workspace.diagnostics.traceDetail')"
     width="860px"
     append-to-body
     class="trace-dialog"
   >
     <div v-if="props.trace" class="trace-body">
       <div class="trace-meta">
-        <span>{{ t('workspace.log.step') }} #{{ props.trace.step }}</span>
+        <span>{{ t('workspace.diagnostics.step') }} #{{ props.trace.step }}</span>
         <span>{{ props.trace.providerId }} / {{ props.trace.modelId }}</span>
         <span>{{ tracePhaseText(props.trace.phase) }}</span>
         <span>{{ traceStatusText(props.trace.status) }}</span>
-        <span>{{ t('workspace.log.duration') }} {{ props.trace.durationMs }}ms</span>
-        <span>{{ t('workspace.log.httpStatus') }} {{ props.trace.httpStatus || '—' }}</span>
+        <span>{{ t('workspace.diagnostics.duration') }} {{ props.trace.durationMs }}ms</span>
+        <span>{{ t('workspace.diagnostics.httpStatus') }} {{ props.trace.httpStatus || '—' }}</span>
         <span>
-          {{ t('workspace.log.tokens') }} {{ props.trace.inputTokens }} /
+          {{ t('workspace.diagnostics.tokens') }} {{ props.trace.inputTokens }} /
           {{ props.trace.outputTokens }} / {{ props.trace.reasoningTokens }}
         </span>
       </div>
@@ -62,7 +62,7 @@ async function copy(text: string): Promise<void> {
 
       <div class="trace-section">
         <div class="trace-section-head">
-          <span class="trace-label">{{ t('workspace.log.request') }}</span>
+          <span class="trace-label">{{ t('workspace.diagnostics.request') }}</span>
           <el-button size="small" text @click="copy(prettyJson(props.trace.request))">
             {{ t('common.copy') }}
           </el-button>
@@ -72,22 +72,22 @@ async function copy(text: string): Promise<void> {
 
       <div class="trace-section">
         <div class="trace-section-head">
-          <span class="trace-label">{{ t('workspace.log.response') }}</span>
+          <span class="trace-label">{{ t('workspace.diagnostics.response') }}</span>
           <el-button size="small" text @click="copy(prettyJson(props.trace.response))">
             {{ t('common.copy') }}
           </el-button>
         </div>
-        <pre class="trace-pre">{{ prettyJson(props.trace.response) || t('workspace.log.emptyContent') }}</pre>
+        <pre class="trace-pre">{{ prettyJson(props.trace.response) || t('workspace.diagnostics.emptyContent') }}</pre>
       </div>
 
       <div class="trace-section">
         <div class="trace-section-head">
           <span class="trace-label">
-            {{ t('workspace.log.toolCallsCount', [props.trace.toolCalls.length]) }}
+            {{ t('workspace.diagnostics.toolCallsCount', [props.trace.toolCalls.length]) }}
           </span>
         </div>
         <div v-if="props.trace.toolCalls.length === 0" class="trace-empty">
-          {{ t('workspace.log.noTool') }}
+          {{ t('workspace.diagnostics.noTool') }}
         </div>
         <div
           v-for="tool in props.trace.toolCalls"
@@ -98,13 +98,13 @@ async function copy(text: string): Promise<void> {
             <span class="trace-tool-name">{{ tool.toolName }}</span>
             <span class="trace-tool-meta">{{ tool.durationMs }}ms</span>
             <span v-if="tool.isError" class="trace-tool-error">
-              {{ t('workspace.log.statusError') }}
+              {{ t('workspace.diagnostics.statusError') }}
             </span>
           </div>
-          <div class="trace-tool-label">{{ t('workspace.log.toolArgs') }}</div>
+          <div class="trace-tool-label">{{ t('workspace.diagnostics.toolArgs') }}</div>
           <pre class="trace-pre">{{ prettyValue(tool.args) }}</pre>
-          <div class="trace-tool-label">{{ t('workspace.log.toolResult') }}</div>
-          <pre class="trace-pre">{{ tool.result || t('workspace.log.emptyContent') }}</pre>
+          <div class="trace-tool-label">{{ t('workspace.diagnostics.toolResult') }}</div>
+          <pre class="trace-pre">{{ tool.result || t('workspace.diagnostics.emptyContent') }}</pre>
         </div>
       </div>
     </div>

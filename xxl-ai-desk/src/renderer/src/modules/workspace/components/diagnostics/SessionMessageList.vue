@@ -1,18 +1,18 @@
 <script setup lang="ts">
 /*
- * 对话记录列表：分页读取 desk_message，点击查看正文与原始 data。
+ * 会话消息列表：分页读取 desk_message，点击查看正文与原始 data。
  * @author xuxueli 2026-11-01
  */
 import { computed, ref } from 'vue'
 import { api } from '@renderer/api'
 import { t } from '@renderer/i18n'
-import { usePagedLog } from '../../composables/usePagedLog'
+import { usePagedList } from '../../composables/usePagedList'
 import {
   formatDateTime,
   prettyJson,
   previewOfMessage,
   previewTag
-} from '../../utils/logDisplay'
+} from '../../utils/diagnosticsDisplay'
 import type { StoredMessage } from '@shared/ipc'
 
 const props = defineProps<{
@@ -22,12 +22,12 @@ const props = defineProps<{
   active?: boolean
 }>()
 
-/* 分页、可见性刷新与轮询统一由 usePagedLog 处理 */
+/* 分页、可见性刷新与轮询统一由 usePagedList 处理 */
 const { items, total, page, pageSize, loading, error, changePage } =
-  usePagedLog<StoredMessage>({
+  usePagedList<StoredMessage>({
     sessionId: () => props.sessionId,
     active: () => Boolean(props.active),
-    fetchPage: (query) => api.sessionLog.messages(query)
+    fetchPage: (query) => api.diagnostics.messages(query)
   })
 
 /* 预生成摘要：避免模板中重复解析 JSON */
@@ -47,35 +47,35 @@ function openDetail(item: StoredMessage): void {
 </script>
 
 <template>
-  <div class="log-list">
-    <div v-if="loading" class="log-empty">{{ t('workspace.log.loading') }}</div>
-    <div v-else-if="error" class="log-empty">{{ error }}</div>
-    <div v-else-if="rows.length === 0" class="log-empty">{{ t('workspace.log.empty') }}</div>
-    <div v-else class="log-rows">
+  <div class="diagnostics-list">
+    <div v-if="loading" class="diagnostics-empty">{{ t('workspace.diagnostics.loading') }}</div>
+    <div v-else-if="error" class="diagnostics-empty">{{ error }}</div>
+    <div v-else-if="rows.length === 0" class="diagnostics-empty">{{ t('workspace.diagnostics.empty') }}</div>
+    <div v-else class="diagnostics-rows">
       <button
         v-for="row in rows"
         :key="row.item.id"
         type="button"
-        class="log-row"
+        class="diagnostics-row"
         @click="openDetail(row.item)"
       >
-        <div class="log-row-head">
-          <span class="log-role">{{ row.item.role || '—' }}</span>
-          <span class="log-meta">#{{ row.item.seq }}</span>
-          <span class="log-meta">{{ formatDateTime(row.item.addTime) }}</span>
+        <div class="diagnostics-row-head">
+          <span class="diagnostics-role">{{ row.item.role || '—' }}</span>
+          <span class="diagnostics-meta">#{{ row.item.seq }}</span>
+          <span class="diagnostics-meta">{{ formatDateTime(row.item.addTime) }}</span>
         </div>
-        <div class="log-text" :class="row.preview.kind">
-          <span v-if="previewTag(row.preview.kind)" class="log-tag">
+        <div class="diagnostics-text" :class="row.preview.kind">
+          <span v-if="previewTag(row.preview.kind)" class="diagnostics-tag">
             {{ previewTag(row.preview.kind) }}
           </span>
-          <span class="log-text-body">
-            {{ row.preview.text || t('workspace.log.emptyContent') }}
+          <span class="diagnostics-text-body">
+            {{ row.preview.text || t('workspace.diagnostics.emptyContent') }}
           </span>
         </div>
       </button>
     </div>
 
-    <div class="log-footer">
+    <div class="diagnostics-footer">
       <el-pagination
         :current-page="page"
         :page-size="pageSize"
@@ -88,10 +88,10 @@ function openDetail(item: StoredMessage): void {
 
     <el-dialog
       v-model="detailVisible"
-      :title="t('workspace.log.messageDetail')"
+      :title="t('workspace.diagnostics.messageDetail')"
       width="720px"
       append-to-body
-      class="log-dialog"
+      class="diagnostics-dialog"
     >
       <div v-if="detail" class="detail-body">
         <div class="detail-meta">
@@ -100,11 +100,11 @@ function openDetail(item: StoredMessage): void {
           <span>{{ formatDateTime(detail.addTime) }}</span>
         </div>
         <div class="detail-section">
-          <div class="detail-label">{{ t('workspace.log.content') }}</div>
-          <pre class="detail-pre">{{ detail.content || t('workspace.log.emptyContent') }}</pre>
+          <div class="detail-label">{{ t('workspace.diagnostics.content') }}</div>
+          <pre class="detail-pre">{{ detail.content || t('workspace.diagnostics.emptyContent') }}</pre>
         </div>
         <div class="detail-section">
-          <div class="detail-label">{{ t('workspace.log.raw') }}</div>
+          <div class="detail-label">{{ t('workspace.diagnostics.raw') }}</div>
           <pre class="detail-pre">{{ prettyJson(detail.data) }}</pre>
         </div>
       </div>
@@ -113,10 +113,10 @@ function openDetail(item: StoredMessage): void {
 </template>
 
 <style scoped lang="scss">
-@use './logList.scss';
+@use './diagnosticsList.scss';
 
-/* 角色标签：单个列表专用，其余行样式复用 logList */
-.log-role {
+/* 角色标签：单个列表专用，其余行样式复用 diagnosticsList */
+.diagnostics-role {
   padding: 1px 6px;
   border-radius: 4px;
   background: var(--desk-selected-bg);

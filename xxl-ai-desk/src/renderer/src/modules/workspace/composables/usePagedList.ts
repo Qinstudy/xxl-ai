@@ -1,5 +1,5 @@
 /*
- * 日志分页加载：统一页码、静默轮询与可见性刷新，供会话 Trace / 模型通讯列表复用。
+ * 分页加载：统一页码、静默轮询与可见性刷新，供会话诊断的会话消息 / 模型通讯列表复用。
  *   - 仅面板可见时请求与轮询，隐藏后立即停止；
  *   - 切换会话回到第一页，轮询不覆盖用户当前页码。
  * @author xuxueli 2026-11-01
@@ -7,16 +7,16 @@
 
 import { onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { ipcErrorMessage } from '@renderer/utils/ipcError'
-import type { LogPageQuery, PageResult } from '@shared/ipc'
+import type { DiagnosticsQuery, PageResult } from '@shared/ipc'
 
 /* 分页加载配置 */
-export interface PagedLogOptions<T> {
+export interface PagedListOptions<T> {
   /* 当前会话（响应式读取） */
   sessionId: () => string
   /* 面板是否可见激活（响应式读取） */
   active: () => boolean
   /* 拉取一页数据 */
-  fetchPage: (query: LogPageQuery) => Promise<PageResult<T>>
+  fetchPage: (query: DiagnosticsQuery) => Promise<PageResult<T>>
   /* 每页条数（默认 20） */
   pageSize?: number
   /* 轮询间隔（默认 3s） */
@@ -24,7 +24,7 @@ export interface PagedLogOptions<T> {
 }
 
 /* 分页加载状态与动作 */
-export interface PagedLogState<T> {
+export interface PagedListState<T> {
   items: Ref<T[]>
   total: Ref<number>
   page: Ref<number>
@@ -34,7 +34,7 @@ export interface PagedLogState<T> {
   changePage: (next: number) => void
 }
 
-export function usePagedLog<T>(options: PagedLogOptions<T>): PagedLogState<T> {
+export function usePagedList<T>(options: PagedListOptions<T>): PagedListState<T> {
   const pageSize = options.pageSize ?? 20
   const pollMs = options.pollMs ?? 3000
 

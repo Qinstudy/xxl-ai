@@ -131,8 +131,9 @@ function restoreInstructions(): void {
 
 .preset-label {
   flex-shrink: 0;
-  font-size: var(--desk-font-sm);
-  color: var(--desk-text-secondary);
+  font-size: var(--desk-font-base);
+  line-height: 22px;
+  color: var(--desk-text);
 }
 
 .preset-list {

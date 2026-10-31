@@ -32,7 +32,7 @@ if (typeof route.query.tab === 'string' && route.query.tab) {
           <el-tab-pane :label="t('settings.general')" name="general">
             <GeneralSettings />
           </el-tab-pane>
-          <el-tab-pane :label="t('settings.runtimeTab')" name="runtime">
+          <el-tab-pane :label="t('settings.advancedTab')" name="advanced">
             <div class="settings-pane">
               <DataDirSettings />
               <RuntimeSettings />

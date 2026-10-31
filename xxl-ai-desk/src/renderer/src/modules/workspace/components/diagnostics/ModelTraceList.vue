@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
- * 模型通讯日志列表：分页读取模型 trace，支持查看完整请求 / 响应 / 工具调用与清空。
+ * 模型通讯列表：分页读取 trace 记录，支持查看完整请求 / 响应 / 工具调用与清空。
  * @author xuxueli 2026-11-01
  */
 import { computed, ref } from 'vue'
@@ -8,9 +8,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@renderer/api'
 import { t } from '@renderer/i18n'
 import { ipcErrorMessage } from '@renderer/utils/ipcError'
-import { usePagedLog } from '../../composables/usePagedLog'
-import { formatClock, previewOfTrace, previewTag, traceStatusText } from '../../utils/logDisplay'
-import TraceDetailDialog from './TraceDetailDialog.vue'
+import { usePagedList } from '../../composables/usePagedList'
+import { formatClock, previewOfTrace, previewTag, traceStatusText } from '../../utils/diagnosticsDisplay'
+import ModelTraceDetailDialog from './ModelTraceDetailDialog.vue'
 import type { LlmTraceDTO } from '@shared/ipc'
 
 const props = defineProps<{
@@ -20,12 +20,12 @@ const props = defineProps<{
   active?: boolean
 }>()
 
-/* 分页、可见性刷新与轮询统一由 usePagedLog 处理 */
+/* 分页、可见性刷新与轮询统一由 usePagedList 处理 */
 const { items, total, page, pageSize, loading, error, changePage } =
-  usePagedLog<LlmTraceDTO>({
+  usePagedList<LlmTraceDTO>({
     sessionId: () => props.sessionId,
     active: () => Boolean(props.active),
-    fetchPage: (query) => api.sessionLog.traces(query)
+    fetchPage: (query) => api.diagnostics.traces(query)
   })
 
 /* 预生成摘要：避免模板中重复解析 JSON */
@@ -46,7 +46,7 @@ function openDetail(item: LlmTraceDTO): void {
 /* 清空本会话通讯记录 */
 async function clearTraces(): Promise<void> {
   try {
-    await ElMessageBox.confirm(t('workspace.log.clearConfirm'), t('workspace.log.clear'), {
+    await ElMessageBox.confirm(t('workspace.diagnostics.clearConfirm'), t('workspace.diagnostics.clear'), {
       type: 'warning',
       appendTo: document.body
     })
@@ -54,9 +54,9 @@ async function clearTraces(): Promise<void> {
     return
   }
   try {
-    await api.sessionLog.clearTraces(props.sessionId)
+    await api.diagnostics.clearTraces(props.sessionId)
     changePage(1)
-    ElMessage.success(t('workspace.log.cleared'))
+    ElMessage.success(t('workspace.diagnostics.cleared'))
   } catch (cause) {
     ElMessage.error(ipcErrorMessage(cause))
   }
@@ -64,46 +64,46 @@ async function clearTraces(): Promise<void> {
 </script>
 
 <template>
-  <div class="log-list">
+  <div class="diagnostics-list">
     <div class="trace-toolbar">
-      <span class="trace-total">{{ t('workspace.log.traceTotal', [total]) }}</span>
+      <span class="trace-total">{{ t('workspace.diagnostics.traceTotal', [total]) }}</span>
       <el-button size="small" :disabled="total === 0" @click="clearTraces">
-        {{ t('workspace.log.clear') }}
+        {{ t('workspace.diagnostics.clear') }}
       </el-button>
     </div>
 
-    <div v-if="loading" class="log-empty">{{ t('workspace.log.loading') }}</div>
-    <div v-else-if="error" class="log-empty">{{ error }}</div>
-    <div v-else-if="rows.length === 0" class="log-empty">{{ t('workspace.log.empty') }}</div>
-    <div v-else class="log-rows">
+    <div v-if="loading" class="diagnostics-empty">{{ t('workspace.diagnostics.loading') }}</div>
+    <div v-else-if="error" class="diagnostics-empty">{{ error }}</div>
+    <div v-else-if="rows.length === 0" class="diagnostics-empty">{{ t('workspace.diagnostics.empty') }}</div>
+    <div v-else class="diagnostics-rows">
       <button
         v-for="row in rows"
         :key="row.item.id"
         type="button"
-        class="log-row"
+        class="diagnostics-row"
         @click="openDetail(row.item)"
       >
-        <div class="log-row-head">
-          <span class="log-step">#{{ row.item.step }}</span>
-          <span class="log-model">{{ row.item.modelId }}</span>
-          <span class="log-status" :class="row.item.status">
+        <div class="diagnostics-row-head">
+          <span class="diagnostics-step">#{{ row.item.step }}</span>
+          <span class="diagnostics-model">{{ row.item.modelId }}</span>
+          <span class="diagnostics-status" :class="row.item.status">
             {{ traceStatusText(row.item.status) }}
           </span>
-          <span class="log-meta">{{ row.item.durationMs }}ms</span>
-          <span class="log-meta">{{ row.item.inputTokens }}/{{ row.item.outputTokens }}</span>
-          <span class="log-meta">{{ t('workspace.log.tools') }} {{ row.item.toolCalls.length }}</span>
-          <span class="log-meta">{{ formatClock(row.item.addTime) }}</span>
+          <span class="diagnostics-meta">{{ row.item.durationMs }}ms</span>
+          <span class="diagnostics-meta">{{ row.item.inputTokens }}/{{ row.item.outputTokens }}</span>
+          <span class="diagnostics-meta">{{ t('workspace.diagnostics.tools') }} {{ row.item.toolCalls.length }}</span>
+          <span class="diagnostics-meta">{{ formatClock(row.item.addTime) }}</span>
         </div>
-        <div class="log-text" :class="row.preview.kind">
-          <span v-if="previewTag(row.preview.kind)" class="log-tag">
+        <div class="diagnostics-text" :class="row.preview.kind">
+          <span v-if="previewTag(row.preview.kind)" class="diagnostics-tag">
             {{ previewTag(row.preview.kind) }}
           </span>
-          <span class="log-text-body">{{ row.preview.text }}</span>
+          <span class="diagnostics-text-body">{{ row.preview.text }}</span>
         </div>
       </button>
     </div>
 
-    <div class="log-footer">
+    <div class="diagnostics-footer">
       <el-pagination
         :current-page="page"
         :page-size="pageSize"
@@ -114,12 +114,12 @@ async function clearTraces(): Promise<void> {
       />
     </div>
 
-    <TraceDetailDialog v-model="detailVisible" :trace="detail" />
+    <ModelTraceDetailDialog v-model="detailVisible" :trace="detail" />
   </div>
 </template>
 
 <style scoped lang="scss">
-@use './logList.scss';
+@use './diagnosticsList.scss';
 
 /* 顶部工具条：总条数 + 清空操作 */
 .trace-toolbar {
@@ -136,13 +136,13 @@ async function clearTraces(): Promise<void> {
 }
 
 /* 步骤号：略强于普通元信息 */
-.log-step {
+.diagnostics-step {
   font-weight: 600;
   color: var(--desk-text-secondary);
 }
 
 /* 模型 ID：超长省略，避免挤压同行其它字段 */
-.log-model {
+.diagnostics-model {
   max-width: 180px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -150,17 +150,17 @@ async function clearTraces(): Promise<void> {
 }
 
 /* 状态标签：默认成功色，失败 / 中止单独着色 */
-.log-status {
+.diagnostics-status {
   padding: 1px 6px;
   border-radius: 4px;
   background: var(--desk-selected-bg);
 }
 
-.log-status.error {
+.diagnostics-status.error {
   color: var(--el-color-danger);
 }
 
-.log-status.aborted {
+.diagnostics-status.aborted {
   color: var(--el-color-warning);
 }
 </style>

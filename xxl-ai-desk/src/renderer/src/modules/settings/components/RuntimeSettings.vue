@@ -154,8 +154,8 @@ function showDetectResult(result: RuntimeDetectResult): void {
 
 <template>
   <div class="runtime">
-    <div class="runtime-title">{{ t('settings.runtimeTitle') }}</div>
-    <div class="runtime-tip">{{ t('settings.runtimeTip') }}</div>
+    <div class="settings-block-title">{{ t('settings.runtimeTitle') }}</div>
+    <div class="settings-block-tip runtime-tip">{{ t('settings.runtimeTip') }}</div>
 
     <!-- Node：内置（Electron）或自定义可执行文件 -->
     <div class="runtime-group">
@@ -216,6 +216,8 @@ function showDetectResult(result: RuntimeDetectResult): void {
 </template>
 
 <style scoped lang="scss">
+@use './settingsBlock.scss';
+
 /* 命令运行环境（Node / Python 路径） */
 .runtime {
   margin-top: 28px;
@@ -223,15 +225,8 @@ function showDetectResult(result: RuntimeDetectResult): void {
   border-top: 1px solid var(--desk-border);
 }
 
-.runtime-title {
-  font-size: var(--desk-font-base);
-  color: var(--el-text-color-regular);
-  margin-bottom: 6px;
-}
-
+/* 说明与下方运行时卡片的间距 */
 .runtime-tip {
-  font-size: var(--desk-font-xs);
-  color: var(--desk-text-tertiary);
   margin-bottom: 16px;
 }
 

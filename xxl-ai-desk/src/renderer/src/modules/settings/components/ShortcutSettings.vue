@@ -46,8 +46,8 @@ function resetShortcuts(): void {
 
 <template>
   <div class="shortcuts">
-    <div class="shortcuts-title">{{ t('settings.shortcuts') }}</div>
-    <div class="shortcuts-tip">{{ t('settings.shortcutsTip') }}</div>
+    <div class="settings-block-title">{{ t('settings.shortcuts') }}</div>
+    <div class="settings-block-tip shortcuts-tip">{{ t('settings.shortcutsTip') }}</div>
     <div v-for="action in quickActions" :key="action.id" class="shortcut-row">
       <span class="shortcut-label">{{ t(action.labelKey) }}</span>
       <ShortcutInput
@@ -62,6 +62,8 @@ function resetShortcuts(): void {
 </template>
 
 <style scoped lang="scss">
+@use './settingsBlock.scss';
+
 /* 快捷键：快捷操作快捷键配置 */
 .shortcuts {
   margin-top: 28px;
@@ -69,15 +71,8 @@ function resetShortcuts(): void {
   border-top: 1px solid var(--desk-border);
 }
 
-.shortcuts-title {
-  font-size: var(--desk-font-base);
-  color: var(--el-text-color-regular);
-  margin-bottom: 6px;
-}
-
+/* 说明与下方快捷键列表的间距 */
 .shortcuts-tip {
-  font-size: var(--desk-font-xs);
-  color: var(--desk-text-tertiary);
   margin-bottom: 12px;
 }
 

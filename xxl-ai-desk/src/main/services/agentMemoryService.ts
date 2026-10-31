@@ -333,7 +333,7 @@ export async function maybeGenerateAgentMemory(sessionId: string): Promise<void>
   generatingProjects.add(project.id)
   try {
     const content = await generateMemory({
-      provider: { ...toRuntimeConfig(target.provider), sessionId },
+      provider: toRuntimeConfig(target.provider),
       modelId: target.modelId,
       language: settings.language,
       oldMemory: memory?.content ?? '',

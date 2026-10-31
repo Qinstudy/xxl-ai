@@ -1,6 +1,6 @@
 /*
- * 会话日志服务：对话记录分页，模型通讯 trace 的落库、分页与清理。
- *   - 对话记录直接读取 desk_message，不复制数据；
+ * 会话诊断服务：会话消息分页，模型通讯 trace 的落库、分页与清理。
+ *   - 诊断视图只读聚合：会话消息读 desk_message，不复制数据；
  *   - 模型通讯仅开发者模式开启时写入；worker 采集后经 host 回传，本服务是唯一 getDb 出口。
  *
  * @author xuxueli 2026-11-01
@@ -10,10 +10,17 @@ import { randomUUID } from 'crypto'
 import { and, count, desc, eq, inArray, lt } from 'drizzle-orm'
 import { getDb } from '../db'
 import { llmTraceTable, messageTable } from '../db/schema'
+import {
+  TRACE_ERROR_MAX_CHARS,
+  TRACE_REQUEST_MAX_CHARS,
+  TRACE_RESPONSE_MAX_CHARS,
+  TRACE_TOOL_CALLS_MAX_CHARS,
+  TRACE_TOOL_RESULT_MAX_CHARS
+} from '@shared/ipc'
 import type {
+  DiagnosticsQuery,
   LlmTraceDTO,
   LlmTraceInput,
-  LogPageQuery,
   PageResult,
   StoredMessage,
   ToolCallTraceDTO
@@ -24,11 +31,6 @@ import { getSettings } from './settingsService'
 /* 保留天数与单会话条数上限：开发者模式长期开启时控制体积 */
 const TRACE_RETENTION_DAYS = 7
 const TRACE_SESSION_LIMIT = 1000
-
-/* 单字段大小上限（字符）：与 worker 侧一致，主进程再兜底一次 */
-const REQUEST_MAX_CHARS = 256 * 1024
-const RESPONSE_MAX_CHARS = 64 * 1024
-const TOOL_CALLS_MAX_CHARS = 256 * 1024
 
 /* 字符串截断：超长追加截断标记 */
 function clip(text: string, limit: number): string {
@@ -45,7 +47,7 @@ function serialize(value: unknown): string {
 }
 
 /* 分页参数归一化：页码 ≥1，每页 1-100 */
-function normalizePage(query: LogPageQuery): { page: number; pageSize: number; offset: number } {
+function normalizePage(query: DiagnosticsQuery): { page: number; pageSize: number; offset: number } {
   const page = Math.max(1, Math.floor(Number(query.page) || 1))
   const pageSize = Math.min(100, Math.max(1, Math.floor(Number(query.pageSize) || 20)))
   return { page, pageSize, offset: (page - 1) * pageSize }
@@ -61,8 +63,8 @@ function normalizePhase(phase: string): LlmTraceDTO['phase'] {
   return phase === 'memory' ? 'memory' : 'chat'
 }
 
-/* 对话记录分页：按 seq 倒序，最新在前 */
-export function listMessagePage(query: LogPageQuery): PageResult<StoredMessage> {
+/* 会话消息分页：按 seq 倒序，最新在前 */
+export function listMessagePage(query: DiagnosticsQuery): PageResult<StoredMessage> {
   const { page, pageSize, offset } = normalizePage(query)
   const condition = eq(messageTable.sessionId, query.sessionId)
   const db = getDb()
@@ -87,10 +89,10 @@ export function listMessagePage(query: LogPageQuery): PageResult<StoredMessage> 
 function serializeToolCalls(toolCalls: ToolCallTraceDTO[]): string {
   const clipped = (toolCalls ?? []).map((item) => ({
     ...item,
-    /* 单个工具结果上限 32KB */
-    result: clip(String(item.result ?? ''), 32 * 1024)
+    /* 单个工具结果上限与 worker 采集一致 */
+    result: clip(String(item.result ?? ''), TRACE_TOOL_RESULT_MAX_CHARS)
   }))
-  return clip(serialize(clipped), TOOL_CALLS_MAX_CHARS)
+  return clip(serialize(clipped), TRACE_TOOL_CALLS_MAX_CHARS)
 }
 
 /* 行记录 → DTO */
@@ -148,10 +150,10 @@ export function recordTrace(sessionId: string, trace: LlmTraceInput): void {
       inputTokens: Number(trace.inputTokens) || 0,
       outputTokens: Number(trace.outputTokens) || 0,
       reasoningTokens: Number(trace.reasoningTokens) || 0,
-      request: clip(trace.request ?? '', REQUEST_MAX_CHARS),
-      response: clip(trace.response ?? '', RESPONSE_MAX_CHARS),
+      request: clip(trace.request ?? '', TRACE_REQUEST_MAX_CHARS),
+      response: clip(trace.response ?? '', TRACE_RESPONSE_MAX_CHARS),
       toolCalls: serializeToolCalls(trace.toolCalls ?? []),
-      error: clip(trace.error ?? '', 4000),
+      error: clip(trace.error ?? '', TRACE_ERROR_MAX_CHARS),
       addTime: new Date().toISOString()
     })
     .run()
@@ -192,7 +194,7 @@ export function purgeExpiredTraces(): void {
 }
 
 /* 模型通讯分页：按写入时间倒序，同一轮内按 step 倒序 */
-export function listTraces(query: LogPageQuery): PageResult<LlmTraceDTO> {
+export function listTraces(query: DiagnosticsQuery): PageResult<LlmTraceDTO> {
   const { page, pageSize, offset } = normalizePage(query)
   const condition = eq(llmTraceTable.sessionId, query.sessionId)
   const db = getDb()

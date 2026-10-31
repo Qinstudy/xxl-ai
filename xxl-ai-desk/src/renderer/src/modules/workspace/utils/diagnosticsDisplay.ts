@@ -1,5 +1,5 @@
 /*
- * 会话日志展示工具：对话记录 / 模型通讯的列表摘要、状态文案与 JSON 格式化。
+ * 会话诊断展示工具：会话消息 / 模型通讯的列表摘要、状态文案与 JSON 格式化。
  *   - 纯函数 + i18n 文案，供列表与详情弹窗复用，避免各组件重复解析内容块；
  *   - 内容块为运行时消息结构，脏数据统一按空数组处理。
  *
@@ -10,11 +10,11 @@ import { t } from '@renderer/i18n'
 import type { LlmTraceDTO, StoredMessage } from '@shared/ipc'
 
 /* 摘要类型：正文 / 思考 / 工具 / 图片 / 失败 / 空 */
-export type LogPreviewKind = 'text' | 'thinking' | 'tool' | 'image' | 'error' | 'empty'
+export type PreviewKind = 'text' | 'thinking' | 'tool' | 'image' | 'error' | 'empty'
 
 /* 列表摘要 */
-export interface LogPreview {
-  kind: LogPreviewKind
+export interface Preview {
+  kind: PreviewKind
   text: string
 }
 
@@ -48,8 +48,8 @@ function joinBlocks(blocks: ContentBlock[], type: 'text' | 'thinking'): string {
     .trim()
 }
 
-/* 对话记录摘要：正文 → 思考 → 工具调用 → 图片 → 空 */
-export function previewOfMessage(item: StoredMessage): LogPreview {
+/* 会话消息摘要：正文 → 思考 → 工具调用 → 图片 → 空 */
+export function previewOfMessage(item: StoredMessage): Preview {
   const text = item.content.trim()
   if (text) {
     return { kind: 'text', text }
@@ -69,11 +69,11 @@ export function previewOfMessage(item: StoredMessage): LogPreview {
   if (blocks.some((block) => block.type === 'image')) {
     return { kind: 'image', text: '' }
   }
-  return { kind: 'empty', text: t('workspace.log.emptyContent') }
+  return { kind: 'empty', text: t('workspace.diagnostics.emptyContent') }
 }
 
 /* 模型通讯摘要：错误 → 正文 → 工具 → 思考 → 状态 / 空 */
-export function previewOfTrace(item: LlmTraceDTO): LogPreview {
+export function previewOfTrace(item: LlmTraceDTO): Preview {
   if (item.error) {
     return { kind: 'error', text: item.error }
   }
@@ -90,35 +90,35 @@ export function previewOfTrace(item: LlmTraceDTO): LogPreview {
     return { kind: 'thinking', text: thinking }
   }
   return item.status === 'success'
-    ? { kind: 'empty', text: t('workspace.log.emptyContent') }
+    ? { kind: 'empty', text: t('workspace.diagnostics.emptyContent') }
     : { kind: 'error', text: traceStatusText(item.status) }
 }
 
 /* 摘要标签：正文与空态不展示 */
-export function previewTag(kind: LogPreviewKind): string {
+export function previewTag(kind: PreviewKind): string {
   if (kind === 'thinking') {
-    return t('workspace.log.thinking')
+    return t('workspace.diagnostics.thinking')
   }
   if (kind === 'tool') {
-    return t('workspace.log.tools')
+    return t('workspace.diagnostics.tools')
   }
   if (kind === 'image') {
-    return t('workspace.log.image')
+    return t('workspace.diagnostics.image')
   }
-  return kind === 'error' ? t('workspace.log.statusError') : ''
+  return kind === 'error' ? t('workspace.diagnostics.statusError') : ''
 }
 
 /* 通讯状态文案 */
 export function traceStatusText(status: LlmTraceDTO['status']): string {
   if (status === 'error') {
-    return t('workspace.log.statusError')
+    return t('workspace.diagnostics.statusError')
   }
-  return status === 'aborted' ? t('workspace.log.statusAborted') : t('workspace.log.statusSuccess')
+  return status === 'aborted' ? t('workspace.diagnostics.statusAborted') : t('workspace.diagnostics.statusSuccess')
 }
 
 /* 通讯来源文案：对话 / 记忆生成 */
 export function tracePhaseText(phase: LlmTraceDTO['phase']): string {
-  return phase === 'memory' ? t('workspace.log.phaseMemory') : t('workspace.log.phaseChat')
+  return phase === 'memory' ? t('workspace.diagnostics.phaseMemory') : t('workspace.diagnostics.phaseChat')
 }
 
 /* 日期与时间（详情用），非法值原样返回 */

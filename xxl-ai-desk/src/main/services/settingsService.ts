@@ -1,7 +1,6 @@
 /*
  * 应用设置服务：以 key-value 持久化外观、主题预设、语言、默认模型、系统指令等配置。
  *   - 读取时逐项回退默认值；保存为部分更新（upsert）。
- *   - 兼容旧版：外观曾存于 theme 键，新版本改读 appearance，旧值仅作为外观回退。
  */
 
 import { getDb } from '../db'
@@ -21,7 +20,7 @@ const APPEARANCE_VALUES = new Set<string>(APPEARANCES)
 /* 主题预设集合 */
 const THEME_VALUES = new Set<string>(THEME_PRESETS)
 
-/* 归一化外观：非法或旧值回退默认 */
+/* 归一化外观：非法值回退默认 */
 function normalizeAppearance(value: string | undefined): AppSettings['appearance'] {
   return APPEARANCE_VALUES.has(value ?? '')
     ? (value as AppSettings['appearance'])
@@ -56,10 +55,8 @@ export function getSettings(): AppSettings {
   const rows = getDb().select().from(settingTable).all()
   const map = new Map(rows.map((row) => [row.key, row.value]))
   const language = (map.get('language') as AppSettings['language']) || DEFAULT_APP_SETTINGS.language
-  /* 兼容旧版：appearance 未写入时读取旧 theme 键（light/dark/system） */
-  const legacyTheme = map.get('theme')
   return {
-    appearance: normalizeAppearance(map.get('appearance') ?? legacyTheme),
+    appearance: normalizeAppearance(map.get('appearance')),
     themePreset: normalizeTheme(map.get('themePreset')),
     language,
     providerId: map.get('providerId') || DEFAULT_APP_SETTINGS.providerId,
