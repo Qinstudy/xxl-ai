@@ -321,7 +321,7 @@
     "memoryContentPlaceholder": "Maintain project memory by the fixed dimensions; it is injected into the next chat after saving",
     "memoryInject": "\n\n## Agent Memory\nHistory memory may be outdated; if it conflicts with current instructions or actual files, trust the current information.\n{0}",
     "memoryGen": {
-      "system": "You are a memory compression assistant. Compress the old memory and recent conversation into a new project memory. Output Markdown only, with exactly these four level-2 sections: ## {0}, ## {1}, ## {2}, ## {3}. Requirements: at most 2000 characters; keep only long-term useful facts, preferences, decisions and todos; never fabricate; never record secrets or passwords; write \"None\" for empty sections.",
+      "system": "You are a memory compression assistant. Merge the old memory and recent conversation into one up-to-date project memory. Output Markdown only, with exactly these four level-2 sections: ## {0}, ## {1}, ## {2}, ## {3}. Requirements: at most 2000 characters; keep what is still valid from the old memory and overwrite outdated content with the recent conversation; keep only long-term useful facts, preferences, decisions and todos; never fabricate; never record secrets or passwords; write \"None\" for empty sections.",
       "user": "Old memory:\n{0}\n\nRecent conversation:\n{1}",
       "empty": "(none)"
     },

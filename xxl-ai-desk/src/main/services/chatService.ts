@@ -41,7 +41,7 @@ const abortRequested = new Set<string>()
 /* 已丢弃结果的会话：删除会话/清空消息后，正在运行的轮次不再回写，避免产生孤儿数据 */
 const discardedSessions = new Set<string>()
 
-/* 将 Agent 消息内容归一化为纯文本（用于列表预览与检索） */
+/* 将 Agent 消息内容归一化为纯正文（用于落库预览与记忆转录）：只保留 text 块 */
 function contentToText(message: unknown): string {
   const content = (message as { content?: unknown })?.content
   if (typeof content === 'string') {
@@ -53,7 +53,9 @@ function contentToText(message: unknown): string {
         if (typeof part === 'string') {
           return part
         }
-        return (part as { text?: string })?.text ?? ''
+        const block = part as { type?: string; text?: string }
+        /* thinking / toolCall / toolResult 不进入正文，避免思考与工具参数落库 */
+        return block.type === 'text' ? (block.text ?? '') : ''
       })
       .join('')
   }

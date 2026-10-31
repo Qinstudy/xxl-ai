@@ -220,9 +220,10 @@ export function registerIpc(getWindow: () => BrowserWindow | null): void {
   handle(IPC.settingsGet, () => getSettings())
   handle(IPC.settingsSave, (_event, patch: Partial<AppSettings>) => {
     const saved = saveSettings(patch)
-    /* 自定义指令与内置工具开关变更后清空运行时缓存，使全部会话（含旧对话）下次对话即生效 */
+    /* 自定义指令、记忆开关与内置工具开关变更后清空运行时缓存，使全部会话（含旧对话）下次对话即生效 */
     if (
       patch.systemPrompt !== undefined ||
+      patch.agentMemoryEnabled !== undefined ||
       patch.builtinToolBrowserEnabled !== undefined ||
       patch.builtinToolFsEnabled !== undefined ||
       patch.builtinToolShellEnabled !== undefined ||

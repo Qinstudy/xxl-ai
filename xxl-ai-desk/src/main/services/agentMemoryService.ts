@@ -114,16 +114,19 @@ export function saveAgentMemory(input: AgentMemorySaveInput): AgentMemoryDTO {
     .from(agentMemoryTable)
     .where(eq(agentMemoryTable.projectId, project.id))
     .get()
-  return upsertMemory(
+  const saved = upsertMemory(
     project.id,
     (input.content ?? '').slice(0, AGENT_MEMORY_MAX_CHARS),
     existing?.lastMessageId ?? ''
   )
+  evictProjectAgents(project.id)
+  return saved
 }
 
 /* 删除项目记忆（保留项目本身） */
 export function removeAgentMemory(projectId: string): void {
   getDb().delete(agentMemoryTable).where(eq(agentMemoryTable.projectId, projectId)).run()
+  evictProjectAgents(projectId)
 }
 
 /* 会话运行时目标：优先会话绑定，缺失时回退设置默认，再回退供应商首个模型 */
@@ -162,6 +165,7 @@ function listMessagesAfter(sessionId: string, lastMessageId: string): Array<{
   id: string
   role: string
   content: string
+  data: string
 }> {
   const db = getDb()
   /* 记忆按项目保存，但消息 seq 是会话内序号：仅当上次消息属于当前会话时才作为起点 */
@@ -177,22 +181,65 @@ function listMessagesAfter(sessionId: string, lastMessageId: string): Array<{
     conditions.push(gt(messageTable.seq, last.seq))
   }
   return db
-    .select({ id: messageTable.id, role: messageTable.role, content: messageTable.content })
+    .select({
+      id: messageTable.id,
+      role: messageTable.role,
+      content: messageTable.content,
+      data: messageTable.data
+    })
     .from(messageTable)
     .where(and(...conditions))
     .orderBy(asc(messageTable.seq))
     .all()
 }
 
-/* 拼接用于压缩的对话转录：只取用户 / 助手正文，超长从最旧截断 */
-function buildTranscript(rows: Array<{ role: string; content: string }>): string {
+/* 提取消息正文：只取 text 块，排除 thinking 与工具调用 / 工具结果 */
+function extractMessageText(row: { content: string; data: string }): string {
+  if (!row.data) {
+    return row.content.trim()
+  }
+  try {
+    const content = (JSON.parse(row.data) as { content?: unknown }).content
+    if (typeof content === 'string') {
+      return content.trim()
+    }
+    if (!Array.isArray(content)) {
+      return row.content.trim()
+    }
+    return content
+      .map((part) => {
+        if (typeof part === 'string') {
+          return part
+        }
+        const block = part as { type?: string; text?: string }
+        return block.type === 'text' ? (block.text ?? '') : ''
+      })
+      .join('')
+      .trim()
+  } catch {
+    /* 历史脏数据无法解析时退回归一化正文，保证记忆生成不中断 */
+    return row.content.trim()
+  }
+}
+
+/* 拼接用于压缩的对话转录：仅用户 / 助手正文，超长从最旧截断 */
+function buildTranscript(
+  rows: Array<{ role: string; content: string; data: string }>
+): string {
   const transcript = rows
-    .filter((row) => (row.role === 'user' || row.role === 'assistant') && row.content.trim())
-    .map((row) => `${row.role}: ${row.content.trim()}`)
+    .filter((row) => row.role === 'user' || row.role === 'assistant')
+    .map((row) => ({ role: row.role, text: extractMessageText(row) }))
+    .filter((row) => row.text)
+    .map((row) => `${row.role}: ${row.text}`)
     .join('\n\n')
   return transcript.length > TRANSCRIPT_MAX_CHARS
     ? transcript.slice(-TRANSCRIPT_MAX_CHARS)
     : transcript
+}
+
+/* 清理项目下会话运行时：系统提示词在创建 Agent 时固化，记忆变更后需重建才能注入最新内容 */
+function evictProjectAgents(projectId: string): void {
+  listSessionIdsByProject(projectId).forEach((id) => evictAgent(id))
 }
 
 /*
@@ -253,7 +300,7 @@ export async function maybeGenerateAgentMemory(sessionId: string): Promise<void>
     }
     upsertMemory(project.id, saved, lastMessageId)
     /* 系统提示词在创建 Agent 时固化：新记忆需清理项目下会话运行时，下一轮重新装配 */
-    listSessionIdsByProject(project.id).forEach((id) => evictAgent(id))
+    evictProjectAgents(project.id)
     log.info(`[agent-memory] 项目 ${project.id} 记忆已更新（${rounds} 轮）`)
   } catch (error) {
     /* 失败隔离：保留旧记忆，下一轮达到阈值时重试 */
