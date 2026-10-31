@@ -9,7 +9,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { t } from '@renderer/i18n'
 import { useBrowserSessionStore } from '@renderer/stores/browserSession'
 import { useBrowserPanel } from '../../composables/browserRuntime'
-import GlobeIcon from '@renderer/components/icons/GlobeIcon.vue'
+import { GlobeIcon } from '@renderer/components/icons'
 
 const props = defineProps<{ sessionId: string }>()
 

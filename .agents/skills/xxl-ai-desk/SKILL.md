@@ -46,13 +46,19 @@ src/
 │   └── fileTypes.ts · defaults.ts · history.ts · providerUrl.ts · browserUrl.ts · appInfo.ts
 └── renderer/src/
     ├── api/index.ts            唯一能力入口：export const api = window.desk
-    ├── components/             跨模块通用件（ApprovalDialog / MarkdownBlock / PanelResizer / Sidebar*）
-    │   ├── shell/              外壳：AppTopbar / AppSidebar / ActivityRail / SectionMenu
-    │   └── icons/
+    ├── components/             跨模块通用件（MarkdownBlock / icons，纯展示、无业务依赖）
+    ├── layout/                 布局域：index.vue + components/ + utils/
+    │   ├── components/         统一经 components/index.ts 导出
+    │   │   ├── Navbar/         顶部导航栏
+    │   │   ├── Sidebar/        左侧栏：index / SidebarRail / SidebarContent / SidebarMenu / SidebarHeader / SidebarRow
+    │   │   ├── AppMain/        主内容区：RouterView + 终端宿主
+    │   │   └── PanelResizer/   面板尺寸拖拽原语
+    │   └── utils/              布局域单消费者工具（persistedWidth）
     ├── composables/            跨模块组合式函数（useAppBootstrap / usePanelResize / useSessionLifecycle / useQuickAction）
     ├── utils/                  无 Vue / 组件依赖的纯工具（ipcError / shortcut / localFileUrl）
-    ├── stores/*.ts             根 store（project/settings/workspace/mcp/skill/chatUi/shell/browserSession）
-    │   └── stores/chat/        会话域拆分：index / stream / messageMapping / lastSession
+    ├── stores/*.ts             根 store（project/settings/workspace/mcp/skill/chatUi/layout/browserSession）
+    │   ├── stores/chat/        会话域拆分：index / stream / messageMapping / lastSession
+    │   └── stores/workspace/   工作区拆分：index / state / storage / panel / fileExplorer / terminalTabs
     ├── modules/{chat,workspace,plugin,settings}/
     ├── i18n/index.ts           装配 shared 文案 + t()
     ├── config/nav.ts           板块 ↔ 路由 ↔ 标题 ↔ 子菜单（唯一导航来源）
@@ -67,7 +73,7 @@ src/
 
 ```
 modules/chat/        pages/ · components/ · composables/ · utils/ · index.ts
-modules/workspace/   components/{browser,file,terminal}/ · composables/ · utils/ · terminal.ts · index.ts
+modules/workspace/   components/{hosts,browser,file,terminal}/ · composables/ · utils/ · terminal.ts · index.ts
 modules/plugin/      pages/ · components/ · utils/ · builtin/{pages,catalog.ts} · mcp/{pages,components}/ · skill/{pages,components}/
 modules/settings/    pages/ · components/ · index.ts
 ```
@@ -81,7 +87,9 @@ modules/settings/    pages/ · components/ · index.ts
 | `agent/worker/*` | `shared/*`（含 `agentProtocol`）· Pi 官方 SDK · `electron-log` | 访问 DB、`services/*`、主进程内部模块；做业务校验 |
 | `ipc.ts` | `services/*` · `agent/host` 门面 | 业务编排、状态清理、连接管理、SQL |
 | `preload` | `shared/ipc`（DeskApi 契约） | 业务逻辑；暴露任意 Node 能力 |
-| `renderer` | `@renderer/api` · 本模块内部 · `@shared/*` · `@renderer/{components,composables,utils,stores}` | 直接 `window.desk`（仅 `api/index.ts` 例外）、`node:`、跨模块内部文件 |
+| `renderer/layout` | `@renderer/{components,composables,utils,stores,config}` · 模块公共 `index.ts` | 模块内部文件；直接 `window.desk`、`node:` |
+| `renderer/components` | `@shared/*` · `@renderer/{composables,utils,i18n}` | `stores/*`、`api`、`modules/*` |
+| `renderer/modules` | `@renderer/api` · 本模块内部 · `@shared/*` · `@renderer/{components,composables,utils,stores}` · 其它模块公共 `index.ts` | 其它模块内部文件；直接 `window.desk`、`node:` |
 
 判定：
 - `services` import `agent/worker` → 违规；`agent/*` 出现 `getDb()` / DDL → 违规。
@@ -97,18 +105,20 @@ modules/settings/    pages/ · components/ · index.ts
   - `agent/host/skills/githubInstaller.ts` 直接 import `services/skillImportService`、`skillLimits`（方向反了，目标下沉 `shared/`）。
   - `agent/worker/sandbox.ts` 直接 import `main/utils/pathGuard`（目标下沉 `shared/`）。
   - `ipc.ts` 部分 handler 含会话运行时清理与 `resetAgents()`（目标改由 service 提供统一入口）。
-  - `composables/` 内有纯函数模块（`useMarkdown` / `useHighlight` / `useCodeBlock` / `useContentLink`），`utils/persistedWidth.ts` 依赖 Vue：新增按 §1.4 语义落位，触碰旧文件时顺手收敛。
+  - `composables/useHighlight.ts` 同时服务 Markdown 与文件查看器；`useContentLink` 依赖 `api.shell`，两者暂留全局；Markdown 专属的 `useMarkdown` / `useCodeBlock` / `sanitize` 已收进 `components/MarkdownBlock/`。
 
 ### 1.4 模块边界（硬约束）
 
 - **一个功能 = 一个模块**：service、契约、IPC、preload、store、页面/组件、文案、SQL、需求目录同属该模块。
 - **模块自包含**：页面放 `pages/`（页内弹窗内联）、模块内共享件放 `components/`、组合式函数放 `composables/`、纯函数放 `utils/`、跨模块出口放 `index.ts`。
+- **components 纯净**：`renderer/src/components` 只放跨模块展示组件，禁止依赖 `stores/*`、`api`、`modules/*`；统一目录 + `index.vue` + barrel。
+- **layout 受控依赖**：`layout` 可组合模块公共 `index.ts`，禁止引用模块内部文件。
 - **跨模块只走公共面**：模块 `index.ts`、store、全局 `components/composables/utils`；禁止 import 其它模块的 `pages/`、内部 `components/`、内部 `utils/`。唯一例外是路由挂载页面（无 `index.ts` 的 `plugin` 只由路由引用 `pages/`）。
 - **index.ts 只导出跨模块真正需要的**：不把内部 `components/composables` 全量透传（当前 `chat` / `workspace` 的 barrel 存在透传，新增导出按本规则）。
 - **上移条件**：`components / composables / utils` 被 **2 个及以上模块**使用才上移到 `renderer/src` 对应目录。
 - **目录规模**：单个模块目录 ≤20 个文件；超限按子业务拆分（参考 `plugin/mcp`、`plugin/skill`）。
 - **禁止桶文件**：`utils.ts / common.ts / helpers.ts / manager.ts` 不得承载多领域逻辑，文件名必须表达领域语义。
-- **会话级 UI 状态**：跨面板/跨页面的会话态放 `stores/workspace.ts` 与 `createSessionScopedStorage`，不放组件局部或全局单例。
+- **会话级 UI 状态**：跨面板/跨页面的会话态放 `stores/workspace/` 与 `createSessionScopedStorage`，不放组件局部或全局单例。
 - **闭环检验**：改一个功能应只动「模块目录 + 其契约 + 调用方」；若要动 3 个以上模块，先重划边界。
 - **适配器扩展**：多实现场景用「接口 + 注册表」，新增实现只加文件、不改调用方。
 
@@ -123,8 +133,11 @@ modules/settings/    pages/ · components/ · index.ts
 | Agent 工具 / 会话 / MCP | `main/agent/worker/*` |
 | IPC 注册 | `main/ipc.ts`（只转发） |
 | 渲染能力入口 | `renderer/src/api/index.ts` |
-| 跨模块组件 / 组合式函数 / 纯工具 | `renderer/src/{components,composables,utils}` |
-| 模块页面 / 模块内组件 | `renderer/src/modules/{domain}/{module}/{pages,components}` |
+| 跨模块组件 | `renderer/src/components/{Name}/index.vue`，统一从 `components/index.ts` 导出 |
+| 布局骨架 / 区域组件 | `renderer/src/layout/{,components/}` |
+| 跨模块组合式函数 / 纯工具 | `renderer/src/{composables,utils}` |
+| 模块页面 / 模块内组件 | `renderer/src/modules/{module}/{pages,components}` |
+| 模块壳级宿主（跨路由常驻） | `renderer/src/modules/{module}/components/hosts/` |
 | 模块状态 | `renderer/src/stores/{module}.ts`（复杂域用 `stores/{module}/`） |
 | 文案 | `shared/i18n/locales/{zh,en}.json` |
 | 颜色 / 尺寸令牌 | `renderer/src/styles/tokens.scss` |
@@ -285,22 +298,24 @@ export const useWidgetStore = defineStore('widget', () => {
 ## 5. 界面外壳
 
 ```
-desk-shell（纵向）
-├─ AppTopbar    全局顶栏（固定最顶部，整体 -webkit-app-region: drag）
-└─ desk-body（横向）
-   ├─ AppSidebar   ActivityRail（常驻图标栏）+ SectionMenu（可折叠/可拖拽子菜单）
-   └─ desk-main    正文
+layout/index.vue（app-wrapper，纵向）
+├─ Navbar        全局顶栏（固定最顶部，整体 -webkit-app-region: drag）
+└─ app-body（横向）
+   ├─ Sidebar     SidebarRail（常驻图标栏）+ SidebarContent（可折叠/可拖拽内容区）
+   │              └─ SidebarContent：ChatSidebarPanel（首页）/ SidebarMenu（插件、设置）
+   └─ AppMain     正文（RouterView + 终端宿主）
 ```
 
-- **导航单一来源**：板块 ↔ 入口路径 ↔ 顶栏标题 ↔ 子菜单项均在 `config/nav.ts`（`NAV_SECTIONS` / `SECTION_ENTRY` / `SECTION_ICON`）。新增板块需同步：`nav.ts`、`ActivityRail` 按钮、路由与正文页。
+- **术语边界**：`layout` 指应用外壳；`nav` 指导航；`sidebar` 指左侧整列；`rail` 指图标栏；`panel` 只指正文内可调整尺寸的面板（工具/终端/文件/浏览器）；`shell` 只用于操作系统 shell（`api.shell`、`desk:shell:*`）。
+- **导航单一来源**：板块 ↔ 入口路径 ↔ 顶栏标题 ↔ 子菜单项均在 `config/nav.ts`（`NAV_SECTIONS` / `SECTION_ENTRY` / `SECTION_ICON`）。新增板块需同步：`nav.ts`、`SidebarRail` 按钮、路由与正文页。
 - **顶栏**：左侧依次为首页入口（回到对话模块新建对话页）与软件名称（`appName` 优先、回落 `app.name`），其后为板块图标 + 标题/操作，标题随路由（首页=会话标题，插件=「插件」，设置=「系统设置」）；软件名称与标题间的细线仅在有标题时展示；交互控件 `no-drag`。
 - **子菜单**：标题 18px/600，条目 14px/400，选中项 600 + 浅底；不展示 Logo；点击当前板块按钮切换子菜单栏折叠/展开，图标栏常驻。
-- **shell 不承载域逻辑**：域内逻辑下沉 `modules/{module}`。
-- **shell 不承载启动逻辑**：`App.vue` 只组装外壳；全局快捷键、设置/项目/会话初始化、会话生命周期与更新检查在 `composables/useAppBootstrap.ts`。
-- **面板交互统一复用**：拖拽用 `composables/usePanelResize.ts` + `components/PanelResizer.vue`；宽度持久化左侧栏用 `utils/persistedWidth.ts`，终端等会话级尺寸走 `stores/workspace.ts`（按会话持久化）。
+- **布局不承载域逻辑**：域内逻辑下沉 `modules/{module}`；`SidebarContent` 是唯一装配侧栏域内容的位置。
+- **布局不承载启动逻辑**：`App.vue` 只组装外壳；全局快捷键、设置/项目/会话初始化、会话生命周期与更新检查在 `composables/useAppBootstrap.ts`。
+- **面板交互统一复用**：拖拽用 `composables/usePanelResize.ts` + `layout/components/PanelResizer/index.vue`；左侧栏宽度走 `stores/layout.ts`，工具/终端等会话级尺寸走 `stores/workspace/`（按会话持久化）。
 - **共享选中态归属域**：跨「子菜单 ↔ 页面」的选中态放所属域 store（如 `settings.activeTab`），不塞进 `layout`。
 - **配色分层**：`--desk-chrome-bg`（顶栏+图标栏）> `--desk-panel-bg`（子菜单栏）> `--desk-bg`（正文）；不加分隔线，仅「子菜单栏 ↔ 正文」保留 1px `--desk-border`。
-- **尺寸令牌**：`--desk-header-height`、`--desk-rail-width`；自绘 SVG 统一 `.desk-svg-icon`，尺寸由使用处覆盖。
+- **尺寸令牌**：`--desk-header-height`、`--desk-rail-width`、`--desk-sidebar-width`、`--desk-terminal-height`、`--desk-panel-header-height`；JS 侧尺寸统一取 `config/layout.ts#LAYOUT`；自绘 SVG 统一 `.desk-svg-icon`，尺寸由使用处覆盖。
 
 ## 6. Agent 运行时
 

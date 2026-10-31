@@ -5,8 +5,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUpdate, onUpdated, ref } from 'vue'
 import { ElImageViewer } from 'element-plus'
-import { renderMarkdown } from '@renderer/composables/useMarkdown'
-import { onCodeBlockClick, restoreCodeBlockState } from '@renderer/composables/useCodeBlock'
+import { renderMarkdown } from '@renderer/components/MarkdownBlock/useMarkdown'
+import { onCodeBlockClick, restoreCodeBlockState } from '@renderer/components/MarkdownBlock/useCodeBlock'
 import { onContentLinkClick } from '@renderer/composables/useContentLink'
 import { t } from '@renderer/i18n'
 

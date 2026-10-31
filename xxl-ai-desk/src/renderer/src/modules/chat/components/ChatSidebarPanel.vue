@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /*
-* 首页子菜单面板：新建对话 / 项目分组（项目下挂会话）
+* 首页侧栏：新建对话 / 项目分组（项目下挂会话）
 * @author xuxueli 2026-10-18
 */
 import { computed, ref, watch } from 'vue'
@@ -8,8 +8,8 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@renderer/stores/chat'
 import { useProjectStore } from '@renderer/stores/project'
-import SidebarPanelHeader from '@renderer/components/SidebarPanelHeader.vue'
-import SidebarRow from '@renderer/components/SidebarRow.vue'
+import SidebarHeader from '@renderer/layout/components/Sidebar/SidebarHeader.vue'
+import SidebarRow from '@renderer/layout/components/Sidebar/SidebarRow.vue'
 import { ipcErrorMessage } from '@renderer/utils/ipcError'
 import { t } from '@renderer/i18n'
 import ProjectGroup from './ProjectGroup.vue'
@@ -104,7 +104,7 @@ async function onSelect(id: string): Promise<void> {
 </script>
 
 <template>
-  <SidebarPanelHeader title-key="chat.title" />
+  <SidebarHeader title-key="chat.title" />
 
   <!-- 新建对话：与插件/设置子菜单项使用同一列表行 -->
   <div class="new-chat">

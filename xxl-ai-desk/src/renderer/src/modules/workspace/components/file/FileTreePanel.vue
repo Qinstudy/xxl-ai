@@ -19,17 +19,17 @@ const emit = defineEmits<{
 
 /* 会话工作区 store：关键字与目录展开态按会话隔离 */
 const workspace = useWorkspaceStore()
-const fileState = computed(() => workspace.sliceOf(props.sessionId).tool.files)
+const fileState = computed(() => workspace.sliceOf(props.sessionId).fileExplorer)
 const keyword = computed({
   get: () => fileState.value.keyword,
   set: (value: string) => {
-    fileState.value.keyword = value
+    workspace.setKeyword(props.sessionId, value)
   }
 })
 const expanded = computed({
   get: () => fileState.value.expanded,
   set: (value: Record<string, boolean>) => {
-    fileState.value.expanded = value
+    workspace.setExpanded(props.sessionId, value)
   }
 })
 

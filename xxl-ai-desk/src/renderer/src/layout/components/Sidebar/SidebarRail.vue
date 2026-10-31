@@ -1,17 +1,17 @@
 <script setup lang="ts">
 /*
- * 左侧常驻图标栏（活动栏）：首页 / 插件 / 底部系统设置，切换一级板块
+ * 左侧常驻导航图标栏：首页 / 插件 / 底部系统设置，切换一级板块
  * @author xuxueli 2026-10-18
  */
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useShellStore } from '@renderer/stores/shell'
+import { useLayoutStore } from '@renderer/stores/layout'
 import { SECTION_ENTRY, SECTION_ICON, sectionOfPath, type SectionKey } from '@renderer/config/nav'
 import { t } from '@renderer/i18n'
 
 const route = useRoute()
 const router = useRouter()
-const shell = useShellStore()
+const layout = useLayoutStore()
 
 /* 当前所属板块（高亮对应入口） */
 const section = computed(() => sectionOfPath(route.path))
@@ -19,10 +19,10 @@ const section = computed(() => sectionOfPath(route.path))
 /* 切换板块：点击其它板块展开子菜单栏并跳转入口地址；点击当前板块则折叠/展开子菜单栏 */
 function go(key: SectionKey): void {
   if (section.value === key) {
-    shell.toggleSidebar()
+    layout.toggleSidebar()
     return
   }
-  shell.expandSidebar()
+  layout.expandSidebar()
   void router.push(SECTION_ENTRY[key])
 }
 </script>

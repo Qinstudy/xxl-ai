@@ -10,8 +10,8 @@ import { useRoute } from 'vue-router'
 import { useChatStore } from '@renderer/stores/chat'
 import { DRAFT_SESSION_KEY, useWorkspaceStore } from '@renderer/stores/workspace'
 import { sectionOfPath } from '@renderer/config/nav'
-import { useTerminalTarget } from '../composables/useTerminalTarget'
-import { WorkspaceTerminalPanel } from '../terminal'
+import { useTerminalTarget } from '../../composables/useTerminalTarget'
+import { WorkspaceTerminalPanel } from '../../terminal'
 
 const route = useRoute()
 const chat = useChatStore()
@@ -28,7 +28,9 @@ watch(workspaceKey, (key) => workspace.ensure(key), { immediate: true })
 /* 是否对话页（终端仅在对话页展示，但组件常驻以保留会话） */
 const isChat = computed(() => sectionOfPath(route.path) === 'home')
 /* 终端展示条件：对话页且当前会话已打开终端 */
-const terminalVisible = computed(() => isChat.value && workspaceState.value.terminal.visible)
+const terminalVisible = computed(
+  () => isChat.value && workspaceState.value.terminalPanel.visible
+)
 
 /* 首次打开后挂载终端组件；此后仅 v-show 切换，PTY 与滚动历史保持 */
 const terminalMounted = ref(false)

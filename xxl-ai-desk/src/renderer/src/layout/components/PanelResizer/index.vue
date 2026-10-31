@@ -1,14 +1,14 @@
 <script setup lang="ts">
 /*
- * 通用面板拖拽手柄：统一左右侧栏 / 底部终端的边缘拖拽、命中区与双击复位交互。
+ * 通用面板拖拽手柄：统一左侧栏 / 右侧面板 / 底部终端的边缘拖拽、命中区与双击复位交互。
  * @author xuxueli 2026-10-25
  */
 import { computed } from 'vue'
-import { usePanelResize, type PanelResizeEdge } from '@renderer/composables/usePanelResize'
+import { usePanelResize, type PanelSide } from '@renderer/composables/usePanelResize'
 
 const props = defineProps<{
-  /* 手柄所在边缘（按面板位置命名，与 usePanelResize 一致） */
-  edge: PanelResizeEdge
+  /* 面板所在侧（手柄位于其朝内一缘，与 usePanelResize 一致） */
+  side: PanelSide
   /* 悬浮提示文案（拖拽调整尺寸） */
   title?: string
 }>()
@@ -22,17 +22,17 @@ const { startResize } = usePanelResize({
   setSize: (value) => {
     size.value = value
   },
-  edge: props.edge
+  side: props.side
 })
 
-/* 手柄方向：纵向边缘（上下）用于底部面板，横向边缘（左右）用于侧栏 */
-const vertical = computed(() => props.edge === 'top' || props.edge === 'bottom')
+/* 手柄方向：纵向侧（上下）用于底部面板，横向侧（左右）用于侧栏 */
+const vertical = computed(() => props.side === 'top' || props.side === 'bottom')
 </script>
 
 <template>
   <div
     class="panel-resizer"
-    :class="[`edge-${edge}`, { vertical }]"
+    :class="[`side-${side}`, { vertical }]"
     :title="title"
     @mousedown="startResize"
     @dblclick="emit('reset')"
@@ -47,7 +47,7 @@ const vertical = computed(() => props.edge === 'top' || props.edge === 'bottom')
   -webkit-app-region: no-drag;
 }
 
-.panel-resizer.edge-left {
+.panel-resizer.side-left {
   top: 0;
   right: 0;
   width: 5px;
@@ -55,7 +55,7 @@ const vertical = computed(() => props.edge === 'top' || props.edge === 'bottom')
   cursor: col-resize;
 }
 
-.panel-resizer.edge-right {
+.panel-resizer.side-right {
   top: 0;
   left: 0;
   width: 5px;
@@ -63,7 +63,7 @@ const vertical = computed(() => props.edge === 'top' || props.edge === 'bottom')
   cursor: col-resize;
 }
 
-.panel-resizer.edge-top {
+.panel-resizer.side-top {
   left: 0;
   bottom: 0;
   width: 100%;
@@ -71,7 +71,7 @@ const vertical = computed(() => props.edge === 'top' || props.edge === 'bottom')
   cursor: row-resize;
 }
 
-.panel-resizer.edge-bottom {
+.panel-resizer.side-bottom {
   top: 0;
   left: 0;
   width: 100%;
@@ -80,8 +80,8 @@ const vertical = computed(() => props.edge === 'top' || props.edge === 'bottom')
 }
 
 /* 透明命中区：视觉条保持 5px，可抓取范围更宽 */
-.panel-resizer.edge-left::after,
-.panel-resizer.edge-right::after {
+.panel-resizer.side-left::after,
+.panel-resizer.side-right::after {
   content: '';
   position: absolute;
   top: 0;
@@ -90,8 +90,8 @@ const vertical = computed(() => props.edge === 'top' || props.edge === 'bottom')
   height: 100%;
 }
 
-.panel-resizer.edge-top::after,
-.panel-resizer.edge-bottom::after {
+.panel-resizer.side-top::after,
+.panel-resizer.side-bottom::after {
   content: '';
   position: absolute;
   top: -6px;

@@ -5,8 +5,8 @@
  */
 import { computed } from 'vue'
 import { useWorkspaceStore } from '@renderer/stores/workspace'
-import PanelResizer from '@renderer/components/PanelResizer.vue'
-import TerminalIcon from '@renderer/components/icons/TerminalIcon.vue'
+import PanelResizer from '@renderer/layout/components/PanelResizer/index.vue'
+import { TerminalIcon } from '@renderer/components/icons'
 import { t } from '@renderer/i18n'
 import { useSessionTerminals } from '../../composables/useSessionTerminals'
 
@@ -20,9 +20,9 @@ const emit = defineEmits<{ close: [] }>()
 
 /* 会话工作区 store：终端高度按会话隔离 */
 const workspace = useWorkspaceStore()
-const terminalState = computed(() => workspace.sliceOf(props.sessionId).terminal)
+const terminalPanel = computed(() => workspace.sliceOf(props.sessionId).terminalPanel)
 const terminalHeight = computed({
-  get: () => terminalState.value.height,
+  get: () => terminalPanel.value.height,
   set: (height: number) => workspace.setTerminalHeight(props.sessionId, height)
 })
 
@@ -36,11 +36,11 @@ const { tabs, activeId, setContainer, activate, openTerminal, disposeTab } = use
 </script>
 
 <template>
-  <div class="chat-terminal" :style="{ height: `${terminalState.height}px` }">
+  <div class="workspace-terminal" :style="{ height: `${terminalPanel.height}px` }">
     <!-- 上边缘拖拽手柄：拖拽调整终端高度，双击恢复默认高度 -->
     <PanelResizer
       v-model:size="terminalHeight"
-      edge="bottom"
+      side="bottom"
       :title="t('layout.resetPanelHeight')"
       @reset="workspace.resetTerminalHeight(props.sessionId)"
     />
@@ -62,15 +62,15 @@ const { tabs, activeId, setContainer, activate, openTerminal, disposeTab } = use
           </button>
         </div>
         <button
-          class="sidebar-toggle terminal-new"
-          :title="t('chat.newTerminal')"
+          class="icon-button terminal-new"
+          :title="t('workspace.newTerminal')"
           @click="openTerminal"
         >
           <el-icon><Plus /></el-icon>
         </button>
       </div>
       <div class="terminal-actions">
-        <button class="sidebar-toggle" :title="t('chat.hideTerminal')" @click="emit('close')">
+        <button class="icon-button" :title="t('workspace.hideTerminal')" @click="emit('close')">
           <el-icon><Close /></el-icon>
         </button>
       </div>
@@ -90,9 +90,9 @@ const { tabs, activeId, setContainer, activate, openTerminal, disposeTab } = use
 
 <style scoped lang="scss">
 /* 底部终端面板：横跨主区底部（高度由会话工作区状态提供，可拖拽调整） */
-.chat-terminal {
+.workspace-terminal {
   position: relative;
-  height: 240px;
+  height: var(--desk-terminal-height);
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -101,7 +101,7 @@ const { tabs, activeId, setContainer, activate, openTerminal, disposeTab } = use
 }
 
 .terminal-header {
-  height: 40px;
+  height: var(--desk-panel-header-height);
   flex-shrink: 0;
   display: flex;
   align-items: center;

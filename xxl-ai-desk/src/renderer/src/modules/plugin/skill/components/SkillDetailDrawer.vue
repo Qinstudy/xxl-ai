@@ -6,7 +6,7 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useSkillStore } from '@renderer/stores/skill'
-import MarkdownBlock from '@renderer/components/MarkdownBlock.vue'
+import { MarkdownBlock } from '@renderer/components'
 import { ipcErrorMessage } from '@renderer/utils/ipcError'
 import { t } from '@renderer/i18n'
 import type { SkillDetail } from '@shared/ipc'

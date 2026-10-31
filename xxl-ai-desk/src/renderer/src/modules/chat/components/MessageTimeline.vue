@@ -4,7 +4,7 @@
  * @author xuxueli 2026-10-25
  */
 import { computed, ref, watch, type ComponentPublicInstance } from 'vue'
-import MarkdownBlock from '@renderer/components/MarkdownBlock.vue'
+import { MarkdownBlock } from '@renderer/components'
 import { toolArgsText, toolView } from '../composables/useToolView'
 import { useNow } from '../composables/useNow'
 import { useChatStore } from '@renderer/stores/chat'

@@ -1,0 +1,163 @@
+/* 会话工作区状态结构：类型、默认值、持久化归一化与尺寸边界 */
+
+import { LAYOUT } from '@renderer/config/layout'
+import { useLayoutStore } from '@renderer/stores/layout'
+
+/* 新建对话草稿态使用的固定工作区 key（首次发送创建会话后迁移给真实会话） */
+export const DRAFT_SESSION_KEY = '__draft__'
+
+/* 持久化键前缀与结构版本 */
+export const STORAGE_PREFIX = 'desk:workspace:'
+export const STORAGE_VERSION = 2
+
+/* 工具面板当前工具 */
+export type WorkspaceTool = 'files' | 'browser'
+
+/* 工具面板布局模式：dock = 与正文并排，focus = 占满正文 */
+export type ToolPanelMode = 'dock' | 'focus'
+
+/* 终端标签（运行时状态：id 与主进程 PTY 对应，切换会话时保留，重启后不持久化） */
+export interface TerminalTabState {
+  /* 终端实例 ID */
+  id: string
+  /* 标签标题（目录名） */
+  title: string
+}
+
+/* 右侧工具面板布局 */
+export interface ToolPanelState {
+  /* 是否展示 */
+  visible: boolean
+  /* 当前工具 */
+  activeTool: WorkspaceTool
+  /* 面板宽度 */
+  width: number
+  /* 布局模式 */
+  mode: ToolPanelMode
+}
+
+/* 底部终端面板布局与运行时标签 */
+export interface TerminalPanelState {
+  /* 是否展示 */
+  visible: boolean
+  /* 面板高度 */
+  height: number
+  /* 终端标签（运行时，不持久化） */
+  tabs: TerminalTabState[]
+  /* 当前激活标签（运行时，不持久化） */
+  activeId: string
+}
+
+/* 文件面板 UI 状态 */
+export interface FileExplorerState {
+  /* 选中文件路径 */
+  selectedPath: string
+  /* 是否预览 */
+  preview: boolean
+  /* 文件树过滤关键字 */
+  keyword: string
+  /* 目录展开态 */
+  expanded: Record<string, boolean>
+}
+
+/* 单个会话的工作区状态（仅存 UI 状态，不含 PTY / webview 运行时） */
+export interface WorkspaceState {
+  toolPanel: ToolPanelState
+  terminalPanel: TerminalPanelState
+  fileExplorer: FileExplorerState
+  /* 最近更新时间 */
+  updateTime: number
+  /* 持久化结构版本 */
+  version: number
+}
+
+/* 创建默认工作区状态 */
+export function createState(): WorkspaceState {
+  return {
+    toolPanel: {
+      visible: false,
+      activeTool: 'files',
+      width: LAYOUT.toolPanel.defaultWidth,
+      mode: 'dock'
+    },
+    terminalPanel: {
+      visible: false,
+      height: LAYOUT.terminal.defaultHeight,
+      tabs: [],
+      activeId: ''
+    },
+    fileExplorer: { selectedPath: '', preview: false, keyword: '', expanded: {} },
+    updateTime: Date.now(),
+    version: STORAGE_VERSION
+  }
+}
+
+/* 数值夹取 */
+export function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, Math.round(value)))
+}
+
+/* 计算工具面板最大宽度：窗口宽度扣除图标栏、左侧子菜单栏与正文最小可用宽度 */
+export function toolWidthMax(): number {
+  const sidebarWidth = useLayoutStore().sidebarWidth
+  const available =
+    window.innerWidth - LAYOUT.railWidth - sidebarWidth - LAYOUT.toolPanel.minChatWidth
+  return Math.max(LAYOUT.toolPanel.minWidth, available)
+}
+
+/* 计算终端最大高度：为正文预留空间 */
+export function terminalHeightMax(): number {
+  return Math.max(LAYOUT.terminal.minHeight, window.innerHeight - LAYOUT.terminal.reservedHeight)
+}
+
+/* 读取布尔值（非法时回落默认值） */
+function boolOf(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+/* 读取字符串（非法时回落默认值） */
+function stringOf(value: unknown, fallback: string): string {
+  return typeof value === 'string' ? value : fallback
+}
+
+/* 解析目录展开态（非法时回落空对象） */
+function expandedOf(value: unknown): Record<string, boolean> {
+  return value && typeof value === 'object' ? (value as Record<string, boolean>) : {}
+}
+
+/* 归一化持久化数据：结构非法时逐字段回落默认值 */
+export function normalizeState(raw: unknown): WorkspaceState {
+  const parsed = raw as Partial<WorkspaceState>
+  const base = createState()
+  return {
+    toolPanel: {
+      visible: boolOf(parsed.toolPanel?.visible, base.toolPanel.visible),
+      activeTool: parsed.toolPanel?.activeTool === 'browser' ? 'browser' : 'files',
+      width: clamp(
+        Number(parsed.toolPanel?.width) || base.toolPanel.width,
+        LAYOUT.toolPanel.minWidth,
+        toolWidthMax()
+      ),
+      mode: parsed.toolPanel?.mode === 'focus' ? 'focus' : 'dock'
+    },
+    terminalPanel: {
+      visible: boolOf(parsed.terminalPanel?.visible, base.terminalPanel.visible),
+      height: clamp(
+        Number(parsed.terminalPanel?.height) || base.terminalPanel.height,
+        LAYOUT.terminal.minHeight,
+        terminalHeightMax()
+      ),
+      /* 终端标签属于运行时资源：重启后不恢复，首次展示时按会话重新创建 */
+      tabs: [],
+      activeId: ''
+    },
+    fileExplorer: {
+      selectedPath: stringOf(parsed.fileExplorer?.selectedPath, ''),
+      preview: boolOf(parsed.fileExplorer?.preview, false),
+      keyword: stringOf(parsed.fileExplorer?.keyword, ''),
+      expanded: expandedOf(parsed.fileExplorer?.expanded)
+    },
+    updateTime: Number(parsed.updateTime) || Date.now(),
+    version: STORAGE_VERSION
+  }
+}

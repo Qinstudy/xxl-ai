@@ -3,9 +3,10 @@
  * @author xuxueli 2026-10-25
  */
 
-export { default as WorkspaceToolPanel } from './components/ToolPanel.vue'
-export { default as BrowserHost } from './components/browser/BrowserHost.vue'
-export { default as WorkspacePanelActions } from './components/WorkspacePanelActions.vue'
-export { default as ShellTerminalHost } from './components/ShellTerminalHost.vue'
+export { default as WorkspaceToolPanel } from './components/WorkspaceToolPanel.vue'
+export { default as WorkspaceLayout } from './components/WorkspaceLayout.vue'
+export { default as BrowserHost } from './components/hosts/BrowserHost.vue'
+export { default as WorkspacePanelToggles } from './components/WorkspacePanelToggles.vue'
+export { default as TerminalHost } from './components/hosts/TerminalHost.vue'
 export { useTerminalTarget } from './composables/useTerminalTarget'
 export { cleanupBrowserSessions } from './composables/browserRuntime'

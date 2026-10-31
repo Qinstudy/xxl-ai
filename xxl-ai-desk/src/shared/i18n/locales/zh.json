@@ -40,8 +40,6 @@
     "unknownError": "未知错误"
   },
   "layout": {
-    "collapseSidebar": "收起侧栏",
-    "expandSidebar": "展开侧栏",
     "resetPanelWidth": "双击恢复默认宽度",
     "resetPanelHeight": "双击恢复默认高度"
   },
@@ -111,14 +109,6 @@
     "editAndRetry": "编辑后重答",
     "noModel": "尚未配置模型，请前往设置添加供应商与模型",
     "goSettings": "前往设置",
-    "showTerminal": "显示终端",
-    "hideTerminal": "隐藏终端",
-    "newTerminal": "新建终端",
-    "terminal": "终端",
-    "terminalExited": "终端已退出（代码 {0}）",
-    "terminalLimit": "终端数量已达上限，请先关闭部分终端或会话",
-    "showSidePanel": "显示工具",
-    "hideSidePanel": "隐藏工具",
     "scrollToBottom": "回到底部",
     "approvalTitle": "越界访问确认",
     "approvalRead": "读取",
@@ -162,6 +152,16 @@
       "snapshotRefMissing": "未找到目标元素，请先调用 snapshot_browser 获取最新 ref",
       "formMissing": "字段未关联表单，无法提交"
     }
+  },
+  "workspace": {
+    "terminal": "终端",
+    "newTerminal": "新建终端",
+    "terminalExited": "终端已退出（代码 {0}）",
+    "terminalLimit": "终端数量已达上限，请先关闭部分终端或会话",
+    "showTerminal": "显示终端",
+    "hideTerminal": "隐藏终端",
+    "showToolPanel": "显示工具面板",
+    "hideToolPanel": "隐藏工具面板"
   },
   "panel": {
     "files": "文件",

@@ -19,7 +19,7 @@ export function useTerminalTarget() {
   })
 
   /* 终端标签名：项目名优先，否则回退「终端」 */
-  const terminalName = computed(() => terminalProject.value?.name || t('chat.terminal'))
+  const terminalName = computed(() => terminalProject.value?.name || t('workspace.terminal'))
 
   /* 终端工作目录 */
   const terminalCwd = computed(() => terminalProject.value?.path || undefined)

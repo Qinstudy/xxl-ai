@@ -82,8 +82,9 @@ export function sectionOfPath(path: string): SectionKey {
   return 'home'
 }
 
-/* 由插件路由路径解析当前子菜单 key（未匹配时回落首项） */
-export function pluginItemKey(path: string): string {
-  const item = NAV_SECTIONS.plugin.items.find((one) => one.path === path)
-  return item?.key ?? NAV_SECTIONS.plugin.items[0].key
+/* 由板块路由路径解析当前子菜单 key（未匹配时回落首项） */
+export function navItemKey(section: Exclude<SectionKey, 'home'>, path: string): string {
+  const items = NAV_SECTIONS[section].items
+  const item = items.find((one) => one.path === path)
+  return item?.key ?? items[0].key
 }

@@ -15,12 +15,12 @@ import { sectionOfPath } from '@renderer/config/nav'
 import {
   executeBrowserAction,
   openBrowserRequest
-} from '@renderer/modules/workspace/composables/browserRuntime'
+} from '../../composables/browserRuntime'
 import {
   pinWarmSession,
   setSessionHost,
   warmSessions
-} from '@renderer/modules/workspace/composables/browserSessionHost'
+} from '../../composables/browserSessionHost'
 
 const chat = useChatStore()
 const workspace = useWorkspaceStore()
@@ -46,7 +46,7 @@ const activeVisible = computed(() => {
     return false
   }
   const state = workspace.sliceOf(currentKey.value)
-  return state.tool.visible && state.tool.tool === 'browser'
+  return state.toolPanel.visible && state.toolPanel.activeTool === 'browser'
 })
 
 /* 当前会话浏览器激活标签是否已有页面（无页面时展示面板空态） */

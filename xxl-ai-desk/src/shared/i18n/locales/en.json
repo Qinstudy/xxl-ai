@@ -40,8 +40,6 @@
     "unknownError": "Unknown error"
   },
   "layout": {
-    "collapseSidebar": "Collapse sidebar",
-    "expandSidebar": "Expand sidebar",
     "resetPanelWidth": "Double-click to reset width",
     "resetPanelHeight": "Double-click to reset height"
   },
@@ -111,14 +109,6 @@
     "editAndRetry": "Edit and retry",
     "noModel": "No model configured yet. Add a provider and model in Settings.",
     "goSettings": "Go to Settings",
-    "showTerminal": "Show terminal",
-    "hideTerminal": "Hide terminal",
-    "newTerminal": "New terminal",
-    "terminal": "Terminal",
-    "terminalExited": "Terminal exited (code {0})",
-    "terminalLimit": "Terminal limit reached. Close some terminals or sessions first.",
-    "showSidePanel": "Show tools",
-    "hideSidePanel": "Hide tools",
     "scrollToBottom": "Scroll to bottom",
     "approvalTitle": "Outside access",
     "approvalRead": "read",
@@ -162,6 +152,16 @@
       "snapshotRefMissing": "Target element not found. Call snapshot_browser to get the latest ref.",
       "formMissing": "The field is not associated with a form; cannot submit"
     }
+  },
+  "workspace": {
+    "terminal": "Terminal",
+    "newTerminal": "New terminal",
+    "terminalExited": "Terminal exited (code {0})",
+    "terminalLimit": "Terminal limit reached; close a terminal or session first",
+    "showTerminal": "Show terminal",
+    "hideTerminal": "Hide terminal",
+    "showToolPanel": "Show tool panel",
+    "hideToolPanel": "Hide tool panel"
   },
   "panel": {
     "files": "Files",

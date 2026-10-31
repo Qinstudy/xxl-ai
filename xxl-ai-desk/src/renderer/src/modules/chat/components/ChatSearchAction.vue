@@ -10,7 +10,7 @@ const { openPalette } = useCommandPalette()
 </script>
 
 <template>
-  <button class="sidebar-toggle" :title="t('common.search')" @click="openPalette">
+  <button class="icon-button" :title="t('common.search')" @click="openPalette">
     <el-icon class="search-icon"><Search /></el-icon>
   </button>
 </template>

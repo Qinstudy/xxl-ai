@@ -24,7 +24,7 @@ const props = defineProps<{ sessionId: string; root?: string; projectName?: stri
 
 /* 会话工作区 store：选中文件与预览态按会话隔离 */
 const workspace = useWorkspaceStore()
-const fileState = computed(() => workspace.sliceOf(props.sessionId).tool.files)
+const fileState = computed(() => workspace.sliceOf(props.sessionId).fileExplorer)
 
 /* 当前选中节点、文件内容与加载/错误态、是否预览 */
 const selected = ref<FsEntry | null>(null)
@@ -35,7 +35,7 @@ const preview = ref(fileState.value.preview)
 
 /* 预览态回写会话工作区（切换会话后保留） */
 watch(preview, (value) => {
-  fileState.value.preview = value
+  workspace.setPreview(props.sessionId, value)
 })
 
 /* 编辑态：original 为磁盘基线，draft 为编辑内容；二者不一致即未保存 */
@@ -107,7 +107,7 @@ const dirty = computed(() => editable.value && draft.value !== original.value)
 /* 清空当前文件选择与内容（根目录切换 / 文件被删除时） */
 function clearSelection(): void {
   selected.value = null
-  fileState.value.selectedPath = ''
+  workspace.setSelectedPath(props.sessionId, '')
   file.value = null
   fileError.value = ''
   preview.value = false
@@ -156,7 +156,7 @@ async function select(entry: FsEntry): Promise<boolean> {
     }
   }
   selected.value = entry
-  fileState.value.selectedPath = entry.path
+  workspace.setSelectedPath(props.sessionId, entry.path)
   fileLoading.value = true
   fileError.value = ''
   preview.value = false

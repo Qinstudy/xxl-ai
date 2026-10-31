@@ -10,13 +10,13 @@ import footnote from 'markdown-it-footnote'
 import { t } from '@renderer/i18n'
 import { mediaKindOf } from '@shared/fileTypes'
 import { toLocalFileUrl } from '@renderer/utils/localFileUrl'
-import { sanitizeMarkdown } from '@renderer/utils/markdownSanitize'
+import { sanitizeMarkdown } from '@renderer/components/MarkdownBlock/sanitize'
 import {
   escapeHtml,
   highlightAuto,
   highlightCode,
   normalizeLanguage
-} from './useHighlight'
+} from '@renderer/composables/useHighlight'
 
 const md = new MarkdownIt({
   html: true,

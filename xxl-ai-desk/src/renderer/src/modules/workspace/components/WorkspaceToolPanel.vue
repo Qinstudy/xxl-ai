@@ -1,24 +1,24 @@
 <script setup lang="ts">
 /*
  * 会话工作区右侧「工具」面板：顶部横向 Tab（文件 / 浏览器）切换工具，
- * 选定后承载对应面板；显隐、宽度、当前工具与放大态均按会话隔离。
+ * 选定后承载对应面板；显隐、宽度、当前工具与布局模式均按会话隔离。
  */
 import { computed, ref, watch } from 'vue'
 import { useWorkspaceStore, type WorkspaceTool } from '@renderer/stores/workspace'
 import { t } from '@renderer/i18n'
 import FilePanel from './file/FilePanel.vue'
-import GlobeIcon from '@renderer/components/icons/GlobeIcon.vue'
+import { GlobeIcon } from '@renderer/components/icons'
 import BrowserPanel from './browser/BrowserPanel.vue'
 
 const props = defineProps<{ sessionId: string; root?: string; projectName?: string }>()
 
-/* 会话工作区 store：提供本会话的面板显隐/宽度/当前工具/放大态 */
+/* 会话工作区 store：提供本会话的面板显隐/宽度/当前工具/布局模式 */
 const workspace = useWorkspaceStore()
 
 /* 当前会话的工具面板状态 */
-const toolState = computed(() => workspace.sliceOf(props.sessionId).tool)
+const toolPanel = computed(() => workspace.sliceOf(props.sessionId).toolPanel)
 /* 当前工具类型（模板与监听统一取值） */
-const activeTool = computed<WorkspaceTool>(() => toolState.value.tool)
+const activeTool = computed<WorkspaceTool>(() => toolPanel.value.activeTool)
 
 /* 确保会话工作区已创建 */
 watch(() => props.sessionId, (sessionId) => workspace.ensure(sessionId), { immediate: true })
@@ -45,14 +45,14 @@ function openTool(tool: WorkspaceTool): void {
   workspace.openTool(props.sessionId, tool)
 }
 
-/* 关闭工具面板（保留放大态，重新打开时维持） */
+/* 关闭工具面板（保留布局模式，重新打开时维持） */
 function closePanel(): void {
   workspace.setToolVisible(props.sessionId, false)
 }
 
-/* 切换放大态（放大后占满正文区） */
-function toggleMaximized(): void {
-  workspace.toggleToolMaximized(props.sessionId)
+/* 切换布局模式（focus 后占满正文区） */
+function toggleFocus(): void {
+  workspace.toggleToolFocus(props.sessionId)
 }
 </script>
 
@@ -80,14 +80,14 @@ function toggleMaximized(): void {
       </div>
       <div class="tool-actions">
         <button
-          class="sidebar-toggle"
-          :title="toolState.maximized ? t('panel.restore') : t('panel.maximize')"
-          @click="toggleMaximized"
+          class="icon-button"
+          :title="toolPanel.mode === 'focus' ? t('panel.restore') : t('panel.maximize')"
+          @click="toggleFocus"
         >
-          <el-icon v-if="toolState.maximized"><ScaleToOriginal /></el-icon>
+          <el-icon v-if="toolPanel.mode === 'focus'"><ScaleToOriginal /></el-icon>
           <el-icon v-else><FullScreen /></el-icon>
         </button>
-        <button class="sidebar-toggle" :title="t('panel.close')" @click="closePanel">
+        <button class="icon-button" :title="t('panel.close')" @click="closePanel">
           <el-icon><Close /></el-icon>
         </button>
       </div>
@@ -115,7 +115,7 @@ function toggleMaximized(): void {
 }
 
 .tool-panel-header {
-  height: 40px;
+  height: var(--desk-panel-header-height);
   flex-shrink: 0;
   display: flex;
   align-items: center;

@@ -1,12 +1,17 @@
-/* 应用外壳状态：左侧栏折叠与宽度（会话内工具/终端状态见 workspace store） */
+/* 应用外壳布局状态：左侧栏折叠与宽度（会话内工具/终端状态见 workspace store） */
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { createPersistedWidth } from '@renderer/utils/persistedWidth'
+import { createPersistedWidth } from '@renderer/layout/utils/persistedWidth'
+import { LAYOUT } from '@renderer/config/layout'
 
-export const useShellStore = defineStore('shell', () => {
+export const useLayoutStore = defineStore('layout', () => {
   /* 左侧子菜单栏宽度：三板块共用（拖拽调整、持久化、双击复位） */
-  const panel = createPersistedWidth('desk-panel-width', { default: 240, min: 180, max: 520 })
+  const sidebar = createPersistedWidth('desk-panel-width', {
+    default: LAYOUT.sidebar.default,
+    min: LAYOUT.sidebar.min,
+    max: LAYOUT.sidebar.max
+  })
 
   /* 左侧栏是否折叠（折叠后仅保留图标栏，内容区铺满） */
   const sidebarCollapsed = ref(false)
@@ -23,9 +28,9 @@ export const useShellStore = defineStore('shell', () => {
 
   return {
     sidebarCollapsed,
-    panelWidth: panel.width,
-    setPanelWidth: panel.setWidth,
-    resetPanelWidth: panel.resetWidth,
+    sidebarWidth: sidebar.width,
+    setSidebarWidth: sidebar.setWidth,
+    resetSidebarWidth: sidebar.resetWidth,
     toggleSidebar,
     expandSidebar
   }

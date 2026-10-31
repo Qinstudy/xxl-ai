@@ -4,7 +4,7 @@
  * @author xuxueli 2026-10-25
  */
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import MarkdownBlock from '@renderer/components/MarkdownBlock.vue'
+import { MarkdownBlock } from '@renderer/components'
 import { escapeHtml, highlightCode, languageOf } from '@renderer/composables/useHighlight'
 import { toLocalFileUrl } from '@renderer/utils/localFileUrl'
 import { parentDir } from '../../utils/path'

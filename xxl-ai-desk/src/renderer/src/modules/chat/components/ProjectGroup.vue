@@ -8,7 +8,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useChatStore } from '@renderer/stores/chat'
 import { useSettingsStore } from '@renderer/stores/settings'
 import { useProjectStore } from '@renderer/stores/project'
-import SidebarRow from '@renderer/components/SidebarRow.vue'
+import SidebarRow from '@renderer/layout/components/Sidebar/SidebarRow.vue'
 import { t } from '@renderer/i18n'
 import type { ProjectDTO, SessionDTO } from '@shared/ipc'
 

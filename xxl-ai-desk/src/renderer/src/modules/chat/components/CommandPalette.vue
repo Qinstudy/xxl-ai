@@ -11,8 +11,7 @@ import { useQuickAction } from '@renderer/composables/useQuickAction'
 import { t } from '@renderer/i18n'
 import { QUICK_ACTIONS } from '@renderer/config/quickActions'
 import { formatShortcut } from '@renderer/utils/shortcut'
-import TerminalIcon from '@renderer/components/icons/TerminalIcon.vue'
-import GlobeIcon from '@renderer/components/icons/GlobeIcon.vue'
+import { GlobeIcon, TerminalIcon } from '@renderer/components/icons'
 import type { QuickAction } from '@shared/ipc'
 
 const visible = defineModel<boolean>('visible', { required: true })

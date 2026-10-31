@@ -31,10 +31,10 @@ export function useSessionTerminals(options: SessionTerminalOptions) {
   /* 会话工作区 store：终端显隐/高度/标签均按会话隔离 */
   const workspace = useWorkspaceStore()
   /* 当前会话的终端状态 */
-  const terminalState = computed(() => workspace.sliceOf(options.sessionId()).terminal)
+  const terminalPanel = computed(() => workspace.sliceOf(options.sessionId()).terminalPanel)
   /* 当前会话的终端标签与激活项 */
-  const tabs = computed(() => terminalState.value.tabs)
-  const activeId = computed(() => terminalState.value.activeId)
+  const tabs = computed(() => terminalPanel.value.tabs)
+  const activeId = computed(() => terminalPanel.value.activeId)
 
   /* 标签 id → xterm 容器 DOM */
   const containers = new Map<string, HTMLDivElement>()
@@ -151,7 +151,7 @@ export function useSessionTerminals(options: SessionTerminalOptions) {
     if (!attached) {
       /* PTY 已退出（应用重启或后台退出）：提示并停止后续绑定 */
       current.ready = true
-      current.term.write(`\r\n${t('chat.terminalExited', ['-1'])}\r\n`)
+      current.term.write(`\r\n${t('workspace.terminalExited', ['-1'])}\r\n`)
       return
     }
     for (const chunk of attached.chunks) {
@@ -195,7 +195,7 @@ export function useSessionTerminals(options: SessionTerminalOptions) {
   async function createTerminalFor(sessionId: string): Promise<void> {
     try {
       const dto = await api.terminal.create({ sessionId, cwd: options.cwd() })
-      const title = folderName(dto.cwd) || options.title() || t('chat.terminal')
+      const title = folderName(dto.cwd) || options.title() || t('workspace.terminal')
       workspace.addTerminalTab(sessionId, { id: dto.id, title })
       if (sessionId !== options.sessionId()) {
         return
@@ -207,7 +207,7 @@ export function useSessionTerminals(options: SessionTerminalOptions) {
     } catch (error) {
       console.warn('创建终端失败：', error)
       /* 区分「单会话上限 / 全局上限 / 其它失败」，直接展示主进程返回的原因 */
-      ElMessage.warning(ipcErrorMessage(error) || t('chat.terminalLimit'))
+      ElMessage.warning(ipcErrorMessage(error) || t('workspace.terminalLimit'))
     }
   }
 
@@ -218,7 +218,7 @@ export function useSessionTerminals(options: SessionTerminalOptions) {
 
   /* 确保会话的终端标签可用：清理已退出标签，全部失效时补开一个 */
   async function ensureTabs(sessionId: string): Promise<void> {
-    const state = workspace.sliceOf(sessionId).terminal
+    const state = workspace.sliceOf(sessionId).terminalPanel
     if (state.tabs.length === 0) {
       const alive = await api.terminal.list(sessionId)
       if (alive.length > 0) {
@@ -226,7 +226,7 @@ export function useSessionTerminals(options: SessionTerminalOptions) {
           sessionId,
           alive.map((item) => ({
             id: item.id,
-            title: folderName(item.cwd) || options.title() || t('chat.terminal'),
+            title: folderName(item.cwd) || options.title() || t('workspace.terminal'),
           })),
         )
         return
@@ -259,9 +259,9 @@ export function useSessionTerminals(options: SessionTerminalOptions) {
 
   /* 挂载当前会话的激活标签 */
   async function mountActive(sessionId: string): Promise<void> {
-    let active = workspace.sliceOf(sessionId).terminal.activeId
+    let active = workspace.sliceOf(sessionId).terminalPanel.activeId
     if (!active) {
-      const last = workspace.sliceOf(sessionId).terminal.tabs.at(-1)
+      const last = workspace.sliceOf(sessionId).terminalPanel.tabs.at(-1)
       if (last) {
         workspace.setActiveTerminal(sessionId, last.id)
         active = last.id
@@ -323,7 +323,7 @@ export function useSessionTerminals(options: SessionTerminalOptions) {
     if (event.type === 'data' && event.data != null) {
       runtime.term.write(event.data)
     } else if (event.type === 'exit') {
-      runtime.term.write(`\r\n${t('chat.terminalExited', [String(event.exitCode ?? 0)])}\r\n`)
+      runtime.term.write(`\r\n${t('workspace.terminalExited', [String(event.exitCode ?? 0)])}\r\n`)
     }
   })
 

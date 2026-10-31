@@ -21,7 +21,7 @@ export interface QuickActionItem {
 export const QUICK_ACTIONS: QuickActionItem[] = [
   { id: 'newChat', labelKey: 'chat.newChatAction', icon: 'Edit' },
   { id: 'settings', labelKey: 'settings.title', icon: 'Setting' },
-  { id: 'terminal', labelKey: 'chat.terminal', svg: 'terminal' },
+  { id: 'terminal', labelKey: 'workspace.terminal', svg: 'terminal' },
   { id: 'files', labelKey: 'panel.files', icon: 'Folder' },
   { id: 'browser', labelKey: 'panel.browser', svg: 'browser' }
 ]

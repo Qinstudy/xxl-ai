@@ -3,8 +3,8 @@
  * 通用二级子菜单列表：插件 / 系统设置 等板块的二级列表（数据来自 config/nav）
  * @author xuxueli 2026-10-18
  */
-import SidebarPanelHeader from '@renderer/components/SidebarPanelHeader.vue'
-import SidebarRow from '@renderer/components/SidebarRow.vue'
+import SidebarHeader from './SidebarHeader.vue'
+import SidebarRow from './SidebarRow.vue'
 import { t } from '@renderer/i18n'
 import type { NavItem } from '@renderer/config/nav'
 
@@ -14,7 +14,7 @@ const emit = defineEmits<{ select: [item: NavItem] }>()
 </script>
 
 <template>
-  <SidebarPanelHeader :title-key="titleKey" />
+  <SidebarHeader :title-key="titleKey" />
   <el-scrollbar class="sidebar-list">
     <SidebarRow
       v-for="item in items"

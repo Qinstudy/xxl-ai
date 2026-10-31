@@ -8,13 +8,13 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ChatCommandPalette,
   ChatSearchAction,
-  useCommandPalette,
-  useSessionActions
+  ChatTopbarTitle,
+  useCommandPalette
 } from '@renderer/modules/chat'
-import { WorkspacePanelActions } from '@renderer/modules/workspace'
+import { WorkspacePanelToggles } from '@renderer/modules/workspace'
 import { useChatStore } from '@renderer/stores/chat'
 import { useSettingsStore } from '@renderer/stores/settings'
-import { useShellStore } from '@renderer/stores/shell'
+import { useLayoutStore } from '@renderer/stores/layout'
 import { NAV_SECTIONS, sectionOfPath } from '@renderer/config/nav'
 import { t } from '@renderer/i18n'
 
@@ -22,9 +22,7 @@ const route = useRoute()
 const router = useRouter()
 const chat = useChatStore()
 const settings = useSettingsStore()
-const shell = useShellStore()
-/* 会话操作（重命名 / 删除） */
-const { onChatCommand } = useSessionActions()
+const layout = useLayoutStore()
 /* 搜索命令面板显隐（顶栏入口与面板共享） */
 const { visible: commandPaletteVisible } = useCommandPalette()
 
@@ -56,7 +54,7 @@ const appName = computed(() => settings.settings.appName || t('app.name'))
 
 /* 回到对话模块：展开子菜单栏并进入新建对话页面 */
 function goHome(): void {
-  shell.expandSidebar()
+  layout.expandSidebar()
   chat.startNewChat()
   void router.push('/')
 }
@@ -66,7 +64,7 @@ function goHome(): void {
   <header class="desk-topbar" :class="{ mac: settings.platform === 'darwin' }">
     <div class="desk-topbar-left">
       <!-- 首页入口：回到对话模块新建对话页（软件名称左侧） -->
-      <button class="sidebar-toggle" :title="t('chat.newChatAction')" @click="goHome">
+      <button class="icon-button" :title="t('chat.newChatAction')" @click="goHome">
         <el-icon><HomeFilled /></el-icon>
       </button>
       <!-- 软件名称：原导航按钮位置 -->
@@ -74,30 +72,7 @@ function goHome(): void {
       <!-- 有标题时展示分隔线（｜），分隔软件名称与标题 -->
       <span v-if="hasTitle" class="topbar-sep" aria-hidden="true"></span>
       <div v-if="hasTitle" class="desk-topbar-context">
-        <template v-if="isChat">
-          <div class="chat-title-wrap">
-            <div class="chat-title">{{ pageTitle }}</div>
-            <!-- 会话操作：重命名 / 删除（悬浮标题文案展示） -->
-            <el-dropdown
-              v-if="chat.currentId"
-              trigger="click"
-              popper-class="chat-title-dropdown"
-              @command="onChatCommand"
-            >
-              <el-icon class="chat-title-more" :title="t('common.actions')"><MoreFilled /></el-icon>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="rename">
-                    <el-icon><EditPen /></el-icon>{{ t('chat.renameSession') }}
-                  </el-dropdown-item>
-                  <el-dropdown-item command="delete" divided>
-                    <el-icon><Delete /></el-icon>{{ t('chat.deleteSession') }}
-                  </el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
-        </template>
+        <ChatTopbarTitle v-if="isChat" :title="pageTitle" />
         <div v-else class="topbar-title">{{ pageTitle }}</div>
       </div>
     </div>
@@ -105,7 +80,7 @@ function goHome(): void {
     <!-- 对话页操作：搜索（chat）+ 终端/工具面板（workspace） -->
     <div v-if="isChat" class="desk-topbar-actions">
       <ChatSearchAction />
-      <WorkspacePanelActions />
+      <WorkspacePanelToggles />
     </div>
 
     <!-- 会话搜索命令面板：由顶栏搜索入口唤起 -->
@@ -156,7 +131,7 @@ function goHome(): void {
 }
 
 /* 首页入口与软件名称：按钮内含内边距，用负外边距收紧至视觉约 9px */
-.desk-topbar-left > .sidebar-toggle {
+.desk-topbar-left > .icon-button {
   margin-right: -6px;
 }
 
@@ -180,46 +155,6 @@ function goHome(): void {
   margin: 0 4px;
   background: var(--desk-text-tertiary);
   opacity: 0.45;
-}
-
-/* 标题 + 操作：仅悬浮标题文案区域时显示「...」 */
-.chat-title-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  /* 顶栏为窗口拖拽区，此处排除拖拽，保证 :hover 正常触发与图标可点击 */
-  -webkit-app-region: no-drag;
-}
-
-.chat-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--desk-text-secondary);
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 会话操作用「...」：默认隐藏，悬浮标题文案时展示 */
-.chat-title-more {
-  flex-shrink: 0;
-  font-size: 16px;
-  color: var(--desk-text-tertiary);
-  cursor: pointer;
-  outline: none;
-  visibility: hidden;
-  transition: color 0.15s ease;
-  -webkit-app-region: no-drag;
-}
-
-.chat-title-wrap:hover .chat-title-more {
-  visibility: visible;
-}
-
-.chat-title-more:hover {
-  color: var(--desk-text);
 }
 
 /* 非对话页标题（插件 / 系统设置） */
