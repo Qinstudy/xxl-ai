@@ -34,19 +34,29 @@ const INSTRUCTION_PRESETS: InstructionPreset[] = [
     promptKey: 'agent.presets.coding.prompt'
   },
   {
-    key: 'review',
-    labelKey: 'agent.presets.review.label',
-    promptKey: 'agent.presets.review.prompt'
+    key: 'office',
+    labelKey: 'agent.presets.office.label',
+    promptKey: 'agent.presets.office.prompt'
   },
   {
-    key: 'analysis',
-    labelKey: 'agent.presets.analysis.label',
-    promptKey: 'agent.presets.analysis.prompt'
+    key: 'writing',
+    labelKey: 'agent.presets.writing.label',
+    promptKey: 'agent.presets.writing.prompt'
   },
   {
     key: 'concise',
     labelKey: 'agent.presets.concise.label',
     promptKey: 'agent.presets.concise.prompt'
+  },
+  {
+    key: 'companion',
+    labelKey: 'agent.presets.companion.label',
+    promptKey: 'agent.presets.companion.prompt'
+  },
+  {
+    key: 'loyal',
+    labelKey: 'agent.presets.loyal.label',
+    promptKey: 'agent.presets.loyal.prompt'
   }
 ]
 
