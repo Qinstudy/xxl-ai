@@ -1,6 +1,6 @@
 <!--
   页面：Dashboard（首页）
-  功能：平台资源统计概览、Agent 会话消息趋势（折线图）、Agent 会话消息占比（饼图）
+  功能：按当前业务空间统计平台资源概览、Agent 会话消息趋势（折线图）、Agent 会话消息占比（饼图）
 -->
 <template>
   <div class="app-container dashboard">
@@ -32,7 +32,7 @@
                 <SvgIcon icon-class="chart" />
                 <span>{{ t('dashboard.msgTrend') }}</span>
               </div>
-              <el-radio-group v-model="chartDays" size="small" @change="loadTrendChart">
+              <el-radio-group v-model="chartDays" size="small" @change="handleDaysChange">
                 <el-radio-button :value="7">{{ t('dashboard.days7') }}</el-radio-button>
                 <el-radio-button :value="14">{{ t('dashboard.days14') }}</el-radio-button>
                 <el-radio-button :value="30">{{ t('dashboard.days30') }}</el-radio-button>
@@ -70,12 +70,16 @@ import { getSessionMsgShare, getSessionMsgTrend, getStats } from '../api'
 import { parseTime } from '@/utils/common'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { t } from '@/i18n'
 import { SvgIcon } from '@/components'
+import { useSpaceStore } from '@/store'
+import type { DashboardStats } from '../types'
 
 /** 指标卡片项 */
 interface StatItem {
+  /** 对应接口字段，避免依赖数组顺序取数 */
+  key: keyof DashboardStats
   label: string
   value: number
   icon: string
@@ -83,12 +87,16 @@ interface StatItem {
   bg: string
 }
 
+// --------------------------------- ref data ---------------------------------
+/** 当前业务空间：首页报表仅加载本空间指标数据 */
+const spaceStore = useSpaceStore()
+
 // 指标卡片：Agent / Skill / MCP / 供应商模型 数量（图标与对应菜单图标保持一致）
 const stats = ref<StatItem[]>([
-  { label: t('dashboard.agentCount'), value: 0, icon: 'monitor', color: '#5b6abf', bg: '#eef0fb' },
-  { label: t('dashboard.skillCount'), value: 0, icon: 'skill', color: '#319c8a', bg: '#e8f6f3' },
-  { label: t('dashboard.mcpCount'), value: 0, icon: 'link', color: '#d4943c', bg: '#fcf4e8' },
-  { label: t('dashboard.modelCount'), value: 0, icon: 'server', color: '#c5566a', bg: '#fbeef1' }
+  { key: 'agentCount', label: t('dashboard.agentCount'), value: 0, icon: 'monitor', color: '#5b6abf', bg: '#eef0fb' },
+  { key: 'skillCount', label: t('dashboard.skillCount'), value: 0, icon: 'skill', color: '#319c8a', bg: '#e8f6f3' },
+  { key: 'mcpCount', label: t('dashboard.mcpCount'), value: 0, icon: 'link', color: '#d4943c', bg: '#fcf4e8' },
+  { key: 'modelCount', label: t('dashboard.modelCount'), value: 0, icon: 'server', color: '#c5566a', bg: '#fbeef1' }
 ])
 
 const trendChartRef = ref<HTMLElement>()
@@ -100,45 +108,62 @@ let trendInstance: ECharts | null = null
 let shareInstance: ECharts | null = null
 let resizeObserver: ResizeObserver | null = null
 
+// --------------------------------- fun ---------------------------------
 /**
- * init
+ * 统计天数切换：趋势折线图与占比饼图共用统计周期，一并刷新
  */
-onMounted(() => {
-  loadStats()
-  nextTick(() => {
-    loadTrendChart()
-    loadShareChart()
-  })
-  // 容器尺寸变化时自适应重绘：窗口缩放、侧边栏折叠等场景
-  if (trendChartRef.value && shareChartRef.value) {
-    resizeObserver = new ResizeObserver(() => {
-      trendInstance?.resize()
-      shareInstance?.resize()
-    })
-    resizeObserver.observe(trendChartRef.value)
-    resizeObserver.observe(shareChartRef.value)
-  }
-})
+function handleDaysChange() {
+  loadTrendChart()
+  loadShareChart()
+}
 
 /**
- * destory
+ * 响应是否已过期：请求期间业务空间或统计天数发生变化
  */
-onUnmounted(() => {
-  resizeObserver?.disconnect()
+function isStale(spaceId: number, days?: number) {
+  return spaceStore.currentSpaceId !== spaceId || (days != null && chartDays.value !== days)
+}
+
+/**
+ * 首页报表 - 数据加载：各指标自行校验空间，未就绪时不发起请求
+ */
+function loadDashboard() {
+  loadStats()
+  loadTrendChart()
+  loadShareChart()
+}
+
+/**
+ * 首页报表 - 重置：切换空间时清空上一空间指标与图表
+ */
+function resetDashboard() {
+  stats.value.forEach((item) => {
+    item.value = 0
+  })
+  shareEmpty.value = false
   trendInstance?.dispose()
+  trendInstance = null
   shareInstance?.dispose()
-})
+  shareInstance = null
+}
 
 /**
  * 指标卡片 - 数据加载
  */
 function loadStats() {
+  const spaceId = spaceStore.currentSpaceId
+  if (spaceId == null) {
+    return
+  }
   getStats().then((res) => {
+    // 请求期间空间已切换：丢弃旧空间响应
+    if (isStale(spaceId)) {
+      return
+    }
     const data = res.data
-    stats.value[0].value = data.agentCount
-    stats.value[1].value = data.skillCount
-    stats.value[2].value = data.mcpCount
-    stats.value[3].value = data.modelCount
+    stats.value.forEach((item) => {
+      item.value = data[item.key]
+    })
   })
 }
 
@@ -150,8 +175,16 @@ function loadStats() {
  * 3. 生成完整的日期序列（从 days-1 天前 → 今天），无数据日期补 0，确保折线连续不断点
  */
 function loadTrendChart() {
+  const spaceId = spaceStore.currentSpaceId
+  if (spaceId == null) {
+    return
+  }
   const days = chartDays.value
   getSessionMsgTrend(days).then((res) => {
+    // 请求期间空间或统计天数已变化：丢弃过期响应
+    if (isStale(spaceId, days)) {
+      return
+    }
     // 后端返回 [{date: '2026-07-11', count: 3}, ...]
     const list = res.data || []
 
@@ -222,13 +255,25 @@ function loadTrendChart() {
  * 加载 Agent 会话消息占比饼图（每块为一个 Agent，占比为消息量百分比）
  */
 function loadShareChart() {
+  const spaceId = spaceStore.currentSpaceId
+  if (spaceId == null) {
+    return
+  }
+
   const days = chartDays.value
   getSessionMsgShare(days).then((res) => {
+
+    // 请求期间空间或统计天数已变化：丢弃过期响应
+    if (isStale(spaceId, days)) {
+      return
+    }
+
     const list = res.data || []
     shareEmpty.value = list.length === 0
 
     if (shareInstance) {
       shareInstance.dispose()
+      shareInstance = null
     }
     if (list.length === 0) {
       return
@@ -261,6 +306,43 @@ function loadShareChart() {
     })
   })
 }
+
+// --------------------------------- page init ---------------------------------
+/**
+ * init
+ */
+onMounted(() => {
+  loadDashboard()
+  // 容器尺寸变化时自适应重绘：窗口缩放、侧边栏折叠等场景
+  if (trendChartRef.value && shareChartRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      trendInstance?.resize()
+      shareInstance?.resize()
+    })
+    resizeObserver.observe(trendChartRef.value)
+    resizeObserver.observe(shareChartRef.value)
+  }
+})
+
+/**
+ * 当前空间变化：清空旧空间报表并重新加载本空间指标（页面刷新切换之外的兜底）
+ */
+watch(
+  () => spaceStore.currentSpaceId,
+  () => {
+    resetDashboard()
+    loadDashboard()
+  }
+)
+
+/**
+ * destory
+ */
+onUnmounted(() => {
+  resizeObserver?.disconnect()
+  trendInstance?.dispose()
+  shareInstance?.dispose()
+})
 </script>
 
 <style scoped lang="scss">

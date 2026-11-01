@@ -124,17 +124,18 @@ router.beforeEach(async (to, from) => {
     to.meta && to.meta.title && useSettingsStore().setMenuTitle(to.meta.title)
     // 2.2、已登录 & roles 为空：说明尚未拉取用户信息（首次登录或刷新页面后），需要初始化动态路由
     if (useUserStore().roles.length === 0) {
+
+      // a、并行初始化：用户信息、动态路由、业务空间三者互不依赖，取耗时最长者，避免串行叠加首屏等待
+      // 业务接口依赖 currentSpaceId 注入 xxl-space-id，空间列表需在路由放行前就绪（失败不阻断，顶部空间切换器内再尝试）
+      isRelogin.show = true
       try {
-        // a、获取用户信息：用户 + 角色权限信息
-        isRelogin.show = true
-        await useUserStore().getInfo()
-        isRelogin.show = false
+        await Promise.all([
+          useUserStore().getInfo(),
+          useRoutesStore().initRoutes(),
+          useSpaceStore().loadSpaces().catch(() => {})
+        ])
 
-        // a2、加载当前用户可见业务空间（失败不阻断，顶部空间切换器内再尝试）
-        useSpaceStore().loadSpaces().catch(() => {})
-
-        // b、初始化动态路由：初始化路由（后端菜单 → 前端路由） -> 获取拍平后数据 -> 过滤 http 链接后逐条注入
-        await useRoutesStore().initRoutes()
+        // b、注入动态路由：获取拍平后数据 -> 过滤 http 链接后逐条注入
         const accessRoutes = useRoutesStore().getFlattenRoutes()
         accessRoutes.forEach((route) => {
           // 无 path 的纯目录节点无需外链判断，其余排除外链路由后逐条注入
@@ -156,6 +157,8 @@ router.beforeEach(async (to, from) => {
         console.debug('Init Router Error:' + errMsg)
         ElMessage.error(errMsg)
         return { path: '/' }
+      } finally {
+        isRelogin.show = false
       }
     }
     return true

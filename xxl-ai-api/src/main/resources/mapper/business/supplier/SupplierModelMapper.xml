@@ -94,10 +94,6 @@
 		</if>
 	</select>
 
-	<select id="countAll" resultType="int">
-		SELECT count(1) FROM xxl_ai_supplier_model
-	</select>
-
 	<!-- 首页：统计当前空间下的供应商模型数 -->
 	<select id="countBySpaceId" parameterType="java.util.HashMap" resultType="int">
 		SELECT count(1)
