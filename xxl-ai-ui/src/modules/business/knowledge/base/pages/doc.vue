@@ -151,9 +151,16 @@
     </el-dialog>
 
     <!-- 向量检索对话框 -->
-    <el-dialog :title="t('business.knowledge.searchTitle', [baseName])" v-model="search.visible" width="760px" append-to-body>
-      <el-form :inline="true">
-        <el-form-item :label="t('business.knowledge.searchQuery')" style="width: 100%">
+    <el-dialog :title="t('business.knowledge.searchTitle', [baseName])" v-model="search.visible" width="860px" append-to-body>
+      <el-alert
+        :title="t('business.knowledge.searchTestAlert', [search.kbThreshold ? search.kbThreshold.toFixed(2) : '0.40'])"
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+      />
+      <el-form :inline="true" @submit.prevent="handleSearchSubmit">
+        <el-form-item :label="t('business.knowledge.searchQuery')">
           <el-input
             v-model="search.query"
             :placeholder="t('business.knowledge.searchQueryPlaceholder')"
@@ -170,12 +177,16 @@
       </el-form>
       <el-table v-loading="search.loading" :data="search.list" max-height="380">
         <el-table-column :label="t('common.serialNo')" align="center" type="index" width="60" />
-        <el-table-column :label="t('business.knowledge.docId')" align="center" width="80">
-          <template #default="scope">{{ scope.row.docId }}</template>
+        <el-table-column :label="t('business.knowledge.docName')" align="center" width="150" :show-overflow-tooltip="true">
+          <template #default="scope">{{ scope.row.docName || scope.row.docId }}</template>
         </el-table-column>
-        <el-table-column :label="t('business.knowledge.score')" align="center" width="110">
+        <el-table-column :label="t('business.knowledge.score')" align="center" width="180">
           <template #default="scope">
-            <el-tag>{{ Number(scope.row.score).toFixed(4) }}</el-tag>
+            <div style="display: flex; align-items: center; justify-content: center; gap: 6px">
+              <span>{{ Number(scope.row.score).toFixed(4) }}</span>
+              <el-tag v-if="scope.row.passed" type="success" size="small">{{ t('business.knowledge.scorePassed') }}</el-tag>
+              <el-tag v-else type="info" size="small">{{ t('business.knowledge.scoreFiltered') }}</el-tag>
+            </div>
           </template>
         </el-table-column>
         <el-table-column :label="t('business.knowledge.hitContent')" align="left" :show-overflow-tooltip="true">
@@ -190,7 +201,7 @@
 defineOptions({ name: 'KnowledgeDoc' })
 import { t } from '@/i18n'
 import { listKnowledgeDoc, addKnowledgeDoc, updateKnowledgeDoc, delKnowledgeDoc, uploadKnowledgeDoc, vectorizeKnowledgeDoc, vectorizeKnowledgeBaseAll } from '@/modules/business/knowledge/doc/api'
-import { searchKnowledgeDoc } from '@/modules/business/knowledge/base/api'
+import { searchKnowledgeDoc, loadKnowledgeBase } from '@/modules/business/knowledge/base/api'
 import { useEnumOption } from '@/composables/useEnumOption'
 import { useFormReset } from '@/composables/useFormReset'
 import { usePageParams } from '@/composables/usePageParams'
@@ -224,7 +235,8 @@ const search = ref({
   visible: false,
   query: '',
   list: [] as KnowledgeHit[],
-  loading: false
+  loading: false,
+  kbThreshold: 0
 })
 
 const formState = ref<FormState<KnowledgeDocForm>>({
@@ -401,6 +413,15 @@ function openSearch() {
   search.value.visible = true
   search.value.query = ''
   search.value.list = []
+  if (baseId.value) {
+    loadKnowledgeBase(baseId.value)
+      .then((res) => {
+        if (res.data?.similarityThreshold != null) {
+          search.value.kbThreshold = res.data.similarityThreshold
+        }
+      })
+      .catch(() => {})
+  }
 }
 function handleSearchSubmit() {
   if (!search.value.query) {
@@ -410,7 +431,10 @@ function handleSearchSubmit() {
   search.value.loading = true
   searchKnowledgeDoc(baseId.value, search.value.query)
     .then((response) => {
-      search.value.list = response.data
+      search.value.list = response.data || []
+      if (response.data && response.data.length > 0 && response.data[0].threshold != null) {
+        search.value.kbThreshold = response.data[0].threshold
+      }
       search.value.loading = false
     })
     .catch(() => {
@@ -428,7 +452,7 @@ getList()
   font-weight: 600;
 }
 .search-query-input {
-  width: 420px;
+  width: 460px;
 }
 .doc-content-input :deep(.el-textarea__inner) {
   max-height: 52vh;

@@ -45,7 +45,10 @@ export type KnowledgeBaseListQuery = ListQuery<KnowledgeBaseQuery>
 export interface KnowledgeHit {
   text: string
   docId: number
-  chunkIndex: number
+  docName?: string
+  chunkIndex?: number
   score: number
+  threshold?: number
+  passed?: boolean
   [key: string]: unknown
 }
