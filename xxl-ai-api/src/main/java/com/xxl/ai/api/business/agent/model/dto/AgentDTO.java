@@ -20,6 +20,7 @@ public class AgentDTO {
     private List<Long> kbIds;       /* 知识库ID集合 */
     private List<Long> mcpIds;      /* MCP ID集合 */
     private List<Long> skillIds;    /* Skill ID集合 */
+    private List<Long> subAgentIds; /* 关联SubAgent ID集合 */
     private int memoryStatus;       /* 记忆开关：0-关闭、1-开启 */
     private Double temperature;     /* 模型采样温度：0.0~2.0，空表示默认 */
     private Double topP;            /* 模型核采样：0.0~1.0，空表示默认 */
@@ -115,6 +116,14 @@ public class AgentDTO {
 
     public void setSkillIds(List<Long> skillIds) {
         this.skillIds = skillIds;
+    }
+
+    public List<Long> getSubAgentIds() {
+        return subAgentIds;
+    }
+
+    public void setSubAgentIds(List<Long> subAgentIds) {
+        this.subAgentIds = subAgentIds;
     }
 
     public int getMemoryStatus() {

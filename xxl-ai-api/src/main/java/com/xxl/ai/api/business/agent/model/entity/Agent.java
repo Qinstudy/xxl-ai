@@ -20,6 +20,7 @@ public class Agent {
     private String kbIds;           /* 知识库ID集合(逗号分隔) */
     private String mcpIds;          /* MCP ID集合(逗号分隔) */
     private String skillIds;        /* Skill ID集合(逗号分隔) */
+    private String subAgentIds;     /* 关联SubAgent ID集合(逗号分隔) */
     private int memoryStatus;       /* 记忆开关：0-关闭、1-开启 */
     private Double temperature;     /* 模型采样温度：0.0~2.0，空表示默认 */
     private Double topP;            /* 模型核采样：0.0~1.0，空表示默认 */
@@ -115,6 +116,14 @@ public class Agent {
 
     public void setSkillIds(String skillIds) {
         this.skillIds = skillIds;
+    }
+
+    public String getSubAgentIds() {
+        return subAgentIds;
+    }
+
+    public void setSubAgentIds(String subAgentIds) {
+        this.subAgentIds = subAgentIds;
     }
 
     public int getMemoryStatus() {

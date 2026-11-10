@@ -16,8 +16,11 @@ import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Agent Service 实现
@@ -90,6 +93,10 @@ public class AgentServiceImpl implements AgentService {
         if (optValid != null) {
             return optValid;
         }
+        Response<String> subAgentValid = validateSubAgents(agent, spaceId);
+        if (subAgentValid != null) {
+            return subAgentValid;
+        }
         agent.setSpaceId(spaceId);
         agent.setPublishStatus(0);
         agent.setUuid(null);
@@ -119,6 +126,51 @@ public class AgentServiceImpl implements AgentService {
                 return Response.ofFail("单次最大 Token 数 (Max Tokens) 必须在 1 到 131072 之间");
             }
         }
+        return null;
+    }
+
+    /**
+     * 校验关联 SubAgent 的合法性（[FEAT-013]：最多5个、不能包含自身、同空间必须存在）
+     */
+    private Response<String> validateSubAgents(Agent agent, long spaceId) {
+        if (StringTool.isBlank(agent.getSubAgentIds())) {
+            agent.setSubAgentIds(null);
+            return null;
+        }
+        List<Long> subIds = Arrays.stream(agent.getSubAgentIds().split(","))
+                .filter(StringTool::isNotBlank)
+                .map(s -> {
+                    try {
+                        return Long.parseLong(s.trim());
+                    } catch (NumberFormatException e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        if (subIds.isEmpty()) {
+            agent.setSubAgentIds(null);
+            return null;
+        }
+        if (subIds.size() > 5) {
+            return Response.ofFail("关联的 SubAgent 数量最多为 5 个");
+        }
+        if (agent.getId() > 0 && subIds.contains(agent.getId())) {
+            return Response.ofFail("不能将当前 Agent 关联为其自身的 SubAgent");
+        }
+        // 校验目标 SubAgent 必须归属同一空间且有效存在
+        List<Agent> targetList = agentMapper.listByIds(subIds);
+        if (targetList == null || targetList.size() != subIds.size()) {
+            return Response.ofFail("部分关联的 SubAgent 不存在");
+        }
+        for (Agent sub : targetList) {
+            if (sub.getSpaceId() != spaceId) {
+                return Response.ofFail("不能关联非当前工作空间的 SubAgent");
+            }
+        }
+        agent.setSubAgentIds(subIds.stream().map(String::valueOf).collect(Collectors.joining(",")));
         return null;
     }
 
@@ -155,10 +207,19 @@ public class AgentServiceImpl implements AgentService {
         if (agent == null || StringTool.isBlank(agent.getName())) {
             return Response.ofFail("Agent 名称不能为空");
         }
+        Agent existing = agentMapper.load(agent.getId());
+        if (existing == null) {
+            return Response.ofFail("Agent 不存在或已被删除");
+        }
         Response<String> optValid = validateOptions(agent);
         if (optValid != null) {
             return optValid;
         }
+        Response<String> subAgentValid = validateSubAgents(agent, existing.getSpaceId());
+        if (subAgentValid != null) {
+            return subAgentValid;
+        }
+        agent.setSpaceId(existing.getSpaceId());
         int ret = agentMapper.update(agent);
         return ret > 0 ? Response.ofSuccess() : Response.ofFail();
     }

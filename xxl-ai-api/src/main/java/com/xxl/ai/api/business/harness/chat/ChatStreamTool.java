@@ -133,6 +133,8 @@ public class ChatStreamTool implements SmartLifecycle {
     private MemoryTool memoryTool;
     @Resource
     private ChatContextWindowTool chatContextWindowTool;
+    @Resource
+    private SubAgentTool subAgentTool;
 
     /** worker 线程数（单节点并发生成数） */
     @Value("${xxl-ai.chat.worker.count}")
@@ -875,7 +877,7 @@ public class ChatStreamTool implements SmartLifecycle {
     /**
      * 构建动态推理超参数（[FEAT-006]）：从 Agent 配置读取 temperature / top_p / max_tokens
      */
-    private OpenAiChatOptions buildChatOptions(Agent agent, TraceCollector traceCollector) {
+    static OpenAiChatOptions buildChatOptions(Agent agent, TraceCollector traceCollector) {
         if (agent == null) {
             return null;
         }
@@ -948,7 +950,7 @@ public class ChatStreamTool implements SmartLifecycle {
     }
 
     /**
-     * 工具装配与可观测装饰：MCP 工具 + Skill 工具 + 终端/文件执行工具，统一包装为 ObservableToolCallback
+     * 工具装配与可观测装饰：MCP 工具 + Skill 工具 + 终端/文件执行工具 + SubAgent 工具，统一包装为 ObservableToolCallback
      */
     private Object[] buildObservableTools(Agent agent,
                                           SkillShellTracker tracker,
@@ -964,6 +966,9 @@ public class ChatStreamTool implements SmartLifecycle {
         }
         for (Object execTool : skillToolFactory.buildExecutorTools(agent, tracker)) {
             taggedTools.add(new ObservableToolCallback.TaggedTool("EXEC", execTool));
+        }
+        for (Object subAgentToolItem : subAgentTool.buildTools(agent, traceCollector)) {
+            taggedTools.add(new ObservableToolCallback.TaggedTool("SUBAGENT", subAgentToolItem));
         }
         Object[] wrapped = ObservableToolCallback.wrapAll(taggedTools, traceCollector, onToolEvent);
         if (wrapped.length > 0) {

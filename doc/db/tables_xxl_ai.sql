@@ -160,6 +160,7 @@ CREATE TABLE IF NOT EXISTS `xxl_ai_agent` (
     `kb_ids`              VARCHAR(500)    NULL DEFAULT NULL     COMMENT '知识库ID集合(逗号分隔)',
     `mcp_ids`             VARCHAR(500)    NULL DEFAULT NULL     COMMENT 'MCP ID集合(逗号分隔)',
     `skill_ids`           VARCHAR(500)    NULL DEFAULT NULL     COMMENT 'Skill ID集合(逗号分隔)',
+    `sub_agent_ids`       VARCHAR(500)    NULL DEFAULT NULL     COMMENT '关联SubAgent ID集合(逗号分隔，最多5个)',
     `memory_status`       TINYINT         NOT NULL DEFAULT 0    COMMENT '记忆开关：0-关闭、1-开启',
     `temperature`         DOUBLE          NULL DEFAULT NULL     COMMENT '模型采样温度(0.0~2.0)，为空采用模型默认值',
     `top_p`               DOUBLE          NULL DEFAULT NULL     COMMENT '模型核采样(0.0~1.0)，为空采用模型默认值',

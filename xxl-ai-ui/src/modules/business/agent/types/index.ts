@@ -25,6 +25,8 @@ export interface Agent {
   mcpIds?: number[]
   /** Skill ID集合 */
   skillIds?: number[]
+  /** 关联SubAgent ID集合 */
+  subAgentIds?: number[]
   /** 记忆开关：0-关闭、1-开启 */
   memoryStatus?: number
   /** 模型采样温度：0.0~2.0，空表示默认 */

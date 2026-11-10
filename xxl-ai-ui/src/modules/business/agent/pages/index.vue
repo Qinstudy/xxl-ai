@@ -142,6 +142,29 @@
             <el-option v-for="item in skillOptions" :key="item.id" :label="item.name" :value="item.id as number" />
           </el-select>
         </el-form-item>
+        <el-form-item prop="subAgentIds">
+          <template #label>
+            <span>{{ t('business.agent.subAgents') }}</span>
+            <el-tooltip :content="t('business.agent.subAgentsTip')" placement="top">
+              <el-icon style="margin-left: 4px; vertical-align: middle; cursor: pointer"><QuestionFilled /></el-icon>
+            </el-tooltip>
+          </template>
+          <el-select
+            v-model="formState.form.subAgentIds"
+            multiple
+            filterable
+            :multiple-limit="5"
+            style="width: 100%"
+            :placeholder="t('business.agent.subAgentsPlaceholder')"
+          >
+            <el-option
+              v-for="item in subAgentOptions.filter((a) => a.id !== formState.form.id)"
+              :key="item.id"
+              :label="item.name + (item.publishStatus === 1 ? '' : ' (' + t('business.agent.unpublished') + ')')"
+              :value="item.id as number"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="t('business.agent.memoryStatus')" prop="memoryStatus">
           <el-switch v-model="formState.form.memoryStatus" :active-value="1" :inactive-value="0" />
         </el-form-item>
@@ -222,7 +245,7 @@
 <script setup lang="ts">
 defineOptions({ name: 'Agent' })
 import { t } from '@/i18n'
-import { listAgent, addAgent, updateAgent, delAgent, publishAgent, unpublishAgent } from '../api'
+import { listAgent, listAllAgent, addAgent, updateAgent, delAgent, publishAgent, unpublishAgent } from '../api'
 import { listSupplierBySpace } from '@/modules/business/supplier/api'
 import { listModelBySupplier } from '@/modules/business/supplier/api'
 import { listMcpBySpace } from '@/modules/business/mcp/api'
@@ -259,6 +282,7 @@ const chatModelOptions = ref<SupplierModel[]>([])
 const kbOptions = ref<KnowledgeBase[]>([])
 const mcpOptions = ref<Mcp[]>([])
 const skillOptions = ref<Skill[]>([])
+const subAgentOptions = ref<Agent[]>([])
 
 const queryParams = ref<AgentQuery>({ pageNum: 1, pageSize: 10, name: undefined, publishStatus: -1 })
 
@@ -298,6 +322,9 @@ function loadBindOptions() {
   listSkillBySpace().then((response) => {
     skillOptions.value = response.data
   })
+  listAllAgent().then((response) => {
+    subAgentOptions.value = response.data
+  })
 }
 /** 供应商切换：加载该供应商下对话模型 */
 function handleSupplierChange(supplierId: number) {
@@ -319,6 +346,7 @@ function reset() {
     kbIds: [],
     mcpIds: [],
     skillIds: [],
+    subAgentIds: [],
     memoryStatus: 0,
     temperature: undefined,
     topP: undefined,
