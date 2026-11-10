@@ -79,18 +79,25 @@ public class ChatContextWindowTool {
                              String systemPrompt,
                              String contextualQuestion,
                              TraceCollector traceCollector) {
+        int systemTokens = estimateTokens(systemPrompt);
+        int questionTokens = estimateTokens(contextualQuestion);
+
         if (CollectionTool.isEmpty(roleList) || CollectionTool.isEmpty(contentList)) {
+            if (traceCollector != null) {
+                traceCollector.setEstimatedPromptTokens(systemTokens + questionTokens);
+            }
             return;
         }
         if (roleList.size() != contentList.size()) {
             logger.warn("历史消息角色列表与内容列表大小不匹配, roleSize={}, contentSize={}",
                     roleList.size(), contentList.size());
+            if (traceCollector != null) {
+                traceCollector.setEstimatedPromptTokens(systemTokens + questionTokens);
+            }
             return;
         }
 
         int originalCount = roleList.size();
-        int systemTokens = estimateTokens(systemPrompt);
-        int questionTokens = estimateTokens(contextualQuestion);
         int availableHistoryTokens = maxTokens - systemTokens - questionTokens;
 
         // 若系统指令与当前提问已占满或超出总预算，历史全量清空
@@ -102,6 +109,7 @@ public class ChatContextWindowTool {
             if (traceCollector != null) {
                 traceCollector.addLog("WARN", "context",
                         "历史 " + originalCount + " 条 → 保留 0 条 (预算已耗尽，可用 " + availableHistoryTokens + " tokens)");
+                traceCollector.setEstimatedPromptTokens(systemTokens + questionTokens);
             }
             return;
         }
@@ -134,6 +142,7 @@ public class ChatContextWindowTool {
             if (traceCollector != null) {
                 traceCollector.addLog("WARN", "context",
                         "历史 " + originalCount + " 条 → 保留 0 条 (截断后无完整对话轮次)");
+                traceCollector.setEstimatedPromptTokens(systemTokens + questionTokens);
             }
             return;
         }
@@ -150,5 +159,22 @@ public class ChatContextWindowTool {
                                 + " 条 (估算 " + accumulatedTokens + " / 预算 " + availableHistoryTokens + " tokens)");
             }
         }
+
+        if (traceCollector != null) {
+            traceCollector.setEstimatedPromptTokens(systemTokens + questionTokens + accumulatedTokens);
+        }
+    }
+
+    /**
+     * 评估输入总 Token 数（系统指令 + 当前提问 + 历史消息列表）
+     */
+    public int estimateTotalPromptTokens(String systemPrompt, String contextualQuestion, List<String> contentList) {
+        int total = estimateTokens(systemPrompt) + estimateTokens(contextualQuestion);
+        if (contentList != null) {
+            for (String content : contentList) {
+                total += estimateTokens(content) + MSG_OVERHEAD_TOKENS;
+            }
+        }
+        return total;
     }
 }

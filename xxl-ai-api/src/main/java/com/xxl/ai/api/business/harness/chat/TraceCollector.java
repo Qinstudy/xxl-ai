@@ -49,6 +49,7 @@ public class TraceCollector {
     private final AtomicInteger spanSeq = new AtomicInteger(0);
     private final AtomicInteger toolSeq = new AtomicInteger(0);
     private volatile boolean firstTokenRecorded = false;
+    private volatile int estimatedPromptTokens = 0; /* 输入上下文预估 Token 数（装配阶段计算） */
 
     public TraceCollector(long msgId, long sessionId, long agentId, String consumer) {
         this.runMeta.setRunId(msgId);
@@ -161,6 +162,41 @@ public class TraceCollector {
     public synchronized void incrementRoundIfNoUsage(boolean usageRecordedInRound) {
         if (!usageRecordedInRound) {
             this.tokenUsage.setRounds(this.tokenUsage.getRounds() + 1);
+        }
+    }
+
+    /**
+     * 设置输入上下文预估 Token 数（由上下文装配滑动窗口阶段提供）
+     */
+    public void setEstimatedPromptTokens(int estimatedPromptTokens) {
+        this.estimatedPromptTokens = Math.max(0, estimatedPromptTokens);
+    }
+
+    /**
+     * 获取输入上下文预估 Token 数
+     */
+    public int getEstimatedPromptTokens() {
+        return estimatedPromptTokens;
+    }
+
+    /**
+     * 当未收到模型尾帧精确 Token 统计时（如流式中断、异常中断或模型未返回 usage），采用本地估算兜底
+     */
+    public synchronized void recordEstimatedUsageIfZero(int promptTokens, int completionTokens) {
+        if (this.tokenUsage.getTotalTokens() > 0) {
+            return;
+        }
+        int prompt = Math.max(0, promptTokens);
+        int completion = Math.max(0, completionTokens);
+        int total = prompt + completion;
+        if (total > 0) {
+            this.tokenUsage.setPromptTokens(prompt);
+            this.tokenUsage.setCompletionTokens(completion);
+            this.tokenUsage.setTotalTokens(total);
+            this.tokenUsage.setEstimated(true);
+            if (this.tokenUsage.getRounds() == 0) {
+                this.tokenUsage.setRounds(1);
+            }
         }
     }
 
@@ -486,6 +522,7 @@ public class TraceCollector {
         private int completionTokens;   /* 输出 Token 数 */
         private int totalTokens;        /* 总 Token 数 */
         private int rounds;             /* 模型调用轮数 */
+        private boolean estimated;      /* 是否为本地估算值（未收到尾帧 usage 时兜底） */
 
         public int getPromptTokens() {
             return promptTokens;
@@ -517,6 +554,14 @@ public class TraceCollector {
 
         public void setRounds(int rounds) {
             this.rounds = rounds;
+        }
+
+        public boolean isEstimated() {
+            return estimated;
+        }
+
+        public void setEstimated(boolean estimated) {
+            this.estimated = estimated;
         }
     }
 

@@ -509,6 +509,7 @@
       "traceTtft": "首字时延 (TTFT)",
       "traceTotalElapsed": "总耗时",
       "traceTokens": "Token 消耗",
+      "traceEstimated": "预估",
       "tracePromptTokens": "输入 {0}",
       "traceCompletionTokens": "输出 {0}",
       "traceRounds": "{0} 轮推理",

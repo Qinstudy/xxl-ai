@@ -28,6 +28,7 @@ export interface TokenUsage {
   completionTokens: number
   totalTokens: number
   rounds: number
+  estimated?: boolean
 }
 
 /** RAG 检索引用来源项 */

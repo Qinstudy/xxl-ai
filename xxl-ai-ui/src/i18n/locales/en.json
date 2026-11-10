@@ -509,6 +509,7 @@
       "traceTtft": "TTFT",
       "traceTotalElapsed": "Total Elapsed",
       "traceTokens": "Token Usage",
+      "traceEstimated": "Estimated",
       "tracePromptTokens": "Prompt {0}",
       "traceCompletionTokens": "Completion {0}",
       "traceRounds": "{0} round(s)",

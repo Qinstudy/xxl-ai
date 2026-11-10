@@ -537,6 +537,9 @@ public class ChatStreamTool implements SmartLifecycle {
             // 5.1、交付物产物归档（[FEAT-005]）：在工具进程全部释放后，比对基线将本轮 .sql/.html/.csv 拷贝入隔离产物区
             archiveRunArtifacts(agentId, sessionId, msgId, artifactBaseline, traceCollector);
 
+            // 5.2、未收到模型尾帧 Usage 时的本地 Token 估算兜底（[LLM-002]）：
+            applyTokenEstimationFallback(traceCollector, content, replyText, thinkText);
+
             // 6、收敛 Run 状态机、写终态与回填消息（含 ext_json）：
             if (context.cancelled().get()) {
                 // a、人工终止：静默结束，回填已生成内容并追加终止提示（status=2）
@@ -597,6 +600,38 @@ public class ChatStreamTool implements SmartLifecycle {
         String notice = I18nUtil.getString(FAILED_NOTICE_KEY);
         String suffix = StringTool.isNotBlank(errorMsg) ? "：" + errorMsg : "";
         return new LlmChatTool.ChatText((content == null ? "" : content) + "\n\n> " + notice + suffix, thinking);
+    }
+
+    /**
+     * 未收到模型尾帧 Usage 时的本地 Token 估算兜底（[LLM-002]）
+     */
+    private void applyTokenEstimationFallback(TraceCollector traceCollector,
+                                              String content,
+                                              CharSequence replyText,
+                                              CharSequence thinkText) {
+        if (traceCollector == null || traceCollector.getTokenUsage().getTotalTokens() > 0) {
+            return;
+        }
+        int promptTokens = traceCollector.getEstimatedPromptTokens();
+        if (promptTokens <= 0 && chatContextWindowTool != null && StringTool.isNotBlank(content)) {
+            promptTokens = chatContextWindowTool.estimateTokens(content);
+        }
+        int completionTokens = 0;
+        if (chatContextWindowTool != null) {
+            if (replyText != null && replyText.length() > 0) {
+                completionTokens += chatContextWindowTool.estimateTokens(replyText.toString());
+            }
+            if (thinkText != null && thinkText.length() > 0) {
+                completionTokens += chatContextWindowTool.estimateTokens(thinkText.toString());
+            }
+        }
+        traceCollector.recordEstimatedUsageIfZero(promptTokens, completionTokens);
+        if (traceCollector.getTokenUsage().isEstimated()) {
+            traceCollector.addLog("WARN", "llm",
+                    "流式响应未包含精确 Token Usage（中断或未返回尾帧），采用 JTokkit 本地估算：输入 "
+                            + promptTokens + " tokens，输出 " + completionTokens + " tokens，合计 "
+                            + (promptTokens + completionTokens) + " tokens (estimated)");
+        }
     }
 
     // ==================== 任务结果队列操作（Redis Stream）： ====================

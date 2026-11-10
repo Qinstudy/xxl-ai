@@ -49,6 +49,15 @@
           <div class="kpi-label">{{ t('business.chat.traceTokens') }}</div>
           <div class="kpi-value">
             {{ traceData.tokenUsage?.totalTokens ?? 0 }}
+            <el-tag
+              v-if="traceData.tokenUsage?.estimated"
+              size="small"
+              type="warning"
+              effect="plain"
+              style="margin-left: 6px; font-size: 11px; vertical-align: middle;"
+            >
+              {{ t('business.chat.traceEstimated') }}
+            </el-tag>
           </div>
           <div class="kpi-sub">
             {{ t('business.chat.tracePromptTokens', [traceData.tokenUsage?.promptTokens ?? 0]) }} ·

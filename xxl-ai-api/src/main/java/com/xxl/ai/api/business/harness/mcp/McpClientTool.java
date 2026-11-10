@@ -185,16 +185,36 @@ public class McpClientTool {
     }
 
     /**
+     * 判断 URL 是否为标准 SSE 端点（基于 URI 规范路径，路径以 /sse 或 /sse/ 结尾，防止 /asset 等子串误判）
+     */
+    public static boolean isSseEndpoint(String url) {
+        if (url == null || url.trim().isEmpty()) {
+            return false;
+        }
+        try {
+            URI uri = URI.create(url.trim());
+            String rawPath = uri.getRawPath();
+            if (rawPath == null || rawPath.isEmpty()) {
+                return false;
+            }
+            String normalized = rawPath.endsWith("/") ? rawPath.substring(0, rawPath.length() - 1) : rawPath;
+            return normalized.equalsIgnoreCase("/sse") || normalized.toLowerCase().endsWith("/sse");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
      * 构建传输层：按 config 配置格式（http/sse/stdio）解析；遵循类型映射（0=远程/1=本地）兜底
      */
     private McpClientTransport transport(Mcp mcp) {
         McpConfig config = parseConfig(mcp);
         String transport = config.transport;
         try {
-            if ("stdio".equals(transport)) {
+            if ("stdio".equalsIgnoreCase(transport)) {
                 return buildStdioTransport(config);
             }
-            if ("sse".equals(transport) || (config.url != null && config.url.contains("/sse"))) {
+            if ("sse".equalsIgnoreCase(transport) || isSseEndpoint(config.url)) {
                 return buildSseTransport(config);
             }
             return buildHttpTransport(config);
