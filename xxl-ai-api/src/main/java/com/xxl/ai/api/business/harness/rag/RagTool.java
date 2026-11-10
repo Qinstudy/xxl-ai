@@ -532,26 +532,10 @@ public class RagTool {
     }
 
     /**
-     * 文本分片：按 chunkSize / chunkOverlap 做字符级分片
+     * 文本分片：委托递归分块器按语义边界与代码点分块
      */
-    private static List<String> split(String content, int chunkSize, int chunkOverlap) {
-        List<String> chunks = new ArrayList<>();
-        if (content == null || content.isEmpty()) {
-            return chunks;
-        }
-        int size = Math.max(chunkSize, 1);
-        int overlap = Math.min(Math.max(chunkOverlap, 0), size - 1);
-        int length = content.length();
-        int start = 0;
-        while (start < length) {
-            int end = Math.min(start + size, length);
-            chunks.add(content.substring(start, end));
-            if (end >= length) {
-                break;
-            }
-            start = end - overlap;
-        }
-        return chunks;
+    public static List<String> split(String content, int chunkSize, int chunkOverlap) {
+        return RagTextSplitter.split(content, chunkSize, chunkOverlap);
     }
 
     /**
