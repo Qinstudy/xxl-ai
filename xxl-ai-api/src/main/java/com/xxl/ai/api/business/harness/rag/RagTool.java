@@ -110,6 +110,13 @@ public class RagTool {
     }
 
     /**
+     * 向量检索调试探针（按知识库ID，供文档管理测试弹窗使用）
+     */
+    public List<Map<String, Object>> searchForTest(long baseId, String query, int topK) {
+        return searchForTest(requireBase(baseId), query, topK);
+    }
+
+    /**
      * 清理知识库下全部文档的向量（知识库删除时调用）
      */
     public void deleteByBase(long baseId) {
@@ -249,6 +256,62 @@ public class RagTool {
             return result;
         } catch (Exception e) {
             throw new IllegalStateException("向量检索异常, baseId=" + kb.getId(), e);
+        }
+    }
+
+    /**
+     * 向量检索调试探针（供文档管理测试弹窗使用）：
+     * 1. 禁用 similarityThreshold 截断，获取原始 Top-K 命中文档及真实相似度得分；
+     * 2. 补齐文档名称（docName）、知识库设定阈值（threshold）与是否达标状态（passed）；
+     * 3. 辅助管理员洞察底层高维空间打分分布，用于微调知识库的相似度阈值。
+     *
+     * @param kb    知识库
+     * @param query 检索内容
+     * @param topK  检索数量
+     * @return 原始命中列表（含 score / docName / threshold / passed 等元数据）
+     */
+    public List<Map<String, Object>> searchForTest(KnowledgeBase kb, String query, int topK) {
+        if (StringTool.isBlank(query)) {
+            throw new IllegalArgumentException("检索内容不能为空");
+        }
+        MilvusVectorStore vectorStore = resolveVectorStore(kb);
+        if (vectorStore == null) {
+            throw new IllegalArgumentException("知识库未配置有效的向量化模型，请先配置");
+        }
+        try {
+            int limit = topK > 0 ? topK : defaultTopK(kb);
+            double threshold = kb.getSimilarityThreshold();
+            // 调试探针不传 similarityThreshold，获取全部原始 Top-K
+            List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder()
+                    .query(query)
+                    .topK(limit)
+                    .build());
+            List<Map<String, Object>> result = new ArrayList<>();
+            if (CollectionTool.isNotEmpty(documents)) {
+                Map<Long, String> docNameCache = new HashMap<>();
+                for (Document doc : documents) {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("text", doc.getText());
+                    double score = doc.getScore() != null ? doc.getScore() : 0.0;
+                    score = Math.round(score * 10000.0d) / 10000.0d;
+                    item.put("score", score);
+                    Map<String, Object> meta = doc.getMetadata();
+                    long docId = 0L;
+                    if (meta != null) {
+                        docId = parseLongObj(meta.get("docId"));
+                        item.put("docId", docId);
+                        item.put("chunkIndex", meta.get("chunkIndex"));
+                    }
+                    item.put("docName", resolveDocName(docId, docNameCache));
+                    item.put("threshold", threshold);
+                    boolean passed = threshold <= 0.0 || score >= threshold;
+                    item.put("passed", passed);
+                    result.add(item);
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            throw new IllegalStateException("向量检索调试探针异常, baseId=" + kb.getId(), e);
         }
     }
 

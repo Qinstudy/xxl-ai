@@ -278,7 +278,7 @@ public class KnowledgeDocServiceImpl implements KnowledgeDocService {
     }
 
     /**
-     * 向量检索：校验归属 → harness 工具检索
+     * 向量检索调试探针：校验归属 → harness 探针检索（不截断 Top-K，展示真实分数与达标状态，辅助调参）
      */
     @Override
     public Response<List<Map<String, Object>>> search(long spaceId, long baseId, String query, int topK) {
@@ -290,7 +290,7 @@ public class KnowledgeDocServiceImpl implements KnowledgeDocService {
             return Response.ofFail("知识库不存在或不属于当前空间");
         }
         try {
-            return Response.ofSuccess(ragTool.search(baseId, query, topK));
+            return Response.ofSuccess(ragTool.searchForTest(knowledgeBase, query, topK));
         } catch (Exception e) {
             return Response.ofFail(e.getMessage());
         }
