@@ -37,6 +37,7 @@ public class AgentAdaptor {
         agent.setMcpIds(joinIds(dto.getMcpIds()));
         agent.setSkillIds(joinIds(dto.getSkillIds()));
         agent.setSubAgentIds(joinIds(dto.getSubAgentIds()));
+        agent.setAutoDecomposeStatus(dto.getAutoDecomposeStatus());
         agent.setMemoryStatus(dto.getMemoryStatus());
         agent.setTemperature(dto.getTemperature());
         agent.setTopP(dto.getTopP());
@@ -66,6 +67,7 @@ public class AgentAdaptor {
         dto.setMcpIds(splitIds(agent.getMcpIds()));
         dto.setSkillIds(splitIds(agent.getSkillIds()));
         dto.setSubAgentIds(splitIds(agent.getSubAgentIds()));
+        dto.setAutoDecomposeStatus(agent.getAutoDecomposeStatus());
         dto.setMemoryStatus(agent.getMemoryStatus());
         dto.setTemperature(agent.getTemperature());
         dto.setTopP(agent.getTopP());

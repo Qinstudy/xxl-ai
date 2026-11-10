@@ -8,27 +8,30 @@ import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.ToolCallback;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * [FEAT-013] SubAgents 多智能体协作工具与适配测试
+ * SubAgents 多智能体协作体系演进单元测试（纯静态 / 纯动态 / 复合单门面协同 + 路由劫持防重造）
  *
  * @author xxl-ai 2026-11-10
  */
 public class SubAgentToolTest {
 
     @Test
-    void testAgentAdaptorSubAgentIds() {
+    void testAgentAdaptorSubAgentAndAutoDecompose() {
         AgentDTO dto = new AgentDTO();
         dto.setId(10L);
-        dto.setName("主Agent");
+        dto.setName("主控编排智能体");
         dto.setSubAgentIds(Arrays.asList(101L, 102L, 103L));
+        dto.setAutoDecomposeStatus(1);
 
         Agent agent = AgentAdaptor.adapt(dto);
         assertNotNull(agent);
         assertEquals("101,102,103", agent.getSubAgentIds());
+        assertEquals(1, agent.getAutoDecomposeStatus());
 
         AgentDTO back = AgentAdaptor.adapt2dto(agent);
         assertNotNull(back);
@@ -37,16 +40,18 @@ public class SubAgentToolTest {
         assertEquals(101L, back.getSubAgentIds().get(0));
         assertEquals(102L, back.getSubAgentIds().get(1));
         assertEquals(103L, back.getSubAgentIds().get(2));
+        assertEquals(1, back.getAutoDecomposeStatus());
     }
 
     @Test
-    void testEmptySubAgentIdsReturnEmptyTools() {
+    void testEmptySubAgentAndAutoDecomposeReturnEmptyTools() {
         SubAgentTool subAgentTool = new SubAgentTool();
 
         Agent parent = new Agent();
         parent.setId(1L);
         parent.setSpaceId(10L);
         parent.setSubAgentIds(null);
+        parent.setAutoDecomposeStatus(0);
 
         List<Object> tools = subAgentTool.buildTools(parent, null);
         assertNotNull(tools);
@@ -59,7 +64,7 @@ public class SubAgentToolTest {
     }
 
     @Test
-    void testSubAgentBuildFilteringRules() throws Exception {
+    void testDelegateSpecialistMountAndFiltering() throws Exception {
         SubAgentTool subAgentTool = new SubAgentTool();
 
         // 模拟 Agent 库数据
@@ -107,36 +112,212 @@ public class SubAgentToolTest {
         mapperField.setAccessible(true);
         mapperField.set(subAgentTool, mockMapper);
 
-        // 主 Agent 尝试挂载：自身(1L) + 有效(101L) + 未发布(102L) + 跨空间(103L) + 不存在(9999L)
+        // 主 Agent 纯静态挂载：自身(1L) + 有效(101L) + 未发布(102L) + 跨空间(103L) + 不存在(9999L)
         Agent parent = new Agent();
         parent.setId(1L);
         parent.setSpaceId(10L);
         parent.setSubAgentIds("1,101,102,103,9999");
+        parent.setAutoDecomposeStatus(0);
 
         List<Object> tools = subAgentTool.buildTools(parent, null);
         assertNotNull(tools);
-        // 仅 sub1(101L) 应该被成功挂载！
-        assertEquals(1, tools.size(), "只有同空间、已发布、非自身的子 Agent 可以被成功挂载为工具");
+        // 纯静态模式仅挂载 delegate_specialist
+        assertEquals(1, tools.size(), "纯静态模式应该挂载且仅挂载单一 delegate_specialist 批量委派工具");
 
         Object toolObj = tools.get(0);
         assertTrue(toolObj instanceof ToolCallback);
         ToolCallback callback = (ToolCallback) toolObj;
         assertNotNull(callback.getToolDefinition());
-        assertEquals("subagent_101", callback.getToolDefinition().name());
+        assertEquals("delegate_specialist", callback.getToolDefinition().name());
+        // 描述中应包含过滤后有效绑定的专家信息
         assertTrue(callback.getToolDefinition().description().contains("SQL优化专家"));
         assertTrue(callback.getToolDefinition().description().contains("负责复杂慢SQL优化与索引建议"));
-        assertTrue(callback.getToolDefinition().inputSchema().contains("task"));
+        assertFalse(callback.getToolDefinition().description().contains("草稿智能体"));
+        assertFalse(callback.getToolDefinition().description().contains("外部空间智能体"));
+        // Schema 应包含 tasks 数组
+        assertTrue(callback.getToolDefinition().inputSchema().contains("tasks"));
+        assertTrue(callback.getToolDefinition().inputSchema().contains("agentId"));
+    }
+
+    @Test
+    void testDecomposeAndSpawnMount() {
+        SubAgentTool subAgentTool = new SubAgentTool();
+
+        Agent parent = new Agent();
+        parent.setId(2L);
+        parent.setSpaceId(10L);
+        parent.setSubAgentIds(null);
+        parent.setAutoDecomposeStatus(1);
+
+        List<Object> tools = subAgentTool.buildTools(parent, null);
+        assertNotNull(tools);
+        assertEquals(1, tools.size(), "纯动态开启 autoDecomposeStatus 时应挂载单一 decompose_and_spawn 工具");
+
+        Object toolObj = tools.get(0);
+        assertTrue(toolObj instanceof ToolCallback);
+        ToolCallback callback = (ToolCallback) toolObj;
+        assertEquals("decompose_and_spawn", callback.getToolDefinition().name());
+        assertTrue(callback.getToolDefinition().inputSchema().contains("roleName"));
+        assertTrue(callback.getToolDefinition().inputSchema().contains("systemInstruction"));
+        assertTrue(callback.getToolDefinition().inputSchema().contains("taskPrompt"));
+    }
+
+    @Test
+    void testDualModeMountSingleHybridFacade() throws Exception {
+        SubAgentTool subAgentTool = new SubAgentTool();
+
+        Map<Long, Agent> mockDb = new HashMap<>();
+        Agent sub1 = new Agent();
+        sub1.setId(101L);
+        sub1.setName("SQL优化专家");
+        sub1.setIntro("负责慢SQL与索引调优");
+        sub1.setSpaceId(10L);
+        sub1.setPublishStatus(1);
+        mockDb.put(101L, sub1);
+
+        AgentMapper mockMapper = (AgentMapper) java.lang.reflect.Proxy.newProxyInstance(
+                AgentMapper.class.getClassLoader(),
+                new Class<?>[]{AgentMapper.class},
+                (proxy, method, args) -> {
+                    if ("load".equals(method.getName()) && args != null && args.length > 0) {
+                        return mockDb.get((Long) args[0]);
+                    }
+                    return null;
+                }
+        );
+
+        Field mapperField = SubAgentTool.class.getDeclaredField("agentMapper");
+        mapperField.setAccessible(true);
+        mapperField.set(subAgentTool, mockMapper);
+
+        Agent parent = new Agent();
+        parent.setId(3L);
+        parent.setSpaceId(10L);
+        parent.setSubAgentIds("101");
+        parent.setAutoDecomposeStatus(1);
+
+        List<Object> tools = subAgentTool.buildTools(parent, null);
+        assertNotNull(tools);
+        // 复合双开时，按单门面自适应原则，必须暴露且仅暴露单一混合协同工具 dispatch_subagents，根除工具竞争与串行等待
+        assertEquals(1, tools.size(), "双模复合时必须暴露且仅暴露 1 个混合协同门面工具 dispatch_subagents");
+
+        ToolCallback callback = (ToolCallback) tools.get(0);
+        assertEquals("dispatch_subagents", callback.getToolDefinition().name());
+        assertTrue(callback.getToolDefinition().description().contains("SQL优化专家"));
+        assertTrue(callback.getToolDefinition().inputSchema().contains("agentId"));
+        assertTrue(callback.getToolDefinition().inputSchema().contains("roleName"));
+    }
+
+    @Test
+    void testTaskInputParsing() {
+        SubAgentTool subAgentTool = new SubAgentTool();
+
+        // 1、测试 specialist tasks 数组解析
+        Map<String, Object> specialistInput = Map.of("tasks", List.of(
+                Map.of("agentId", 101, "task", "优化慢SQL"),
+                Map.of("agentId", 102L, "task", "检查死锁")
+        ));
+        List<SubAgentTool.SpecialistTaskInput> tasks = subAgentTool.parseSpecialistTasks(specialistInput);
+        assertNotNull(tasks);
+        assertEquals(2, tasks.size());
+        assertEquals(101L, tasks.get(0).getAgentId());
+        assertEquals("优化慢SQL", tasks.get(0).getTask());
+        assertEquals(102L, tasks.get(1).getAgentId());
+
+        // 2、测试 decompose tasks 数组解析
+        Map<String, Object> decomposeInput = Map.of("tasks", List.of(
+                Map.of("roleName", "架构审计员", "systemInstruction", "你是一名资深架构师", "taskPrompt", "审计事务边界", "enableRag", false)
+        ));
+        List<SubAgentTool.DecomposeTaskInput> decTasks = subAgentTool.parseDecomposeTasks(decomposeInput);
+        assertNotNull(decTasks);
+        assertEquals(1, decTasks.size());
+        assertEquals("架构审计员", decTasks.get(0).getRoleName());
+        assertEquals("你是一名资深架构师", decTasks.get(0).getSystemInstruction());
+        assertEquals("审计事务边界", decTasks.get(0).getTaskPrompt());
+        assertEquals(false, decTasks.get(0).getEnableRag());
+
+        // 3、测试 hybrid tasks 混合混编解析
+        Map<String, Object> hybridInput = Map.of("tasks", List.of(
+                Map.of("agentId", 101L, "task", "调优慢查询"),
+                Map.of("roleName", "Redis秒杀架构师", "systemInstruction", "你精通缓存", "task", "设计预扣减", "enableRag", true)
+        ));
+        List<SubAgentTool.HybridTaskInput> hybridTasks = subAgentTool.parseHybridTasks(hybridInput);
+        assertNotNull(hybridTasks);
+        assertEquals(2, hybridTasks.size());
+        assertEquals(101L, hybridTasks.get(0).getAgentId());
+        assertEquals("调优慢查询", hybridTasks.get(0).getTask());
+        assertNull(hybridTasks.get(1).getAgentId());
+        assertEquals("Redis秒杀架构师", hybridTasks.get(1).getRoleName());
+        assertEquals("设计预扣减", hybridTasks.get(1).getTask());
+    }
+
+    @Test
+    void testSpecialistFirstRoutingAndHijack() {
+        SubAgentTool subAgentTool = new SubAgentTool();
+
+        Agent staticDba = new Agent();
+        staticDba.setId(101L);
+        staticDba.setName("SQL优化专家");
+        staticDba.setIntro("精通MySQL慢查询与索引优化");
+
+        Map<Long, Agent> specialistMap = Map.of(101L, staticDba);
+
+        // Case 1: 显式填写有效 agentId -> 正常命中静态专家，无劫持
+        SubAgentTool.HybridTaskInput directInput = new SubAgentTool.HybridTaskInput(
+                101L, null, null, "分析慢SQL", true
+        );
+        SubAgentTool.SpecialistMatch match1 = subAgentTool.matchExistingSpecialist(directInput, specialistMap);
+        assertNotNull(match1);
+        assertEquals(101L, match1.getAgent().getId());
+        assertFalse(match1.isHijacked(), "显式指定 agentId 不应标记为劫持纠偏");
+
+        // Case 2: 未填 agentId，但捏造角色与静态专家核心词重叠（如 "SQL优化顾问"） -> 触发劫持纠偏至 staticDba
+        SubAgentTool.HybridTaskInput redundantInput = new SubAgentTool.HybridTaskInput(
+                null, "SQL优化顾问", "你是一名SQL大师", "帮我看看慢SQL", true
+        );
+        SubAgentTool.SpecialistMatch match2 = subAgentTool.matchExistingSpecialist(redundantInput, specialistMap);
+        assertNotNull(match2, "重造相近角色必须被仲裁器拦截纠偏");
+        assertEquals(101L, match2.getAgent().getId());
+        assertTrue(match2.isHijacked(), "应标记为劫持重定向");
+
+        // Case 3: 确属全新领域角色（如 "Kafka削峰架构师"） -> 不触发劫持，放行交由动态瞬态专家
+        SubAgentTool.HybridTaskInput novelInput = new SubAgentTool.HybridTaskInput(
+                null, "Kafka削峰架构师", "你精通消息队列", "设计高并发削峰", true
+        );
+        SubAgentTool.SpecialistMatch match3 = subAgentTool.matchExistingSpecialist(novelInput, specialistMap);
+        assertNull(match3, "全新空白领域角色不应被误劫持");
+    }
+
+    @Test
+    void testStopwordsAndBigramOverlap() {
+        // 验证停用词过滤：剔除 "专家"、"顾问" 后均收敛为 "sql优化"
+        assertEquals("sql优化", SubAgentTool.stripStopwords("SQL优化专家"));
+        assertEquals("sql优化", SubAgentTool.stripStopwords("SQL优化顾问"));
+
+        // 验证重叠度检测
+        assertTrue(SubAgentTool.isRoleOverlapped("sql优化", "sql优化", "任务", "介绍"));
+        assertFalse(SubAgentTool.isRoleOverlapped("kafka削峰", "sql优化", "任务", "介绍"));
     }
 
     public static void main(String[] args) throws Exception {
         System.out.println("Running SubAgentToolTest...");
         SubAgentToolTest test = new SubAgentToolTest();
-        test.testAgentAdaptorSubAgentIds();
-        System.out.println("✓ testAgentAdaptorSubAgentIds PASSED");
-        test.testEmptySubAgentIdsReturnEmptyTools();
-        System.out.println("✓ testEmptySubAgentIdsReturnEmptyTools PASSED");
-        test.testSubAgentBuildFilteringRules();
-        System.out.println("✓ testSubAgentBuildFilteringRules PASSED");
+        test.testAgentAdaptorSubAgentAndAutoDecompose();
+        System.out.println("✓ testAgentAdaptorSubAgentAndAutoDecompose PASSED");
+        test.testEmptySubAgentAndAutoDecomposeReturnEmptyTools();
+        System.out.println("✓ testEmptySubAgentAndAutoDecomposeReturnEmptyTools PASSED");
+        test.testDelegateSpecialistMountAndFiltering();
+        System.out.println("✓ testDelegateSpecialistMountAndFiltering PASSED");
+        test.testDecomposeAndSpawnMount();
+        System.out.println("✓ testDecomposeAndSpawnMount PASSED");
+        test.testDualModeMountSingleHybridFacade();
+        System.out.println("✓ testDualModeMountSingleHybridFacade PASSED");
+        test.testTaskInputParsing();
+        System.out.println("✓ testTaskInputParsing PASSED");
+        test.testSpecialistFirstRoutingAndHijack();
+        System.out.println("✓ testSpecialistFirstRoutingAndHijack PASSED");
+        test.testStopwordsAndBigramOverlap();
+        System.out.println("✓ testStopwordsAndBigramOverlap PASSED");
         System.out.println("ALL SUBAGENT TESTS PASSED SUCCESSFULLY!");
     }
 

@@ -165,6 +165,15 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item prop="autoDecomposeStatus">
+          <template #label>
+            <span>{{ t('business.agent.autoDecompose') }}</span>
+            <el-tooltip :content="t('business.agent.autoDecomposeTip')" placement="top">
+              <el-icon style="margin-left: 4px; vertical-align: middle; cursor: pointer"><QuestionFilled /></el-icon>
+            </el-tooltip>
+          </template>
+          <el-switch v-model="formState.form.autoDecomposeStatus" :active-value="1" :inactive-value="0" />
+        </el-form-item>
         <el-form-item :label="t('business.agent.memoryStatus')" prop="memoryStatus">
           <el-switch v-model="formState.form.memoryStatus" :active-value="1" :inactive-value="0" />
         </el-form-item>
@@ -347,6 +356,7 @@ function reset() {
     mcpIds: [],
     skillIds: [],
     subAgentIds: [],
+    autoDecomposeStatus: 0,
     memoryStatus: 0,
     temperature: undefined,
     topP: undefined,

@@ -92,7 +92,7 @@
             <div v-for="tool in traceData.toolTraces" :key="tool.callId" class="tool-trace-card">
               <div class="tool-trace-head">
                 <div class="tool-title-group">
-                  <el-tag size="small" type="info" effect="plain">{{ tool.toolType }}</el-tag>
+                  <el-tag size="small" :type="tool.toolType === 'SUBAGENT' ? 'warning' : 'info'" effect="plain">{{ tool.toolType }}</el-tag>
                   <span class="tool-name">{{ tool.toolName }}</span>
                 </div>
                 <div class="tool-status-group">
@@ -228,6 +228,7 @@ function stageLabel(stage?: string): string {
   if (stage === 'tool') return t('business.chat.traceStageTool')
   if (stage === 'llm') return t('business.chat.traceStageLlm')
   if (stage === 'artifact') return t('business.chat.traceStageArtifact')
+  if (stage === 'subagent') return t('business.chat.traceStageSubagent')
   return t('business.chat.traceStageRun')
 }
 
@@ -380,6 +381,9 @@ function formatJsonText(raw?: string): string {
 .stage-artifact {
   background: #4f46e5;
 }
+.stage-subagent {
+  background: #9333ea;
+}
 
 .span-name {
   flex: 1;
@@ -428,6 +432,9 @@ function formatJsonText(raw?: string): string {
 }
 .stage-bg-artifact {
   background: #4f46e5;
+}
+.stage-bg-subagent {
+  background: #9333ea;
 }
 .bar-error {
   background: #f56c6c !important;

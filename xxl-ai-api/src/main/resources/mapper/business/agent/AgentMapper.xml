@@ -16,6 +16,7 @@
 		<result column="mcp_ids" property="mcpIds" />
 		<result column="skill_ids" property="skillIds" />
 		<result column="sub_agent_ids" property="subAgentIds" />
+		<result column="auto_decompose_status" property="autoDecomposeStatus" />
 		<result column="memory_status" property="memoryStatus" />
 		<result column="temperature" property="temperature" />
 		<result column="top_p" property="topP" />
@@ -38,6 +39,7 @@
 		t.mcp_ids,
 		t.skill_ids,
 		t.sub_agent_ids,
+		t.auto_decompose_status,
 		t.memory_status,
 		t.temperature,
 		t.top_p,
@@ -51,10 +53,10 @@
 	<insert id="insert" parameterType="com.xxl.ai.api.business.agent.model.entity.Agent" useGeneratedKeys="true" keyProperty="id" >
 		INSERT INTO xxl_ai_agent (
 			space_id, name, intro, model_supplier_id, model_id, system_prompt,
-			kb_ids, mcp_ids, skill_ids, sub_agent_ids, memory_status, temperature, top_p, max_tokens, publish_status, uuid, add_time, update_time
+			kb_ids, mcp_ids, skill_ids, sub_agent_ids, auto_decompose_status, memory_status, temperature, top_p, max_tokens, publish_status, uuid, add_time, update_time
 		) VALUES (
 			 #{spaceId}, #{name}, #{intro}, #{modelSupplierId}, #{modelId}, #{systemPrompt},
-			 #{kbIds}, #{mcpIds}, #{skillIds}, #{subAgentIds}, #{memoryStatus}, #{temperature}, #{topP}, #{maxTokens}, #{publishStatus}, #{uuid}, NOW(), NOW()
+			 #{kbIds}, #{mcpIds}, #{skillIds}, #{subAgentIds}, #{autoDecomposeStatus}, #{memoryStatus}, #{temperature}, #{topP}, #{maxTokens}, #{publishStatus}, #{uuid}, NOW(), NOW()
 		 );
 	</insert>
 
@@ -81,6 +83,7 @@
 			mcp_ids = #{mcpIds},
 			skill_ids = #{skillIds},
 			sub_agent_ids = #{subAgentIds},
+			auto_decompose_status = #{autoDecomposeStatus},
 			memory_status = #{memoryStatus},
 			temperature = #{temperature},
 			top_p = #{topP},

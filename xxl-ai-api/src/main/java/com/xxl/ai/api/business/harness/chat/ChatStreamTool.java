@@ -524,7 +524,7 @@ public class ChatStreamTool implements SmartLifecycle {
         ArtifactBaseline artifactBaseline = new ArtifactBaseline();
         try {
             // Agent 校验 → 装配历史/记忆/显式RAG/可观测工具 → harness 流式对话
-            chatText = llmChat(msgId, agentId, sessionId, content, onThinking, onContent, context.shellTracker, traceCollector, artifactBaseline);
+            chatText = llmChat(msgId, agentId, sessionId, content, onThinking, onContent, context.shellTracker, traceCollector, artifactBaseline, context.cancelled());
         } catch (Throwable e) {
             failure = e;
         } finally {
@@ -766,7 +766,8 @@ public class ChatStreamTool implements SmartLifecycle {
                                          java.util.function.Consumer<String> onContent,
                                          SkillShellTracker shellTracker,
                                          TraceCollector traceCollector,
-                                         ArtifactBaseline artifactBaseline) throws Exception {
+                                         ArtifactBaseline artifactBaseline,
+                                         AtomicBoolean cancelled) throws Exception {
 
         // 1、解析模型运行时：
         TraceCollector.TraceSpan ctxSpan = traceCollector.startSpan("context", "加载 Agent 配置与会话历史");
@@ -818,9 +819,11 @@ public class ChatStreamTool implements SmartLifecycle {
         // 2.3、长期记忆注入：
         systemPrompt = injectMemory(agent, sessionId, systemPrompt, traceCollector);
 
-        // 2.4、工具装配与可观测装饰器包装：MCP 工具 + Skill 工具 + 终端/文件执行工具
+        // 2.4、工具装配与可观测装饰器包装：MCP 工具 + Skill 工具 + 终端/文件执行工具 + SubAgent 工具
         Object[] tools = buildObservableTools(agent, shellTracker, traceCollector,
-                toolJson -> appendResult(msgId, EVENT_TOOL, toolJson));
+                toolJson -> appendResult(msgId, EVENT_TOOL, toolJson),
+                cancelled,
+                (type, data) -> appendResult(msgId, type, data));
 
         // 2.4.1、采集交付物基线快照（[FEAT-005]：同步完 Skill 沙箱后采集，避免把已有技能文件误判为新交付物）
         if (artifactBaseline != null && StringTool.isNotBlank(agent.getSkillIds())) {
@@ -923,13 +926,34 @@ public class ChatStreamTool implements SmartLifecycle {
     }
 
     /**
-     * 系统指令：Agent 配置的非空则用
+     * 系统指令：Agent 配置的非空则用，具备 SubAgent 能力时自动追加多智能体协同调度规范
      */
     private String buildSystemPrompt(Agent agent) {
-        if (StringTool.isNotBlank(agent.getSystemPrompt())) {
-            return agent.getSystemPrompt().trim();
+        String basePrompt = StringTool.isNotBlank(agent.getSystemPrompt()) ? agent.getSystemPrompt().trim() : "";
+        boolean hasSubAgents = StringTool.isNotBlank(agent.getSubAgentIds());
+        boolean hasAutoDecompose = agent.getAutoDecomposeStatus() == 1;
+        if (!hasSubAgents && !hasAutoDecompose) {
+            return basePrompt;
         }
-        return "";
+
+        StringBuilder sb = new StringBuilder(basePrompt);
+        sb.append("\n\n【多智能体协同调度规范】\n");
+        sb.append("你当前处于主控智能体（Supervisor）模式：\n");
+        sb.append("1. 简单问题直答：若用户问题简单直接，请直接回答，切勿过度拆解；\n");
+        sb.append("2. 跨领域复杂任务调度准则：\n");
+
+        if (hasSubAgents && hasAutoDecompose) {
+            sb.append("   - 你具备混合协同调度能力，可通过单一门面工具 dispatch_subagents 同时委派预置专家与动态瞬态专家（单批次最多4项并行任务）；\n");
+            sb.append("   - 【预置专家强制优先】：拆分任务时必须优先核对已绑定专家名录，凡属于专家职责的子任务必须在 tasks 数组项中填写对应的 agentId，严禁动态重复捏造已有专家；\n");
+            sb.append("   - 【空白领域动态补位】：仅当部分子任务超出所有已绑定专家的职责边界时，才在同一 tasks 数组项中填写 roleName 与 systemInstruction 动态定义互补专家；\n");
+        } else if (hasSubAgents) {
+            sb.append("   - 可调用 delegate_specialist 批量委派给专项子智能体（一次性下发多个任务并行执行，缩短总耗时）；\n");
+        } else {
+            sb.append("   - 可调用 decompose_and_spawn 动态定义 2~4 个互补专家角色并行分析并汇总结果；\n");
+        }
+
+        sb.append("3. 综合提炼：收到各子智能体的执行报告后，请进行交叉核对与逻辑提炼，最终以统一、连贯的专业口吻回复用户，严禁机械堆砌各子智能体的原始回答。");
+        return sb.toString();
     }
 
     /**
@@ -968,7 +992,9 @@ public class ChatStreamTool implements SmartLifecycle {
     private Object[] buildObservableTools(Agent agent,
                                           SkillShellTracker tracker,
                                           TraceCollector traceCollector,
-                                          java.util.function.Consumer<String> onToolEvent) {
+                                          java.util.function.Consumer<String> onToolEvent,
+                                          AtomicBoolean cancelled,
+                                          java.util.function.BiConsumer<String, String> eventConsumer) {
         List<ObservableToolCallback.TaggedTool> taggedTools = new ArrayList<>();
         for (Object mcpTool : mcpToolFactory.buildTools(agent)) {
             taggedTools.add(new ObservableToolCallback.TaggedTool("MCP", mcpTool));
@@ -980,7 +1006,7 @@ public class ChatStreamTool implements SmartLifecycle {
         for (Object execTool : skillToolFactory.buildExecutorTools(agent, tracker)) {
             taggedTools.add(new ObservableToolCallback.TaggedTool("EXEC", execTool));
         }
-        for (Object subAgentToolItem : subAgentTool.buildTools(agent, traceCollector)) {
+        for (Object subAgentToolItem : subAgentTool.buildTools(agent, traceCollector, cancelled, eventConsumer)) {
             taggedTools.add(new ObservableToolCallback.TaggedTool("SUBAGENT", subAgentToolItem));
         }
         Object[] wrapped = ObservableToolCallback.wrapAll(taggedTools, traceCollector, onToolEvent);
