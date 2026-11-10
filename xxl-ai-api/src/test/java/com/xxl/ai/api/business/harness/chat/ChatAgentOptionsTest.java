@@ -59,18 +59,37 @@ public class ChatAgentOptionsTest {
     @Test
     void testBuildOpenAiChatOptions() {
         OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder();
+        builder.model("glm-4.7");
         builder.temperature(0.5);
         builder.topP(0.85);
         builder.maxTokens(4096);
 
         OpenAiChatOptions options = builder.build();
         assertNotNull(options);
+        assertEquals("glm-4.7", options.getModel());
         assertEquals(0.5, options.getTemperature());
         assertEquals(0.85, options.getTopP());
         assertEquals(4096, options.getMaxTokens());
 
-        // 验证 mutate 支持
-        assertNotNull(options.mutate());
+        // 验证 mutate 支持并保持 model
+        OpenAiChatOptions mutated = options.mutate().build();
+        assertNotNull(mutated);
+        assertEquals("glm-4.7", mutated.getModel());
+    }
+
+    @Test
+    void testChatStreamToolBuildChatOptionsPreservesModel() {
+        Agent agent = new Agent();
+        agent.setTemperature(0.7);
+        agent.setTopP(0.9);
+        agent.setMaxTokens(8192);
+
+        OpenAiChatOptions options = ChatStreamTool.buildChatOptions(agent, "glm-4-flash", null);
+        assertNotNull(options);
+        assertEquals("glm-4-flash", options.getModel());
+        assertEquals(0.7, options.getTemperature());
+        assertEquals(0.9, options.getTopP());
+        assertEquals(8192, options.getMaxTokens());
     }
 
     public static void main(String[] args) {
@@ -78,6 +97,7 @@ public class ChatAgentOptionsTest {
         test.testAgentAdaptorOptionsMapping();
         test.testAgentAdaptorNullOptionsFallback();
         test.testBuildOpenAiChatOptions();
+        test.testChatStreamToolBuildChatOptionsPreservesModel();
         System.out.println("ALL AGENT OPTIONS TESTS PASSED!");
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
@@ -117,7 +118,12 @@ public class LlmChatTool {
 
         // 动态注入推理超参数（[FEAT-006]）：温度 / 核采样 / 最大Token 等
         if (chatOptions != null) {
-            spec = spec.options(chatOptions.mutate());
+            if (chatOptions instanceof OpenAiChatOptions openAiChatOptions) {
+                // 确保模型代码与当前运行时供应商模型严格一致，防止被 Spring AI 默认的 gpt-5-mini 篡改
+                spec = spec.options(openAiChatOptions.mutate().model(runtime.getModelName()));
+            } else {
+                spec = spec.options(chatOptions.mutate());
+            }
         }
 
         // 附加工具（ToolCallback / @Tool 对象）

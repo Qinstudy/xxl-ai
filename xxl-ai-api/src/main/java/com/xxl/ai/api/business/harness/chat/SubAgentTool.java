@@ -164,8 +164,8 @@ public class SubAgentTool {
         }
         String contextualQuestion = ragTool.buildContextualQuestion(task, references);
 
-        // 4、提取子智能体动态推理超参数
-        OpenAiChatOptions chatOptions = ChatStreamTool.buildChatOptions(subAgent, traceCollector);
+        // 4、提取子智能体动态推理超参数（显式绑定子智能体模型代码，防覆盖）
+        OpenAiChatOptions chatOptions = ChatStreamTool.buildChatOptions(subAgent, runtime.getModelName(), traceCollector);
 
         // 5、提取子智能体系统指令
         String systemPrompt = StringTool.isNotBlank(subAgent.getSystemPrompt()) ? subAgent.getSystemPrompt().trim() : "";

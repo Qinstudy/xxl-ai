@@ -849,8 +849,8 @@ public class ChatStreamTool implements SmartLifecycle {
             noticeText.append(notice);
         }
 
-        // 2.7、大模型推理超参数动态配置（[FEAT-006]）：从 Agent 读取配置并记录 Trace 日志
-        OpenAiChatOptions chatOptions = buildChatOptions(agent, traceCollector);
+        // 2.7、大模型推理超参数动态配置（[FEAT-006]）：从 Agent 读取配置并记录 Trace 日志（显式绑定当前真实模型名称）
+        OpenAiChatOptions chatOptions = buildChatOptions(agent, runtime.getModelName(), traceCollector);
 
         // 3、harness 流式对话：增量回调写思考流与内容流，采集 TTFT 与多轮 Token Usage
         LlmChatTool.ChatText chatText = llmChatTool.chat(
@@ -876,8 +876,11 @@ public class ChatStreamTool implements SmartLifecycle {
 
     /**
      * 构建动态推理超参数（[FEAT-006]）：从 Agent 配置读取 temperature / top_p / max_tokens
+     *
+     * 需显式绑定当前真实模型名称（modelName），防止未设置 model 时 Spring AI 默认回退为 gpt-5-mini
+     * 导致请求国产或第三方大模型（如智谱 GLM、Deepseek、Ollama）时因模型名称不匹配被服务端拒绝（400）。
      */
-    static OpenAiChatOptions buildChatOptions(Agent agent, TraceCollector traceCollector) {
+    static OpenAiChatOptions buildChatOptions(Agent agent, String modelName, TraceCollector traceCollector) {
         if (agent == null) {
             return null;
         }
@@ -889,6 +892,9 @@ public class ChatStreamTool implements SmartLifecycle {
         }
 
         OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder();
+        if (StringTool.isNotBlank(modelName)) {
+            builder.model(modelName.trim());
+        }
         List<String> logItems = new ArrayList<>();
         if (temperature != null) {
             builder.temperature(temperature);
@@ -907,6 +913,13 @@ public class ChatStreamTool implements SmartLifecycle {
             traceCollector.addLog("INFO", "context", "注入推理超参数：" + String.join(", ", logItems));
         }
         return builder.build();
+    }
+
+    /**
+     * 构建动态推理超参数（兼容无 modelName 签名）
+     */
+    static OpenAiChatOptions buildChatOptions(Agent agent, TraceCollector traceCollector) {
+        return buildChatOptions(agent, null, traceCollector);
     }
 
     /**
