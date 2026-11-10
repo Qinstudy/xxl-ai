@@ -23,6 +23,7 @@ import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Lazy;
@@ -846,6 +847,9 @@ public class ChatStreamTool implements SmartLifecycle {
             noticeText.append(notice);
         }
 
+        // 2.7、大模型推理超参数动态配置（[FEAT-006]）：从 Agent 读取配置并记录 Trace 日志
+        OpenAiChatOptions chatOptions = buildChatOptions(agent, traceCollector);
+
         // 3、harness 流式对话：增量回调写思考流与内容流，采集 TTFT 与多轮 Token Usage
         LlmChatTool.ChatText chatText = llmChatTool.chat(
                 runtime,
@@ -856,6 +860,7 @@ public class ChatStreamTool implements SmartLifecycle {
                 tools,
                 Collections.emptyList(),
                 "xxl-ai-session-" + sessionId,
+                chatOptions,
                 onThinking,
                 onContent,
                 traceCollector,
@@ -865,6 +870,41 @@ public class ChatStreamTool implements SmartLifecycle {
             chatText = new LlmChatTool.ChatText(chatText.getContent(), noticeText + chatText.getThinking());
         }
         return chatText;
+    }
+
+    /**
+     * 构建动态推理超参数（[FEAT-006]）：从 Agent 配置读取 temperature / top_p / max_tokens
+     */
+    private OpenAiChatOptions buildChatOptions(Agent agent, TraceCollector traceCollector) {
+        if (agent == null) {
+            return null;
+        }
+        Double temperature = agent.getTemperature();
+        Double topP = agent.getTopP();
+        Integer maxTokens = agent.getMaxTokens();
+        if (temperature == null && topP == null && maxTokens == null) {
+            return null;
+        }
+
+        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder();
+        List<String> logItems = new ArrayList<>();
+        if (temperature != null) {
+            builder.temperature(temperature);
+            logItems.add("temperature=" + temperature);
+        }
+        if (topP != null) {
+            builder.topP(topP);
+            logItems.add("topP=" + topP);
+        }
+        if (maxTokens != null && maxTokens > 0) {
+            builder.maxTokens(maxTokens);
+            logItems.add("maxTokens=" + maxTokens);
+        }
+
+        if (traceCollector != null && !logItems.isEmpty()) {
+            traceCollector.addLog("INFO", "context", "注入推理超参数：" + String.join(", ", logItems));
+        }
+        return builder.build();
     }
 
     /**

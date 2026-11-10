@@ -21,6 +21,9 @@ public class Agent {
     private String mcpIds;          /* MCP ID集合(逗号分隔) */
     private String skillIds;        /* Skill ID集合(逗号分隔) */
     private int memoryStatus;       /* 记忆开关：0-关闭、1-开启 */
+    private Double temperature;     /* 模型采样温度：0.0~2.0，空表示默认 */
+    private Double topP;            /* 模型核采样：0.0~1.0，空表示默认 */
+    private Integer maxTokens;      /* 单次生成最大Token数，空表示默认 */
     private int publishStatus;      /* 发布状态：0-未发布、1-已发布 */
     private String uuid;            /* 访问UUID */
     private Date addTime;           /* 新增时间 */
@@ -120,6 +123,30 @@ public class Agent {
 
     public void setMemoryStatus(int memoryStatus) {
         this.memoryStatus = memoryStatus;
+    }
+
+    public Double getTemperature() {
+        return temperature;
+    }
+
+    public void setTemperature(Double temperature) {
+        this.temperature = temperature;
+    }
+
+    public Double getTopP() {
+        return topP;
+    }
+
+    public void setTopP(Double topP) {
+        this.topP = topP;
+    }
+
+    public Integer getMaxTokens() {
+        return maxTokens;
+    }
+
+    public void setMaxTokens(Integer maxTokens) {
+        this.maxTokens = maxTokens;
     }
 
     public int getPublishStatus() {

@@ -440,7 +440,14 @@
       "systemPromptPlaceholder": "Enter the agent system prompt",
       "publishSuccess": "Published",
       "unpublishSuccess": "Unpublished",
-      "confirmDelete": "Are you sure to delete the agent with ID \"{0}\"?"
+      "confirmDelete": "Are you sure to delete the agent with ID \"{0}\"?",
+      "optionsTitle": "Model Inference Options",
+      "temperature": "Temperature",
+      "temperatureTip": "Controls randomness and creativity (0.0~2.0). Lower is more deterministic, higher is more creative. Leave empty for model default",
+      "topP": "Top P",
+      "topPTip": "Controls cumulative probability threshold for candidate tokens (0.0~1.0). Leave empty for model default",
+      "maxTokens": "Max Tokens",
+      "maxTokensTip": "Limits the maximum number of generated tokens per response (1~131072). Leave empty for model default"
     },
     "chat": {
       "newChat": "New Chat",

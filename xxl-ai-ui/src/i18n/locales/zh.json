@@ -440,7 +440,14 @@
       "systemPromptPlaceholder": "请输入 Agent 系统指令",
       "publishSuccess": "发布成功",
       "unpublishSuccess": "已取消发布",
-      "confirmDelete": "是否确认删除 Agent 编号为\"{0}\"的数据项？"
+      "confirmDelete": "是否确认删除 Agent 编号为\"{0}\"的数据项？",
+      "optionsTitle": "模型推理高级参数",
+      "temperature": "采样温度 (Temperature)",
+      "temperatureTip": "控制生成结果的随机性与发散度（0.0~2.0）。值越低越严谨确定，值越高越具创意，留空使用模型默认值",
+      "topP": "核采样 (Top P)",
+      "topPTip": "控制候选 Token 累积概率阈值（0.0~1.0），留空使用模型默认值",
+      "maxTokens": "单次最大 Token (Max Tokens)",
+      "maxTokensTip": "限制单次回复的最大生成 Token 数量（1~131072），留空使用模型默认值"
     },
     "chat": {
       "newChat": "新建对话",

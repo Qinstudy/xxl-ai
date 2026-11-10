@@ -37,6 +37,9 @@ public class AgentAdaptor {
         agent.setMcpIds(joinIds(dto.getMcpIds()));
         agent.setSkillIds(joinIds(dto.getSkillIds()));
         agent.setMemoryStatus(dto.getMemoryStatus());
+        agent.setTemperature(dto.getTemperature());
+        agent.setTopP(dto.getTopP());
+        agent.setMaxTokens(dto.getMaxTokens());
         agent.setPublishStatus(dto.getPublishStatus());
         agent.setUuid(dto.getUuid());
         return agent;
@@ -62,10 +65,13 @@ public class AgentAdaptor {
         dto.setMcpIds(splitIds(agent.getMcpIds()));
         dto.setSkillIds(splitIds(agent.getSkillIds()));
         dto.setMemoryStatus(agent.getMemoryStatus());
+        dto.setTemperature(agent.getTemperature());
+        dto.setTopP(agent.getTopP());
+        dto.setMaxTokens(agent.getMaxTokens());
         dto.setPublishStatus(agent.getPublishStatus());
         dto.setUuid(agent.getUuid());
-        dto.setAddTime(DateTool.formatDateTime(agent.getAddTime()));
-        dto.setUpdateTime(DateTool.formatDateTime(agent.getUpdateTime()));
+        dto.setAddTime(agent.getAddTime() != null ? DateTool.formatDateTime(agent.getAddTime()) : null);
+        dto.setUpdateTime(agent.getUpdateTime() != null ? DateTool.formatDateTime(agent.getUpdateTime()) : null);
         return dto;
     }
 

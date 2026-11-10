@@ -86,11 +86,40 @@ public class AgentServiceImpl implements AgentService {
         if (agent.getModelSupplierId() == 0 || agent.getModelId() == 0) {
             return Response.ofFail("请选择 Agent 对话模型");
         }
+        Response<String> optValid = validateOptions(agent);
+        if (optValid != null) {
+            return optValid;
+        }
         agent.setSpaceId(spaceId);
         agent.setPublishStatus(0);
         agent.setUuid(null);
         agentMapper.insert(agent);
         return Response.ofSuccess();
+    }
+
+    /**
+     * 校验大模型推理超参数合法性（[FEAT-006]）
+     */
+    private Response<String> validateOptions(Agent agent) {
+        if (agent.getTemperature() != null) {
+            double temp = agent.getTemperature();
+            if (temp < 0.0 || temp > 2.0) {
+                return Response.ofFail("采样温度 (Temperature) 必须在 0.0 到 2.0 之间");
+            }
+        }
+        if (agent.getTopP() != null) {
+            double topP = agent.getTopP();
+            if (topP < 0.0 || topP > 1.0) {
+                return Response.ofFail("核采样 (Top P) 必须在 0.0 到 1.0 之间");
+            }
+        }
+        if (agent.getMaxTokens() != null) {
+            int maxTokens = agent.getMaxTokens();
+            if (maxTokens <= 0 || maxTokens > 131072) {
+                return Response.ofFail("单次最大 Token 数 (Max Tokens) 必须在 1 到 131072 之间");
+            }
+        }
+        return null;
     }
 
     /**
@@ -125,6 +154,10 @@ public class AgentServiceImpl implements AgentService {
         Agent agent = AgentAdaptor.adapt(dto);
         if (agent == null || StringTool.isBlank(agent.getName())) {
             return Response.ofFail("Agent 名称不能为空");
+        }
+        Response<String> optValid = validateOptions(agent);
+        if (optValid != null) {
+            return optValid;
         }
         int ret = agentMapper.update(agent);
         return ret > 0 ? Response.ofSuccess() : Response.ofFail();
