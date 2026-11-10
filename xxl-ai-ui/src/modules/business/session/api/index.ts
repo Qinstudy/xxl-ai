@@ -5,7 +5,7 @@
  */
 import { request } from '@/utils/request'
 import type { Response, PageModel } from '@/types'
-import type { SessionMsg, SessionDTO, SessionListQuery } from '../types'
+import type { ArtifactPreviewDTO, SessionMsg, SessionDTO, SessionListQuery } from '../types'
 
 // ==================== 管理端（对话管理） ====================
 
@@ -17,4 +17,31 @@ export function pageSession(query: SessionListQuery): Promise<Response<PageModel
 /** 分页查询对话消息明细（校验空间与 Agent 归属，页面内按时间正序） */
 export function listSessionMsg(sessionId: number, agentId?: number, offset = 0, pagesize = 10): Promise<Response<PageModel<SessionMsg>>> {
   return request({ url: '/session/msgList', method: 'get', params: { sessionId, agentId, offset, pagesize } })
+}
+
+/** 在线预览对话消息挂载的交付物内容（管理端） */
+export function previewSessionArtifact(
+  sessionId: number,
+  msgId: number,
+  artifactId: string
+): Promise<Response<ArtifactPreviewDTO>> {
+  return request({
+    url: '/session/artifact/preview',
+    method: 'get',
+    params: { sessionId, msgId, artifactId }
+  })
+}
+
+/** 下载对话消息挂载的交付物文件（管理端，Blob 透传） */
+export function downloadSessionArtifact(
+  sessionId: number,
+  msgId: number,
+  artifactId: string
+): Promise<Blob> {
+  return request({
+    url: '/session/artifact/download',
+    method: 'get',
+    params: { sessionId, msgId, artifactId },
+    responseType: 'blob'
+  }) as unknown as Promise<Blob>
 }

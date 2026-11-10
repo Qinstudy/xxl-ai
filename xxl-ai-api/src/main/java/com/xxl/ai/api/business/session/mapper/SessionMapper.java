@@ -34,6 +34,9 @@ public interface SessionMapper {
     /** 查询 Agent 下出现过的访客标识（记忆归档按 Agent×访客扫描） */
     List<String> listVisitorIds(@Param("agentId") long agentId);
 
+    /** 查询 Agent 下全部会话 ID（级联删除同步清理产物目录） */
+    List<Long> listIdsByAgentId(@Param("agentId") long agentId);
+
     /** 管理端：分页查询空间内对话（可按 Agent、标题、访客ID 过滤，含所属 Agent 名称） */
     List<SessionDTO> pageList(@Param("spaceId") long spaceId,
                               @Param("agentId") long agentId,

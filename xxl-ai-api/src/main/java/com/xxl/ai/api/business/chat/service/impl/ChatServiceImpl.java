@@ -4,6 +4,8 @@ import com.xxl.ai.api.business.agent.mapper.AgentMapper;
 import com.xxl.ai.api.business.agent.model.entity.Agent;
 import com.xxl.ai.api.business.chat.service.ChatService;
 import com.xxl.ai.api.business.harness.chat.ChatStreamTool;
+import com.xxl.ai.api.business.session.model.dto.ArtifactDownloadDTO;
+import com.xxl.ai.api.business.session.model.dto.ArtifactPreviewDTO;
 import com.xxl.ai.api.business.session.model.entity.Session;
 import com.xxl.ai.api.business.session.service.SessionService;
 import com.xxl.tool.core.StringTool;
@@ -126,6 +128,44 @@ public class ChatServiceImpl implements ChatService {
         }
         chatStreamTool.cancel(sessionId);
         return Response.ofSuccess();
+    }
+
+    /**
+     * 在线预览对话交付物内容（C端公开校验：Agent 就绪 + 会话归属访客 + 消息所属会话）
+     */
+    @Override
+    public Response<ArtifactPreviewDTO> previewArtifact(String uuid, String visitorId, long sessionId, long msgId, String artifactId) {
+        try {
+            Agent agent = requireReadyAgent(uuid);
+            Session session = sessionService.require(agent.getId(), sessionId);
+            if (StringTool.isBlank(visitorId)
+                    || StringTool.isBlank(session.getVisitorId())
+                    || !session.getVisitorId().equals(visitorId.trim())) {
+                return Response.ofFail("无权访问该对话产物");
+            }
+            return sessionService.previewMsgArtifact(sessionId, msgId, artifactId);
+        } catch (IllegalArgumentException e) {
+            return Response.ofFail(e.getMessage());
+        }
+    }
+
+    /**
+     * 解析对话交付物下载文件（C端公开校验：Agent 就绪 + 会话归属访客 + 消息所属会话）
+     */
+    @Override
+    public Response<ArtifactDownloadDTO> downloadArtifact(String uuid, String visitorId, long sessionId, long msgId, String artifactId) {
+        try {
+            Agent agent = requireReadyAgent(uuid);
+            Session session = sessionService.require(agent.getId(), sessionId);
+            if (StringTool.isBlank(visitorId)
+                    || StringTool.isBlank(session.getVisitorId())
+                    || !session.getVisitorId().equals(visitorId.trim())) {
+                return Response.ofFail("无权访问该对话产物");
+            }
+            return sessionService.downloadMsgArtifact(sessionId, msgId, artifactId);
+        } catch (IllegalArgumentException e) {
+            return Response.ofFail(e.getMessage());
+        }
     }
 
 }

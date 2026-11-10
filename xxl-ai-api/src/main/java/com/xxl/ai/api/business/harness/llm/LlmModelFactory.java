@@ -14,9 +14,11 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
 import org.springframework.ai.openai.http.okhttp.OpenAiHttpClientBuilderCustomizer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -25,7 +27,7 @@ import java.util.TreeMap;
  * LLM 模型工厂（spring-ai）
  *
  * 按「供应商模型运行时配置」（SupplierRuntime）程序化构建 spring-ai 模型：
- *  - 对话模型：OpenAiChatModel（OpenAI 兼容协议，覆盖 Deepseek / GLM / Ollama(/v1) 等）
+ *  - 对话模型：OpenAiChatModel（OpenAI 兼容协议，覆盖 Deepseek / GLM / Ollama(/v1) 等，开启 streamUsage 采集流式 Token）
  *  - 嵌入模型：OpenAiEmbeddingModel（向量化）
  * 对话模型按「供应商 + 模型 + 会话」缓存、条目内记录配置指纹校验有效性；
  * 嵌入模型按需构建，实例生命周期由 RAG 向量存储缓存持有。
@@ -48,6 +50,10 @@ public class LlmModelFactory {
 
     /** 模型缓存有效期（毫秒）：定期过期刷新，避免长期持有陈旧实例 */
     private static final long CACHE_EXPIRE = 5 * 60 * 1000L;
+
+    /** 单次对话流式请求底层 HTTP 超时（毫秒，对齐 xxl-ai.chat.stream.timeout，避免默认 60s callTimeout 腰斩长文生成） */
+    @Value("${xxl-ai.chat.stream.timeout:180000}")
+    private long streamTimeout = 180_000L;
 
     /** 对话模型缓存（supplierId:modelId:sessionId → 配置指纹 + ChatModel），5min 过期 */
     private final Cache<String, ChatModelEntry> chatModelCache = CacheTool.<String, ChatModelEntry>newLRUCache(CACHE_MAX)
@@ -83,11 +89,13 @@ public class LlmModelFactory {
             return entry.model;
         }
 
-        // build model and store
+        // build model and store（开启 streamUsage=true，使流式尾帧返回 prompt/completion/total tokens；显式绑定底层 OkHttp 超时）
         OpenAiChatOptions options = OpenAiChatOptions.builder()
                 .baseUrl(normalizeBaseUrl(runtime.getBaseUrl()))
                 .apiKey(runtime.getApiKey())
                 .model(runtime.getModelName())
+                .streamUsage(true)
+                .timeout(Duration.ofMillis(streamTimeout))
                 .customHeaders(buildHeaders(runtime.getHeaders(), sessionId))
                 .build();
         OpenAiChatModel model = OpenAiChatModel.builder()

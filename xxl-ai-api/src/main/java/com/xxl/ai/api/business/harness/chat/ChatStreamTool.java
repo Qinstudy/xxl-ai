@@ -6,10 +6,9 @@ import com.xxl.ai.api.business.harness.llm.LlmChatTool;
 import com.xxl.ai.api.business.harness.mcp.McpToolFactory;
 import com.xxl.ai.api.business.harness.memory.MemoryTool;
 import com.xxl.ai.api.business.harness.rag.RagTool;
+import com.xxl.ai.api.business.harness.skill.SkillArtifactTool;
 import com.xxl.ai.api.business.harness.skill.SkillShellTracker;
 import com.xxl.ai.api.business.harness.skill.SkillToolFactory;
-import com.xxl.ai.api.business.knowledge.mapper.KnowledgeBaseMapper;
-import com.xxl.ai.api.business.knowledge.model.entity.KnowledgeBase;
 import com.xxl.ai.api.business.session.constant.SessionConstant;
 import com.xxl.ai.api.business.session.mapper.SessionMapper;
 import com.xxl.ai.api.business.session.mapper.SessionMsgMapper;
@@ -41,36 +40,21 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 /**
- * 对话流工具（harness 运行时）：对话流的「发送/续传入口 + 生成 worker + 结果流 + SSE 转发」一体
+ * 对话流工具（harness 运行时）：对话流的「发送/续传入口 + 生成 worker + 结果流 + SSE 转发 + 全链路可观测」一体
  *
  * 【完整会话流程】
  * 1、发送（请求侧，业务 ChatService 调用）：
  *    {@link #submit} 投递任务（XADD 任务队列）→ {@link #open} 打开 SSE 连接；
  * 2、生成（worker 侧，{@link #start} 拉起的消费线程）：
- *    {@link #consumeLoop} → {@link #handleTask} → {@link #llmChat}（Agent 校验/装配 → LlmChatTool 流式）；
- *    增量经回调 → {@link #appendResult} 写结果流；结束 → {@link #saveAssistant} 回填消息 + {@link #ackTask} 确认；
+ *    {@link #consumeLoop} → {@link #handleTask} → {@link #llmChat}（Agent 校验/显式RAG检索/工具可观测包装 → LlmChatTool 流式）；
+ *    增量与可观测事件（thinking/message/reference/tool/usage/trace）经回调 → {@link #appendResult} 写结果流；
+ *    结束 → {@link #saveAssistant} 回填消息与 ext_json + {@link #ackTask} 确认；
  * 3、下发与续传（连接侧）：
  *    {@link #streamResult} 从结果流 XREAD 转发为 SSE；携带 lastEventId 时从断点之后重放，不重新生成。
  *
- * 【组件协作】
- *   业务：ChatService（会话校验）、SessionMsgMapper/SessionMapper（回填消息与对话活跃时间）；
- *   harness 兄弟工具：LlmChatTool（模型执行）、RagTool（RAG）、McpToolFactory/SkillToolFactory（工具装配）；
- *   存储：Redis 任务队列 xxl:ai:chat:tasks + 结果流 xxl:ai:chat:result:{msgId}。
- *
- * 【关键约定】
- *   助手消息主键 msgId 同时作为结果流标识；生成与连接解耦，任意节点可转发/续传，worker 可独立扩容。
- *
- *
- * 【数据流】
- *  <code>
- *      1、提交任务：user -> [add] task-queue（会话任务队列）；
- *      2、消费任务：worker-thread -> [pull] task-queue
- *                                        -> handleTask (LLM chat) -> [add] result-queue（会话结果队列）；
- *      3、转发结果：user -> [monitor] sse
- *                      -> sse-thread-pool -> [pull] result-queue -> [send] sse（转发）
- *  </code>
  * @author xxl-ai 2026-09-19
  */
 @Component
@@ -84,6 +68,16 @@ public class ChatStreamTool implements SmartLifecycle {
     public static final String EVENT_THINKING = "thinking";
     /** 事件名：回复内容增量 */
     public static final String EVENT_MESSAGE = "message";
+    /** 事件名：RAG 引用来源列表（JSON 数组） */
+    public static final String EVENT_REFERENCE = "reference";
+    /** 事件名：工具调用实时状态（JSON 对象：RUNNING / SUCCESS / ERROR） */
+    public static final String EVENT_TOOL = "tool";
+    /** 事件名：Token 消耗统计更新（JSON 对象） */
+    public static final String EVENT_USAGE = "usage";
+    /** 事件名：完整 Trace 汇总（JSON 对象，生成终态下发，与落库 ext_json 一致） */
+    public static final String EVENT_TRACE = "trace";
+    /** 事件名：本轮新产生的交付物产物列表（JSON 数组，含 .sql/.html/.csv） */
+    public static final String EVENT_ARTIFACT = "artifact";
     /** 事件名：空闲心跳 */
     public static final String EVENT_PING = "ping";
     /** 事件名：终态（生成结束，内容为空） */
@@ -131,11 +125,13 @@ public class ChatStreamTool implements SmartLifecycle {
     @Resource
     private SkillToolFactory skillToolFactory;
     @Resource
+    private SkillArtifactTool skillArtifactTool;
+    @Resource
     private RagTool ragTool;
     @Resource
-    private KnowledgeBaseMapper knowledgeBaseMapper;
-    @Resource
     private MemoryTool memoryTool;
+    @Resource
+    private ChatContextWindowTool chatContextWindowTool;
 
     /** worker 线程数（单节点并发生成数） */
     @Value("${xxl-ai.chat.worker.count}")
@@ -435,7 +431,7 @@ public class ChatStreamTool implements SmartLifecycle {
     private void consumeLoop(String consumer) {
         long lastReclaim = 0L;
         while (running) {
-            // 1、检查并清除‌当前线程中断状态
+            // 1、检查并清除当前线程中断状态
             Thread.interrupted();
 
             // 2、process
@@ -448,7 +444,7 @@ public class ChatStreamTool implements SmartLifecycle {
                     Duration reclaimIdle = Duration.ofMillis(streamTimeout + 60_000);
                     // process
                     for (MapRecord<String, Object, Object> record : reclaimTasks(consumer, reclaimIdle)) {
-                        handleTask(record);
+                        handleTask(record, consumer);
                     }
                 }
 
@@ -457,7 +453,7 @@ public class ChatStreamTool implements SmartLifecycle {
                 if (records != null) {
                     // process
                     for (MapRecord<String, Object, Object> record : records) {
-                        handleTask(record);
+                        handleTask(record, consumer);
                     }
                 }
             } catch (Throwable e) {
@@ -480,12 +476,12 @@ public class ChatStreamTool implements SmartLifecycle {
     }
 
     /**
-     * 消费单条任务：解析 → 生成（增量写结果流）→ 回填消息 → 写终态 → 确认
+     * 消费单条任务：解析 → 全链路可观测生成（增量与事件写结果流）→ 回填消息与 ext_json → 写终态 → 确认
      *
      *  - 成功回填 status=1；失败或人工终止回填 status=2（保留已生成的部分内容，终止时追加终止提示），
-     *  - 失败写 {@code error} 终态；无论成败都写 {@code done} 终态并 XACK。bootstrap 记录无 msgId，直接确认丢弃。
+     *  - 失败写 {@code error} 终态；无论成败都下发 {@code trace} 终态快照、{@code done} 终态并 XACK。
      */
-    private void handleTask(MapRecord<String, Object, Object> record) {
+    private void handleTask(MapRecord<String, Object, Object> record, String consumer) {
 
         // 1、解析任务参数
         Map<Object, Object> fields = record.getValue();
@@ -498,7 +494,10 @@ public class ChatStreamTool implements SmartLifecycle {
         long agentId = parseLong(fields.get("agentId"));
         String content = str(fields.get("content"));
 
-        // 2、登记运行上下文：（供终止定位生成线程与工具进程），并累积增量以便失败/终止回填
+        // 2、初始化全链路追踪收集器与运行上下文
+        TraceCollector traceCollector = new TraceCollector(msgId, sessionId, agentId, consumer);
+        traceCollector.addLog("INFO", "run", "Worker 接管生成任务（Run #" + msgId + "，节点 " + consumer + "）");
+
         RunContext context = new RunContext(Thread.currentThread(), skillToolFactory.newShellTracker(agentId), new AtomicBoolean());
         runContexts.put(sessionId, context);
 
@@ -519,9 +518,10 @@ public class ChatStreamTool implements SmartLifecycle {
         // 4、执行生成：
         LlmChatTool.ChatText chatText = null;
         Throwable failure = null;
+        ArtifactBaseline artifactBaseline = new ArtifactBaseline();
         try {
-            // Agent 校验 → 装配历史/工具/RAG → harness 流式对话
-            chatText = llmChat(msgId, agentId, sessionId, content, onThinking, onContent, context.shellTracker);
+            // Agent 校验 → 装配历史/记忆/显式RAG/可观测工具 → harness 流式对话
+            chatText = llmChat(msgId, agentId, sessionId, content, onThinking, onContent, context.shellTracker, traceCollector, artifactBaseline);
         } catch (Throwable e) {
             failure = e;
         } finally {
@@ -531,33 +531,49 @@ public class ChatStreamTool implements SmartLifecycle {
             // 5、清理运行上下文与工具进程：
             runContexts.remove(sessionId, context);
             context.shellTracker.cancel();
+            // 5.1、交付物产物归档（[FEAT-005]）：在工具进程全部释放后，比对基线将本轮 .sql/.html/.csv 拷贝入隔离产物区
+            archiveRunArtifacts(agentId, sessionId, msgId, artifactBaseline, traceCollector);
 
-            // 6、写终态与回填消息：
+            // 6、收敛 Run 状态机、写终态与回填消息（含 ext_json）：
             if (context.cancelled().get()) {
                 // a、人工终止：静默结束，回填已生成内容并追加终止提示（status=2）
                 logger.info("Chat 生成已终止, msgId={}, sessionId={}", msgId, sessionId);
-                // 正常返回时优先用完整结果，异常中断时用已累积的增量
+                traceCollector.addLog("WARN", "run", "用户主动终止对话生成");
+                traceCollector.completeRun("CANCELLED", "用户主动终止");
+                String extJson = traceCollector.toExtJson();
+
                 LlmChatTool.ChatText partial = chatText != null
                         ? chatText
                         : new LlmChatTool.ChatText(replyText.toString(), thinkText.toString());
                 saveAssistant(msgId, sessionId, terminatedText(partial.getContent(), partial.getThinking()),
-                        SessionConstant.MSG_STATUS_FAILED);
+                        SessionConstant.MSG_STATUS_FAILED, extJson);
+                emitArtifactsAndTrace(msgId, traceCollector, extJson);
             } else if (failure != null) {
-                // b、生成失败：先回填正文与状态（status=2，追加失败提示保证正文非空），再下发 error 终态，保证前端收到 error 后回读消息时正文与状态已就绪，不会停留在"思考中"占位
-                String errorMsg = failure.getMessage()!=null ? failure.getMessage() : failure.toString();
+                // b、生成失败：先回填正文、ext_json 与状态（status=2），再下发 trace 与 error 终态
+                String errorMsg = failure.getMessage() != null ? failure.getMessage() : failure.toString();
                 logger.error("Chat 生成失败, msgId={}, sessionId={}, err={}", msgId, sessionId, errorMsg, failure);
+                traceCollector.addLog("ERROR", "run", "对话生成异常：" + errorMsg);
+                traceCollector.completeRun("FAILED", errorMsg);
+                String extJson = traceCollector.toExtJson();
 
                 saveAssistant(msgId, sessionId,
                         failedText(replyText.toString(), thinkText.toString(), errorMsg),
-                        SessionConstant.MSG_STATUS_FAILED
+                        SessionConstant.MSG_STATUS_FAILED,
+                        extJson
                 );
+                emitArtifactsAndTrace(msgId, traceCollector, extJson);
                 appendResult(msgId, EVENT_ERROR, errorMsg);
             } else {
-                // c、生成成功：回填完整结果（status=1）
-                saveAssistant(msgId, sessionId, chatText, SessionConstant.MSG_STATUS_DONE);
+                // c、生成成功：收敛 COMPLETED 状态，回填完整结果与 ext_json（status=1），下发 trace 快照
+                traceCollector.addLog("INFO", "run", "对话生成完成");
+                traceCollector.completeRun("COMPLETED", null);
+                String extJson = traceCollector.toExtJson();
+
+                saveAssistant(msgId, sessionId, chatText, SessionConstant.MSG_STATUS_DONE, extJson);
+                emitArtifactsAndTrace(msgId, traceCollector, extJson);
             }
 
-            // 7、写终态（done/error）并 XACK，避免客户端 SSE 阻塞等待
+            // 7、写终态（done）并 XACK，避免客户端 SSE 阻塞等待
             appendResult(msgId, EVENT_DONE, "");
             // ack 任务，避免 PEL 堆积
             ackTask(record.getId());
@@ -734,20 +750,10 @@ public class ChatStreamTool implements SmartLifecycle {
         }
     }
 
-    // ==================== LLM 流式交互 ====================
+    // ==================== LLM 流式交互与全链路可观测装配 ====================
 
     /**
-     * LLM 流式交互：增量回调写思考流与内容流，最终返回完整内容与思考文本
-     *
-     * @param msgId 助手消息主键（结果流标识）
-     * @param agentId 代理ID
-     * @param sessionId 会话ID
-     * @param content 内容
-     * @param onThinking 思考流回调
-     * @param onContent 内容流回调
-     * @param shellTracker 技能壳跟踪器
-     * @return 完整内容与思考文本
-     * @throws Exception 异常
+     * LLM 流式交互：增量回调写思考流与内容流，全链路采集 Span / RAG 引用 / 工具证据链 / Token 消耗
      */
     private LlmChatTool.ChatText llmChat(long msgId,
                                          long agentId,
@@ -755,56 +761,83 @@ public class ChatStreamTool implements SmartLifecycle {
                                          String content,
                                          java.util.function.Consumer<String> onThinking,
                                          java.util.function.Consumer<String> onContent,
-                                         SkillShellTracker shellTracker) throws Exception {
+                                         SkillShellTracker shellTracker,
+                                         TraceCollector traceCollector,
+                                         ArtifactBaseline artifactBaseline) throws Exception {
 
         // 1、解析模型运行时：
-        // 生成发生在 worker 节点，需以 agent_id 重新校验 Agent 可用性（请求节点与 worker 可能不同）
-        Agent agent = chatService.requireReadyAgentById(agentId);
-        Response<SupplierRuntime> runtimeResp = supplierService.loadRuntime(agent.getSpaceId(),
-                agent.getModelSupplierId(), agent.getModelId());
-        if (!runtimeResp.isSuccess()) {
-            throw new IllegalStateException(runtimeResp.getMsg());
-        }
-        SupplierRuntime runtime = runtimeResp.getData();
-        if (runtime.getModelType() != 0) {
-            throw new IllegalStateException("所选模型不是对话模型");
-        }
-
-        // 2、装配生成上下文：
-
-        // 2.1、历史消息（角色 / 内容 平行列表）：仅取当前助手占位之前最近的 historyLimit 条，避免上下文过长
-        // 查询按 id 倒序取最近 N 条，此处按 id 升序排列还原为对话时间顺序
-        List<SessionMsg> recentMsgs = sessionMsgMapper.listRecentBySessionId(sessionId, msgId, historyLimit);
-        recentMsgs.sort(Comparator.comparingLong(SessionMsg::getId));
+        TraceCollector.TraceSpan ctxSpan = traceCollector.startSpan("context", "加载 Agent 配置与会话历史");
+        Agent agent;
+        SupplierRuntime runtime;
         List<String> roleList = new ArrayList<>();
         List<String> contentList = new ArrayList<>();
-        for (SessionMsg historyMsg : recentMsgs) {
-            // 跳过未完成的助手占位（如异常残留），避免把半截回复带入上下文
-            if (SessionConstant.ROLE_ASSISTANT.equals(historyMsg.getRole())
-                    && historyMsg.getStatus() == SessionConstant.MSG_STATUS_GENERATING) {
-                continue;
+        try {
+            agent = chatService.requireReadyAgentById(agentId);
+            Response<SupplierRuntime> runtimeResp = supplierService.loadRuntime(agent.getSpaceId(),
+                    agent.getModelSupplierId(), agent.getModelId());
+            if (!runtimeResp.isSuccess()) {
+                throw new IllegalStateException(runtimeResp.getMsg());
             }
-            roleList.add(historyMsg.getRole());
-            contentList.add(historyMsg.getContent());
-        }
-        // 末尾为本次刚落库的当前提问，移除避免重复注入
-        if (!roleList.isEmpty() && SessionConstant.ROLE_USER.equals(roleList.get(roleList.size() - 1))) {
-            roleList.remove(roleList.size() - 1);
-            contentList.remove(contentList.size() - 1);
+            runtime = runtimeResp.getData();
+            if (runtime.getModelType() != 0) {
+                throw new IllegalStateException("所选模型不是对话模型");
+            }
+            traceCollector.bindModel(runtime.getSupplierId(), runtime.getSupplierName(),
+                    runtime.getModelId(), runtime.getModelName());
+            traceCollector.addLog("INFO", "context",
+                    "绑定模型：" + runtime.getSupplierName() + " / " + runtime.getModelName());
+
+            // 2.1、历史消息（角色 / 内容 平行列表）：仅取当前助手占位之前最近的 historyLimit 条
+            List<SessionMsg> recentMsgs = sessionMsgMapper.listRecentBySessionId(sessionId, msgId, historyLimit);
+            recentMsgs.sort(Comparator.comparingLong(SessionMsg::getId));
+            for (SessionMsg historyMsg : recentMsgs) {
+                if (SessionConstant.ROLE_ASSISTANT.equals(historyMsg.getRole())
+                        && historyMsg.getStatus() == SessionConstant.MSG_STATUS_GENERATING) {
+                    continue;
+                }
+                roleList.add(historyMsg.getRole());
+                contentList.add(historyMsg.getContent());
+            }
+            // 末尾为本次刚落库的当前提问，移除避免重复注入
+            if (!roleList.isEmpty() && SessionConstant.ROLE_USER.equals(roleList.get(roleList.size() - 1))) {
+                roleList.remove(roleList.size() - 1);
+                contentList.remove(contentList.size() - 1);
+            }
+            traceCollector.finishSpan(ctxSpan, "SUCCESS", "历史上下文 " + roleList.size() + " 条");
+        } catch (Exception e) {
+            traceCollector.finishSpan(ctxSpan, "ERROR", e.getMessage());
+            throw e;
         }
 
         // 2.2、系统指令：
         String systemPrompt = buildSystemPrompt(agent);
 
         // 2.3、长期记忆注入：
-        systemPrompt = injectMemory(agent, sessionId, systemPrompt);
+        systemPrompt = injectMemory(agent, sessionId, systemPrompt, traceCollector);
 
-        // 2.4、工具装配：MCP 工具 + Skill 工具（无技能时不注册）+ 终端/文件执行工具
-        Object[] tools = buildTools(agent, shellTracker);
+        // 2.4、工具装配与可观测装饰器包装：MCP 工具 + Skill 工具 + 终端/文件执行工具
+        Object[] tools = buildObservableTools(agent, shellTracker, traceCollector,
+                toolJson -> appendResult(msgId, EVENT_TOOL, toolJson));
 
-        // 2.5、RAG Advisor 装配：降级提示先写入思考流，并并入最终思考文本，保证刷新后一致
+        // 2.4.1、采集交付物基线快照（[FEAT-005]：同步完 Skill 沙箱后采集，避免把已有技能文件误判为新交付物）
+        if (artifactBaseline != null && StringTool.isNotBlank(agent.getSkillIds())) {
+            artifactBaseline.capture(skillArtifactTool.captureBaseline(agentId));
+        }
+
+        // 2.5、显式 RAG 知识库检索与引用卡片下发（[FEAT-003] / [CTX-002]）：
         List<String> degradeNotices = new ArrayList<>();
-        List<Object> advisors = buildAdvisors(agent, degradeNotices);
+        List<TraceCollector.RagReference> references = ragTool.retrieveForChat(
+                agent.getSpaceId(), splitIds(agent.getKbIds()), content, degradeNotices, traceCollector);
+        if (!references.isEmpty()) {
+            traceCollector.addReferences(references);
+            appendResult(msgId, EVENT_REFERENCE, traceCollector.toReferencesJson());
+        }
+        // [CTX-002] 遵循「静态前置、动态后置」：systemPrompt 保持稳定（Agent 指令 + 记忆），动态 RAG 切片拼入当前 UserMessage
+        String contextualQuestion = ragTool.buildContextualQuestion(content, references);
+
+        // 2.6、历史上下文 Token 预算评估与滑动窗口裁剪（[CTX-001]）：
+        chatContextWindowTool.pruneHistory(roleList, contentList, systemPrompt, contextualQuestion, traceCollector);
+
         StringBuilder noticeText = new StringBuilder();
         for (String notice : degradeNotices) {
             if (onThinking != null) {
@@ -813,9 +846,21 @@ public class ChatStreamTool implements SmartLifecycle {
             noticeText.append(notice);
         }
 
-        // 3、harness 流式对话：增量回调写思考流与内容流，最终返回完整内容与思考文本
-        LlmChatTool.ChatText chatText = llmChatTool.chat(runtime, systemPrompt, roleList, contentList, content, tools, advisors,
-                "xxl-ai-session-" + sessionId, onThinking, onContent);
+        // 3、harness 流式对话：增量回调写思考流与内容流，采集 TTFT 与多轮 Token Usage
+        LlmChatTool.ChatText chatText = llmChatTool.chat(
+                runtime,
+                systemPrompt,
+                roleList,
+                contentList,
+                contextualQuestion,
+                tools,
+                Collections.emptyList(),
+                "xxl-ai-session-" + sessionId,
+                onThinking,
+                onContent,
+                traceCollector,
+                usageJson -> appendResult(msgId, EVENT_USAGE, usageJson)
+        );
         if (!noticeText.isEmpty()) {
             chatText = new LlmChatTool.ChatText(chatText.getContent(), noticeText + chatText.getThinking());
         }
@@ -823,88 +868,77 @@ public class ChatStreamTool implements SmartLifecycle {
     }
 
     /**
-     * 系统指令：Agent 配置的非空则用，否则按名称默认引导
+     * 系统指令：Agent 配置的非空则用
      */
     private String buildSystemPrompt(Agent agent) {
         if (StringTool.isNotBlank(agent.getSystemPrompt())) {
             return agent.getSystemPrompt().trim();
         }
-        /*String name = StringTool.isBlank(agent.getName()) ? "AI 助手" : agent.getName();
-        return "你是 " + name + " 的智能助手。";*/
         return "";
     }
 
     /**
-     * 长期记忆注入：Agent 开启记忆时，按会话所属访客读取记忆并合并进系统指令
-     *
-     * 记忆注入失败（如查询异常）时降级为原始系统指令，保证对话主流程可用。
+     * 长期记忆注入：Agent 开启记忆时，按会话所属访客读取记忆并合并进系统指令（记录 memory Span）
      */
-    private String injectMemory(Agent agent, long sessionId, String systemPrompt) {
+    private String injectMemory(Agent agent, long sessionId, String systemPrompt, TraceCollector traceCollector) {
         if (agent.getMemoryStatus() != 1) {
             return systemPrompt;
         }
+        TraceCollector.TraceSpan memSpan = traceCollector.startSpan("memory", "加载访客长期记忆");
         try {
             Session session = sessionMapper.load(sessionId);
             if (session == null || StringTool.isBlank(session.getVisitorId())) {
+                traceCollector.finishSpan(memSpan, "SKIPPED", "无访客标识");
                 return systemPrompt;
             }
             String memory = memoryTool.loadMemory(agent.getId(), session.getVisitorId());
+            int memLen = memory == null ? 0 : memory.length();
+            traceCollector.finishSpan(memSpan, "SUCCESS", memLen > 0 ? ("注入记忆 " + memLen + " 字符") : "暂无历史记忆");
+            if (memLen > 0) {
+                traceCollector.addLog("INFO", "memory", "已注入访客长期记忆（" + memLen + " 字符）");
+            }
             return memoryTool.mergePrompt(systemPrompt, memory);
         } catch (Exception e) {
             logger.warn("长期记忆注入失败，已降级跳过, agentId={}, sessionId={}, err={}",
                     agent.getId(), sessionId, e.getMessage());
+            traceCollector.finishSpan(memSpan, "ERROR", e.getMessage());
+            traceCollector.addLog("WARN", "memory", "长期记忆加载失败已降级跳过：" + e.getMessage());
             return systemPrompt;
         }
     }
 
     /**
-     * 工具装配：MCP 工具 + Skill 工具（无技能时不注册）+ 终端/文件执行工具
-     *
-     * Shell 命令统一经 tracker 执行，便于会话终止或生成结束时回收后台进程。
+     * 工具装配与可观测装饰：MCP 工具 + Skill 工具 + 终端/文件执行工具，统一包装为 ObservableToolCallback
      */
-    private Object[] buildTools(Agent agent, SkillShellTracker tracker) {
-        List<Object> tools = new ArrayList<>();
-        tools.addAll(mcpToolFactory.buildTools(agent));
+    private Object[] buildObservableTools(Agent agent,
+                                          SkillShellTracker tracker,
+                                          TraceCollector traceCollector,
+                                          java.util.function.Consumer<String> onToolEvent) {
+        List<ObservableToolCallback.TaggedTool> taggedTools = new ArrayList<>();
+        for (Object mcpTool : mcpToolFactory.buildTools(agent)) {
+            taggedTools.add(new ObservableToolCallback.TaggedTool("MCP", mcpTool));
+        }
         Object skillTool = skillToolFactory.buildTool(agent);
         if (skillTool != null) {
-            tools.add(skillTool);
+            taggedTools.add(new ObservableToolCallback.TaggedTool("SKILL", skillTool));
         }
-        tools.addAll(skillToolFactory.buildExecutorTools(agent, tracker));
-        return tools.toArray();
+        for (Object execTool : skillToolFactory.buildExecutorTools(agent, tracker)) {
+            taggedTools.add(new ObservableToolCallback.TaggedTool("EXEC", execTool));
+        }
+        Object[] wrapped = ObservableToolCallback.wrapAll(taggedTools, traceCollector, onToolEvent);
+        if (wrapped.length > 0) {
+            traceCollector.addLog("INFO", "context", "已挂载可观测工具 " + wrapped.length + " 个");
+        }
+        return wrapped;
     }
 
     /**
-     * RAG Advisor：按 Agent 绑定的知识库逐个装配（单库失败降级跳过，不影响其余知识库与对话主流程）
+     * 回填助手消息（占位记录）内容、思考过程、生成状态与全链路追踪 ext_json，并刷新对话活跃时间
      */
-    private List<Object> buildAdvisors(Agent agent, List<String> degradeNotices) {
-        List<Object> advisorList = new ArrayList<>();
-        for (Long kbId : splitIds(agent.getKbIds())) {
-            KnowledgeBase knowledgeBase = knowledgeBaseMapper.load(kbId);
-            if (knowledgeBase == null || knowledgeBase.getSpaceId() != agent.getSpaceId()) {
-                continue;
-            }
-            try {
-                Object advisor = ragTool.buildAdvisor(knowledgeBase);
-                if (advisor != null) {
-                    advisorList.add(advisor);
-                }
-            } catch (Exception e) {
-                // 单个知识库不可用（如向量库不可达）时降级：跳过 RAG，保证对话主流程可用
-                logger.warn("Agent 知识库 RAG 装配失败，已降级跳过, agentId={}, kbId={}, name={}, err={}",
-                        agent.getId(), kbId, knowledgeBase.getName(), e.getMessage());
-                degradeNotices.add("【知识库降级】「" + knowledgeBase.getName() + "」检索服务不可用，本次对话已跳过 RAG 上下文。\n");
-            }
-        }
-        return advisorList;
-    }
-
-    /**
-     * 回填助手消息（占位记录）内容、思考过程与生成状态，并刷新对话活跃时间
-     */
-    private void saveAssistant(long msgId, long sessionId, LlmChatTool.ChatText chatText, int status) {
+    private void saveAssistant(long msgId, long sessionId, LlmChatTool.ChatText chatText, int status, String extJson) {
         String content = chatText == null || chatText.getContent() == null ? "" : chatText.getContent();
         String reasoning = chatText != null && StringTool.isNotBlank(chatText.getThinking()) ? chatText.getThinking() : null;
-        sessionMsgMapper.updateAssistant(msgId, content, reasoning, status);
+        sessionMsgMapper.updateAssistant(msgId, content, reasoning, status, extJson);
         sessionMapper.touch(sessionId);
     }
 
@@ -956,6 +990,70 @@ public class ChatStreamTool implements SmartLifecycle {
             }
         }
         return list;
+    }
+
+    /**
+     * 交付物产物归档（[FEAT-005]）：仅当本轮初始化了工作基线时扫描变更文件并拷贝入隔离产物区
+     */
+    private void archiveRunArtifacts(long agentId,
+                                     long sessionId,
+                                     long msgId,
+                                     ArtifactBaseline artifactBaseline,
+                                     TraceCollector traceCollector) {
+        if (artifactBaseline == null || !artifactBaseline.isCaptured()) {
+            return;
+        }
+        TraceCollector.TraceSpan artifactSpan = traceCollector.startSpan("artifact", "归档交付物产物");
+        try {
+            List<TraceCollector.ArtifactItem> archived = skillArtifactTool.archiveRunArtifacts(
+                    agentId, sessionId, msgId, artifactBaseline.getSnapshot());
+            if (!archived.isEmpty()) {
+                traceCollector.addArtifacts(archived);
+                String names = archived.stream()
+                        .map(TraceCollector.ArtifactItem::getFileName)
+                        .collect(Collectors.joining(", "));
+                traceCollector.finishSpan(artifactSpan, "SUCCESS", "归档 " + archived.size() + " 个交付物：" + names);
+                traceCollector.addLog("INFO", "artifact", "已归档交付物产物（" + archived.size() + " 个）：" + names);
+            } else {
+                traceCollector.finishSpan(artifactSpan, "SUCCESS", "本次未产生新交付物");
+            }
+        } catch (Exception e) {
+            logger.warn("交付物产物归档失败，已降级跳过, agentId={}, sessionId={}, msgId={}, err={}",
+                    agentId, sessionId, msgId, e.getMessage());
+            traceCollector.finishSpan(artifactSpan, "ERROR", e.getMessage());
+            traceCollector.addLog("WARN", "artifact", "交付物归档失败已降级跳过：" + e.getMessage());
+        }
+    }
+
+    /**
+     * 下发本轮新归档交付物事件（非空时）与全链路 Trace 终态快照
+     */
+    private void emitArtifactsAndTrace(long msgId, TraceCollector traceCollector, String extJson) {
+        if (!traceCollector.getArtifacts().isEmpty()) {
+            appendResult(msgId, EVENT_ARTIFACT, traceCollector.toArtifactsJson());
+        }
+        appendResult(msgId, EVENT_TRACE, extJson);
+    }
+
+    /**
+     * 运行期交付物基线快照容器：区分「未开启 Skill 无需扫描」与「空目录基线」
+     */
+    private static class ArtifactBaseline {
+        private boolean captured;
+        private Map<String, SkillArtifactTool.FileFingerprint> snapshot;
+
+        public void capture(Map<String, SkillArtifactTool.FileFingerprint> baseline) {
+            this.snapshot = baseline == null ? Collections.emptyMap() : baseline;
+            this.captured = true;
+        }
+
+        public boolean isCaptured() {
+            return captured;
+        }
+
+        public Map<String, SkillArtifactTool.FileFingerprint> getSnapshot() {
+            return snapshot;
+        }
     }
 
     /**

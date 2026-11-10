@@ -110,6 +110,13 @@
 			<artifactId>mcp</artifactId>
 		</dependency>
 
+		<!-- JTokkit：Token 估算与上下文窗口治理（固定精确版本，防止传递依赖漂移） -->
+		<dependency>
+			<groupId>com.knuddels</groupId>
+			<artifactId>jtokkit</artifactId>
+			<version>1.1.0</version>
+		</dependency>
+
 		<!-- ********************************* for plugin end ********************************* -->
 
 	</dependencies>

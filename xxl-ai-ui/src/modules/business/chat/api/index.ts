@@ -6,7 +6,7 @@
 import { request } from '@/utils/request'
 import type { Response } from '@/types'
 import type { AgentChatInfo } from '../types'
-import type { Session, SessionMsg } from '@/modules/business/session/types'
+import type { ArtifactPreviewDTO, Session, SessionMsg } from '@/modules/business/session/types'
 
 const BASE = import.meta.env.VITE_APP_BASE_API ?? ''
 
@@ -90,4 +90,35 @@ export async function resumeStream(
  */
 export function stopStream(sessionId: number): Promise<Response<string>> {
   return request({ url: '/chat/stop', method: 'post', params: { sessionId } })
+}
+
+/** 在线预览对话交付物内容（C端公开） */
+export function previewChatArtifact(
+  uuid: string,
+  visitorId: string,
+  sessionId: number,
+  msgId: number,
+  artifactId: string
+): Promise<Response<ArtifactPreviewDTO>> {
+  return request({
+    url: '/chat/artifact/preview',
+    method: 'get',
+    params: { uuid, visitorId, sessionId, msgId, artifactId }
+  })
+}
+
+/** 下载对话交付物文件（C端公开，Blob 透传） */
+export function downloadChatArtifact(
+  uuid: string,
+  visitorId: string,
+  sessionId: number,
+  msgId: number,
+  artifactId: string
+): Promise<Blob> {
+  return request({
+    url: '/chat/artifact/download',
+    method: 'get',
+    params: { uuid, visitorId, sessionId, msgId, artifactId },
+    responseType: 'blob'
+  }) as unknown as Promise<Blob>
 }

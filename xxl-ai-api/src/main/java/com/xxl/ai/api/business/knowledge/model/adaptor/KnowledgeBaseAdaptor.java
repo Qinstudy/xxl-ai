@@ -31,6 +31,7 @@ public class KnowledgeBaseAdaptor {
         knowledgeBase.setChunkSize(dto.getChunkSize());
         knowledgeBase.setChunkOverlap(dto.getChunkOverlap());
         knowledgeBase.setTopK(dto.getTopK());
+        knowledgeBase.setSimilarityThreshold(dto.getSimilarityThreshold() != null ? dto.getSimilarityThreshold() : 0.40);
         knowledgeBase.setStatus(dto.getStatus());
         return knowledgeBase;
     }
@@ -52,6 +53,7 @@ public class KnowledgeBaseAdaptor {
         dto.setChunkSize(knowledgeBase.getChunkSize());
         dto.setChunkOverlap(knowledgeBase.getChunkOverlap());
         dto.setTopK(knowledgeBase.getTopK());
+        dto.setSimilarityThreshold(knowledgeBase.getSimilarityThreshold());
         dto.setStatus(knowledgeBase.getStatus());
         dto.setAddTime(DateTool.formatDateTime(knowledgeBase.getAddTime()));
         dto.setUpdateTime(DateTool.formatDateTime(knowledgeBase.getUpdateTime()));

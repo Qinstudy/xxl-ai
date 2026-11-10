@@ -1,6 +1,8 @@
 package com.xxl.ai.api.business.chat.service;
 
 import com.xxl.ai.api.business.agent.model.entity.Agent;
+import com.xxl.ai.api.business.session.model.dto.ArtifactDownloadDTO;
+import com.xxl.ai.api.business.session.model.dto.ArtifactPreviewDTO;
 import com.xxl.tool.response.Response;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -50,5 +52,15 @@ public interface ChatService {
      * 其他节点上的在途生成不受影响（无进行中生成时亦返回成功）。
      */
     Response<String> stop(long sessionId);
+
+    /**
+     * 在线预览对话交付物内容（C端公开校验：Agent 就绪 + 会话归属访客 + 消息所属会话）
+     */
+    Response<ArtifactPreviewDTO> previewArtifact(String uuid, String visitorId, long sessionId, long msgId, String artifactId);
+
+    /**
+     * 解析对话交付物下载文件（C端公开校验：Agent 就绪 + 会话归属访客 + 消息所属会话）
+     */
+    Response<ArtifactDownloadDTO> downloadArtifact(String uuid, String visitorId, long sessionId, long msgId, String artifactId);
 
 }

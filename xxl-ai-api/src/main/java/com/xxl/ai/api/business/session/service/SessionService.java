@@ -1,5 +1,7 @@
 package com.xxl.ai.api.business.session.service;
 
+import com.xxl.ai.api.business.session.model.dto.ArtifactDownloadDTO;
+import com.xxl.ai.api.business.session.model.dto.ArtifactPreviewDTO;
 import com.xxl.ai.api.business.session.model.dto.SessionDTO;
 import com.xxl.ai.api.business.session.model.dto.SessionMsgDTO;
 import com.xxl.ai.api.business.session.model.entity.Session;
@@ -74,6 +76,16 @@ public interface SessionService {
      */
     Response<PageModel<SessionMsgDTO>> pageMsgList(long spaceId, long agentId, long sessionId, int offset, int pagesize);
 
+    /**
+     * 在线预览对话消息交付物（管理端：校验空间与对话归属）
+     */
+    Response<ArtifactPreviewDTO> previewArtifact(long spaceId, long sessionId, long msgId, String artifactId);
+
+    /**
+     * 解析对话消息交付物下载文件（管理端：校验空间与对话归属）
+     */
+    Response<ArtifactDownloadDTO> downloadArtifact(long spaceId, long sessionId, long msgId, String artifactId);
+
     // ==================== 运行时支撑（chat 模块调用） ====================
 
     /**
@@ -95,5 +107,15 @@ public interface SessionService {
      * 按 Agent ID 批量清理对话与消息（Agent 删除时同步级联）
      */
     void purgeByAgentIds(List<Long> agentIds);
+
+    /**
+     * 读取已校验归属对话的消息交付物预览内容（供 C 端与管理端复用）
+     */
+    Response<ArtifactPreviewDTO> previewMsgArtifact(long sessionId, long msgId, String artifactId);
+
+    /**
+     * 解析已校验归属对话的消息交付物下载文件（供 C 端与管理端复用）
+     */
+    Response<ArtifactDownloadDTO> downloadMsgArtifact(long sessionId, long msgId, String artifactId);
 
 }

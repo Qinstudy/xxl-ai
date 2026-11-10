@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS `xxl_ai_knowledge_base` (
     `chunk_size`          INT             NOT NULL DEFAULT 500    COMMENT '分片大小',
     `chunk_overlap`       INT             NOT NULL DEFAULT 50     COMMENT '分片重叠',
     `top_k`               INT             NOT NULL DEFAULT 5      COMMENT '检索数量',
+    `similarity_threshold` DECIMAL(4, 2) NOT NULL DEFAULT 0.40 COMMENT '相似度阈值 (0.00-1.00，默认 0.40)',
     `status`              TINYINT         NOT NULL DEFAULT 0      COMMENT '状态：0-正常、1-停用',
     `add_time`            DATETIME        NOT NULL                COMMENT '新增时间',
     `update_time`         DATETIME        NOT NULL                COMMENT '更新时间',
@@ -188,6 +189,7 @@ CREATE TABLE IF NOT EXISTS `xxl_ai_session_msg` (
     `role`          VARCHAR(10)     NOT NULL            COMMENT '角色：user/assistant',
     `reasoning`     TEXT            NULL DEFAULT NULL   COMMENT '思考过程（推理模型 reasoning_content）',
     `content`       TEXT            NOT NULL            COMMENT '消息内容',
+    `ext_json`      MEDIUMTEXT      NULL DEFAULT NULL   COMMENT '扩展信息(JSON：runMeta/tokenUsage/references/toolTraces/spans/logs)',
     `status`        TINYINT         NOT NULL DEFAULT 1  COMMENT '状态：0-生成中、1-完成、2-失败（助手消息ID复用为结果流标识）',
     `add_time`      DATETIME        NOT NULL            COMMENT '新增时间',
     `update_time`   DATETIME        NOT NULL            COMMENT '更新时间',
@@ -307,8 +309,9 @@ VALUES
     (1, '远程MCP服务（示例）', 0, 'http://127.0.0.1:8091/sample/mcp', null, '{"transport":"http","url":"http://127.0.0.1:8091/sample/mcp","headers":{}}', 0, '示例MCP服务（远程）：提供 get_current_time/calculator 等多工具能力', NOW(), NOW()),
     -- 本地 stdio 进程：：示例MCP
     (1, 'Fetch 网页抓取', 1, null, null, '{"transport":"stdio","command":"npx","args":["-y","mcp-fetch-server"],"env":{}}', 0, '网页抓取与内容提取', NOW(), NOW()),
-    (1, 'Filesystem 文件系统', 1, null, null, '{"transport":"stdio","command":"npx","args":["-y","@modelcontextprotocol/server-filesystem","/tmp"],"env":{}}', 0, '本地文件系统读写（请按需调整授权目录参数）', NOW(), NOW()),
-    (1, 'Playwright 浏览器工具', 1, null, null, '{"transport":"stdio","command":"npx","args":["@playwright/mcp@latest","--headless","--isolated"]}', 0, '浏览器操作工具', NOW(), NOW());
+    (1, 'Filesystem 文件系统', 1, null, null, '{"transport":"stdio","command":"npx","args":["-y","@modelcontextprotocol/server-filesystem","E:\\\\data\\\\tmp"],"env":{}}', 0, '本地文件系统读写（请按需调整授权目录参数）', NOW(), NOW()),
+    (1, 'Playwright 浏览器工具', 1, null, null, '{"transport":"stdio","command":"npx","args":["@playwright/mcp@latest","--headless","--isolated"]}', 0, '浏览器操作工具', NOW(), NOW()),
+    (1, 'MySQL 数据库操作工具', 1, null, null, '{"transport":"stdio","command":"npx","args":["-y","@benborla29/mcp-server-mysql"],"env":{"MYSQL_HOST":"127.0.0.1","MYSQL_PORT":"3306","MYSQL_USER":"root","MYSQL_PASS":"123456","MYSQL_DB":"xxl_ai"}}', 0, 'MySQL 数据库操作工具（支持 SQL 查询与读写）', NOW(), NOW());
 
 -- 7、预设 SKILL（开箱即用：sql-optimizer 慢SQL优化、ppt 演示文稿生成）
 INSERT INTO `xxl_ai_skill` (`id`, `space_id`, `name`, `description`, `version`, `status`, `add_time`, `update_time`)
@@ -338,9 +341,9 @@ VALUES
 
 
 -- 8、预设知识库与知识文档（RAG 测试数据：《三体》主题，嵌入模型使用本地 Ollama qwen3-embedding，开箱即可向量化/检索）
-INSERT INTO `xxl_ai_knowledge_base` (`id`, `space_id`, `name`, `description`, `embed_supplier_id`, `embed_model_id`, `chunk_size`, `chunk_overlap`, `top_k`, `status`, `add_time`, `update_time`)
+INSERT INTO `xxl_ai_knowledge_base` (`id`, `space_id`, `name`, `description`, `embed_supplier_id`, `embed_model_id`, `chunk_size`, `chunk_overlap`, `top_k`, `similarity_threshold`, `status`, `add_time`, `update_time`)
 VALUES
-    (1, 1, '三体知识库', '刘慈欣《三体》系列知识库：主要人物、核心设定、关键情节，作为 RAG 知识问答联调用例', 2, 5, 500, 50, 5, 0, NOW(), NOW());
+    (1, 1, '三体知识库', '刘慈欣《三体》系列知识库：主要人物、核心设定、关键情节，作为 RAG 知识问答联调用例', 2, 5, 500, 50, 5, 0.40, 0, NOW(), NOW());
 
 INSERT INTO `xxl_ai_knowledge_doc` (`id`, `space_id`, `base_id`, `name`, `content`, `chunk_count`, `status`, `add_time`, `update_time`)
 VALUES

@@ -13,6 +13,7 @@
 		<result column="chunk_size" property="chunkSize" />
 		<result column="chunk_overlap" property="chunkOverlap" />
 		<result column="top_k" property="topK" />
+		<result column="similarity_threshold" property="similarityThreshold" />
 		<result column="status" property="status" />
 		<result column="add_time" property="addTime" />
 		<result column="update_time" property="updateTime" />
@@ -28,6 +29,7 @@
 		t.chunk_size,
 		t.chunk_overlap,
 		t.top_k,
+		t.similarity_threshold,
 		t.status,
 		t.add_time,
 		t.update_time
@@ -36,10 +38,10 @@
 	<insert id="insert" parameterType="com.xxl.ai.api.business.knowledge.model.entity.KnowledgeBase" useGeneratedKeys="true" keyProperty="id" >
 		INSERT INTO xxl_ai_knowledge_base (
 			space_id, name, description, embed_supplier_id, embed_model_id,
-			chunk_size, chunk_overlap, top_k, status, add_time, update_time
+			chunk_size, chunk_overlap, top_k, similarity_threshold, status, add_time, update_time
 		) VALUES (
 			 #{spaceId}, #{name}, #{description}, #{embedSupplierId}, #{embedModelId},
-			 #{chunkSize}, #{chunkOverlap}, #{topK}, #{status}, NOW(), NOW()
+			 #{chunkSize}, #{chunkOverlap}, #{topK}, #{similarityThreshold}, #{status}, NOW(), NOW()
 		 );
 	</insert>
 
@@ -64,6 +66,7 @@
 			chunk_size = #{chunkSize},
 			chunk_overlap = #{chunkOverlap},
 			top_k = #{topK},
+			similarity_threshold = #{similarityThreshold},
 			status = #{status},
 			update_time = NOW()
 		WHERE id = #{id}

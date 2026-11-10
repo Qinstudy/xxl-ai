@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.xxl.ai.api.business.mcp.model.entity.Mcp;
 import io.modelcontextprotocol.client.McpSyncClient;
+import io.modelcontextprotocol.client.transport.HttpClientSseClientTransport;
 import io.modelcontextprotocol.client.transport.HttpClientStreamableHttpTransport;
 import io.modelcontextprotocol.client.transport.ServerParameters;
 import io.modelcontextprotocol.client.transport.StdioClientTransport;
@@ -112,8 +113,8 @@ public class McpClientTool {
                 return McpConnectResult.fail(0, System.currentTimeMillis() - start, "配置不完整（缺少必要参数）");
             }
             sync = io.modelcontextprotocol.client.McpClient.sync(transport)
-                    .requestTimeout(Duration.ofSeconds(30))
-                    .initializationTimeout(Duration.ofSeconds(15))
+                    .requestTimeout(Duration.ofSeconds(60))
+                    .initializationTimeout(Duration.ofSeconds(60))
                     .build();
             sync.initialize();
             String serverName = null;
@@ -135,7 +136,7 @@ public class McpClientTool {
             return McpConnectResult.ok(serverName, serverVersion, instructions, tools, elapsed, "连接成功，发现 " + tools.size() + " 个工具");
         } catch (Exception e) {
             long elapsed = System.currentTimeMillis() - start;
-            logger.warn("MCP 连通测试失败, id={}, name={}, err={}", mcp.getId(), mcp.getName(), e.getMessage());
+            logger.warn("MCP 连通测试失败, id={}, name={}, err={}", mcp.getId(), mcp.getName(), e.getMessage(), e);
             return McpConnectResult.fail(0, elapsed, String.valueOf(e.getMessage()));
         } finally {
             if (sync != null) {
@@ -169,7 +170,7 @@ public class McpClientTool {
             }
             McpSyncClient sync = io.modelcontextprotocol.client.McpClient.sync(transport)
                     .requestTimeout(Duration.ofSeconds(60))
-                    .initializationTimeout(Duration.ofSeconds(15))
+                    .initializationTimeout(Duration.ofSeconds(60))
                     .build();
             sync.initialize();
             if (cached != null && cached.sync != null) {
@@ -184,7 +185,7 @@ public class McpClientTool {
     }
 
     /**
-     * 构建传输层：按 config 配置格式（http/stdio）解析；遵循类型映射（0=远程/1=本地）兜底
+     * 构建传输层：按 config 配置格式（http/sse/stdio）解析；遵循类型映射（0=远程/1=本地）兜底
      */
     private McpClientTransport transport(Mcp mcp) {
         McpConfig config = parseConfig(mcp);
@@ -192,6 +193,9 @@ public class McpClientTool {
         try {
             if ("stdio".equals(transport)) {
                 return buildStdioTransport(config);
+            }
+            if ("sse".equals(transport) || (config.url != null && config.url.contains("/sse"))) {
+                return buildSseTransport(config);
             }
             return buildHttpTransport(config);
         } catch (Exception e) {
@@ -201,10 +205,10 @@ public class McpClientTool {
     }
 
     /**
-     * Streamable HTTP 传输：url（完整消息端点） + headers
+     * Streamable HTTP 传输：url（完整消息端点，含 query 参数） + headers
      *
-     * SDK 传输层按 「base = scheme://host:port、endpoint = url.path」构建，
-     * 保证配置的服务地址精确作为 MCP 消息端点使用（避免 resolve("/mcp") 覆盖路径导致的 404）
+     * SDK 传输层按 「base = scheme://host:port、endpoint = url.rawPath + rawQuery」构建，
+     * 保证配置的服务地址精确作为 MCP 消息端点使用（保留 ?key=xxx 等鉴权 query 参数）
      */
     private McpClientTransport buildHttpTransport(McpConfig config) {
         if (config.url == null || config.url.isEmpty()) {
@@ -216,8 +220,12 @@ public class McpClientTool {
             URI uri = URI.create(config.url);
             if (uri.getScheme() != null && uri.getAuthority() != null) {
                 baseUri = uri.getScheme() + "://" + uri.getAuthority();
-                String path = uri.getPath();
+                String path = uri.getRawPath();
+                String query = uri.getRawQuery();
                 endpoint = (path == null || path.isEmpty()) ? "/mcp" : path;
+                if (query != null && !query.isEmpty()) {
+                    endpoint += "?" + query;
+                }
             }
         } catch (IllegalArgumentException e) {
             logger.warn("MCP 服务地址解析失败, 使用原样地址, err={}", e.getMessage());
@@ -232,21 +240,137 @@ public class McpClientTool {
     }
 
     /**
+     * SSE 传输：url（完整消息端点，含 query 参数） + headers
+     *
+     * 针对标准 MCP SSE 服务（如 /sse?key=xxx），客户端建立 SSE 连接后自动按服务端返回的 endpoint 发送消息
+     */
+    private McpClientTransport buildSseTransport(McpConfig config) {
+        if (config.url == null || config.url.isEmpty()) {
+            return null;
+        }
+        String baseUri = config.url;
+        String sseEndpoint = "/sse";
+        try {
+            URI uri = URI.create(config.url);
+            if (uri.getScheme() != null && uri.getAuthority() != null) {
+                baseUri = uri.getScheme() + "://" + uri.getAuthority();
+                String path = uri.getRawPath();
+                String query = uri.getRawQuery();
+                sseEndpoint = (path == null || path.isEmpty()) ? "/sse" : path;
+                if (query != null && !query.isEmpty()) {
+                    sseEndpoint += "?" + query;
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            logger.warn("MCP SSE 服务地址解析失败, 使用原样地址, err={}", e.getMessage());
+        }
+        HttpClientSseClientTransport.Builder builder = HttpClientSseClientTransport.builder(baseUri)
+                .sseEndpoint(sseEndpoint)
+                .customizeClient(clientBuilder -> clientBuilder.connectTimeout(Duration.ofSeconds(10)));
+        if (config.headers != null && !config.headers.isEmpty()) {
+            builder.httpRequestCustomizer(headerCustomizer(config.headers));
+        }
+        return builder.build();
+    }
+
+    /**
      * 本地进程传输：command + args + env + cwd
      */
     private McpClientTransport buildStdioTransport(McpConfig config) {
         if (config.command == null || config.command.isEmpty()) {
             return null;
         }
-        ServerParameters.Builder params = ServerParameters.builder(config.command);
-        if (config.args != null && !config.args.isEmpty()) {
-            params.args(config.args);
+        String command = config.command;
+        List<String> args = config.args != null ? new ArrayList<>(config.args) : new ArrayList<>();
+        Map<String, String> env = config.env != null ? new HashMap<>(config.env) : new HashMap<>();
+
+        // 1. MySQL 社区生态包名与 URL 连接串自动兼容纠偏
+        // 官方 `@modelcontextprotocol/server-mysql` 在 npm 上并不存在，社区实际标准包为 `@benborla29/mcp-server-mysql`
+        // 且后者通过环境变量 (MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASS, MYSQL_DB) 接收配置
+        for (int i = 0; i < args.size(); i++) {
+            String arg = args.get(i);
+            if (arg != null && arg.contains("@modelcontextprotocol/server-mysql")) {
+                args.set(i, arg.replace("@modelcontextprotocol/server-mysql", "@benborla29/mcp-server-mysql"));
+            }
+            if (arg != null && arg.startsWith("mysql://")) {
+                parseMysqlUrlToEnv(arg, env);
+                args.remove(i);
+                i--;
+            }
         }
-        if (config.env != null && !config.env.isEmpty()) {
-            params.env(config.env);
+
+        // 2. Windows 平台兼容适配：
+        boolean isWindows = System.getProperty("os.name").toLowerCase().contains("win");
+        if (isWindows) {
+            // (a) 若配置了类 Unix 的 /tmp 路径，在 Windows 下无法识别，自动转换为已存在的临时目录（如 E:/data 或系统临时目录）
+            for (int i = 0; i < args.size(); i++) {
+                String arg = args.get(i);
+                if ("/tmp".equals(arg) || "/tmp/".equals(arg)) {
+                    java.io.File targetDir = new java.io.File("E:/data/tmp");
+                    if (!targetDir.exists()) {
+                        targetDir = new java.io.File("E:/data");
+                    }
+                    if (!targetDir.exists()) {
+                        targetDir = new java.io.File(System.getProperty("java.io.tmpdir"));
+                    }
+                    args.set(i, targetDir.getAbsolutePath());
+                    logger.info("Windows 平台将 MCP 路径 /tmp 自动转换为: {}", targetDir.getAbsolutePath());
+                }
+            }
+
+            // (b) 自动通过 cmd.exe /c 包装批处理与脚本命令（针对 npx/npm/pnpm/yarn 及 .cmd/.bat）
+            String lower = command.toLowerCase();
+            boolean isBatch = lower.equals("npx") || lower.equals("npm") || lower.equals("pnpm") || lower.equals("yarn")
+                    || lower.endsWith(".cmd") || lower.endsWith(".bat");
+            if (isBatch && !"cmd.exe".equalsIgnoreCase(command) && !"cmd".equalsIgnoreCase(command)) {
+                args.add(0, command);
+                args.add(0, "/c");
+                command = "cmd.exe";
+            }
+        }
+
+        ServerParameters.Builder params = ServerParameters.builder(command);
+        if (!args.isEmpty()) {
+            params.args(args);
+        }
+        if (!env.isEmpty()) {
+            params.env(env);
         }
         McpJsonMapper jsonMapper = McpJsonDefaults.getMapper();
         return new StdioClientTransport(params.build(), jsonMapper);
+    }
+
+    /**
+     * 将 mysql://user:password@host:port/db URL 解析为环境参数并放入 env Map
+     */
+    private void parseMysqlUrlToEnv(String url, Map<String, String> env) {
+        try {
+            URI uri = URI.create(url);
+            String host = uri.getHost() != null ? uri.getHost() : "127.0.0.1";
+            int port = uri.getPort() > 0 ? uri.getPort() : 3306;
+            String path = uri.getPath();
+            String db = (path != null && path.length() > 1) ? path.substring(1) : "xxl_ai";
+            String userInfo = uri.getUserInfo();
+            String user = "root";
+            String pass = "";
+            if (userInfo != null && !userInfo.isEmpty()) {
+                String[] parts = userInfo.split(":", 2);
+                user = parts[0];
+                if (parts.length > 1) {
+                    pass = parts[1];
+                }
+            }
+            env.putIfAbsent("MYSQL_HOST", host);
+            env.putIfAbsent("MYSQL_PORT", String.valueOf(port));
+            env.putIfAbsent("MYSQL_USER", user);
+            env.putIfAbsent("MYSQL_PASS", pass);
+            env.putIfAbsent("MYSQL_DB", db);
+            env.putIfAbsent("ALLOW_INSERT_OPERATION", "true");
+            env.putIfAbsent("ALLOW_UPDATE_OPERATION", "true");
+            env.putIfAbsent("ALLOW_DELETE_OPERATION", "true");
+        } catch (Exception e) {
+            logger.warn("解析 MySQL 连接串失败: {}, err={}", url, e.getMessage());
+        }
     }
 
     /**
@@ -291,6 +415,10 @@ public class McpClientTool {
             config.cwd = (cwdEl != null && cwdEl.isJsonPrimitive()) ? cwdEl.getAsString() : null;
         } catch (Exception e) {
             logger.warn("MCP config 解析失败, id={}, err={}", mcp.getId(), e.getMessage());
+        }
+        // 兜底：若 config 中未指定 url，从实体平铺列回填
+        if (config.url == null || config.url.isEmpty()) {
+            config.url = mcp.getUrl();
         }
         // 兜底：config 缺 transport 时按类型映射（0=远程http、1=本地stdio）
         if (config.transport == null) {

@@ -80,6 +80,13 @@
 		WHERE t.agent_id = #{agentId}
 	</select>
 
+	<!-- 级联清理：查询 Agent 下全部会话 ID -->
+	<select id="listIdsByAgentId" parameterType="java.util.HashMap" resultType="java.lang.Long">
+		SELECT t.id
+		FROM xxl_ai_session AS t
+		WHERE t.agent_id = #{agentId}
+	</select>
+
 	<!-- 管理端：空间内对话分页（按 Agent、标题、访客ID 过滤，含所属 Agent 名称） -->
 	<select id="pageList" parameterType="java.util.HashMap" resultMap="SessionDTO">
 		SELECT
