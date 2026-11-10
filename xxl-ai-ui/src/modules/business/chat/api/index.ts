@@ -53,12 +53,13 @@ export async function sendStream(
   visitorId: string,
   sessionId: number,
   content: string,
+  variables?: Record<string, string>,
   signal?: AbortSignal
 ): Promise<ReadableStreamDefaultReader<Uint8Array> | null> {
   const response = await fetch(`${BASE}/chat/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ uuid, visitorId, sessionId, content }),
+    body: JSON.stringify({ uuid, visitorId, sessionId, content, variables }),
     signal
   })
   if (!response.ok || !response.body) {

@@ -6,6 +6,8 @@ import com.xxl.ai.api.business.session.model.dto.ArtifactPreviewDTO;
 import com.xxl.tool.response.Response;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.Map;
+
 /**
  * 对话流式 Service（公开访问：免管理端登录态，按 uuid + visitorId 隔离会话）
  *
@@ -39,6 +41,11 @@ public interface ChatService {
      * 发起流式对话：校验会话 → 落库用户消息与助手占位 → 投递任务 → 打开 SSE 连接
      */
     SseEmitter send(String uuid, String visitorId, long sessionId, String content);
+
+    /**
+     * 发起流式对话（支持动态变量槽位注入）
+     */
+    SseEmitter send(String uuid, String visitorId, long sessionId, String content, Map<String, String> variables);
 
     /**
      * 断线/刷新续传：从结果流 {@code lastEventId} 之后继续转发，不重新生成

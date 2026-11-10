@@ -20,6 +20,7 @@ export interface RunMeta {
   totalElapsedMs?: number
   errorMsg?: string
   workerNode?: string
+  promptVariables?: Record<string, string>
 }
 
 /** Token 消耗统计（多轮 ReAct 累加） */

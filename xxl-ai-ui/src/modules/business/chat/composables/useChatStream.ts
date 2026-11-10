@@ -48,7 +48,7 @@ export function useChatStream() {
    * 发送消息并流式接收：打开流 → 解析并自动续传
    */
   async function sendMessage(
-    payload: { uuid: string; visitorId: string; sessionId: number; content: string },
+    payload: { uuid: string; visitorId: string; sessionId: number; content: string; variables?: Record<string, string> },
     onThinking: ChatStreamHandler,
     onContent: ChatStreamHandler,
     callbacksOrOnError?: ChatStreamCallbacks | ((message: string) => void)
@@ -56,7 +56,7 @@ export function useChatStream() {
     stopped = false
     controller = new AbortController()
     const callbacks = normalizeCallbacks(callbacksOrOnError)
-    const reader = await sendStream(payload.uuid, payload.visitorId, payload.sessionId, payload.content, controller.signal)
+    const reader = await sendStream(payload.uuid, payload.visitorId, payload.sessionId, payload.content, payload.variables, controller.signal)
     if (!reader) {
       throw new Error('empty stream')
     }

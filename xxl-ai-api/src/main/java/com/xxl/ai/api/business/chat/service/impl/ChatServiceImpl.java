@@ -16,6 +16,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.Map;
+
 /**
  * 对话流式 Service 实现
  *
@@ -83,29 +85,34 @@ public class ChatServiceImpl implements ChatService {
     /**
      * 发起对话：校验会话 → 落库用户消息与助手占位 → 投递任务 → 打开 SSE 连接
      */
-    @Override
-    public SseEmitter send(String uuid, String visitorId, long sessionId, String content) {
-        try {
-            if (StringTool.isBlank(content)) {
-                throw new IllegalArgumentException("请输入内容");
-            }
-            Agent agent = requireReadyAgent(uuid);
-            Session session = sessionService.require(agent.getId(), sessionId);
-            long msgId = sessionService.openRound(session, content);
-            try {
-                // 任务队列属系统内部流转，使用 agent_id（uuid 仅用于 C 端投放入口）
-                chatStreamTool.submit(msgId, agent.getId(), sessionId, content);
-            } catch (Exception submitError) {
-                // 投递失败：占位消息回填失败态，避免永远停留在生成中（无任务可消费）
-                sessionService.fail(msgId, sessionId);
-                throw submitError;
-            }
-            return chatStreamTool.open(msgId, null);
-        } catch (Exception e) {
-            logger.warn("Agent 对话提交失败, uuid={}, err={}", uuid, e.getMessage());
-            return chatStreamTool.error(e.getMessage());
-        }
-    }
+     @Override
+     public SseEmitter send(String uuid, String visitorId, long sessionId, String content) {
+         return send(uuid, visitorId, sessionId, content, null);
+     }
+
+     @Override
+     public SseEmitter send(String uuid, String visitorId, long sessionId, String content, Map<String, String> variables) {
+         try {
+             if (StringTool.isBlank(content)) {
+                 throw new IllegalArgumentException("请输入内容");
+             }
+             Agent agent = requireReadyAgent(uuid);
+             Session session = sessionService.require(agent.getId(), sessionId);
+             long msgId = sessionService.openRound(session, content);
+             try {
+                 // 任务队列属系统内部流转，使用 agent_id（uuid 仅用于 C 端投放入口）
+                 chatStreamTool.submit(msgId, agent.getId(), sessionId, content, variables);
+             } catch (Exception submitError) {
+                 // 投递失败：占位消息回填失败态，避免永远停留在生成中（无任务可消费）
+                 sessionService.fail(msgId, sessionId);
+                 throw submitError;
+             }
+             return chatStreamTool.open(msgId, null);
+         } catch (Exception e) {
+             logger.warn("Agent 对话提交失败, uuid={}, err={}", uuid, e.getMessage());
+             return chatStreamTool.error(e.getMessage());
+         }
+     }
 
     /**
      * 断线/刷新续传：从既有结果流的 {@code lastEventId} 之后继续转发，不重新生成

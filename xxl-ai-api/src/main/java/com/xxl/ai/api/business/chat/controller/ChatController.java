@@ -50,7 +50,7 @@ public class ChatController {
     @RequestMapping("/send")
     @XxlSso(login = false)
     public SseEmitter send(@RequestBody ChatSendDTO dto) {
-        return chatService.send(dto.getUuid(), dto.getVisitorId(), dto.getSessionId(), dto.getContent());
+        return chatService.send(dto.getUuid(), dto.getVisitorId(), dto.getSessionId(), dto.getContent(), dto.getVariables());
     }
 
     /**

@@ -110,6 +110,18 @@
             :placeholder="t('business.agent.systemPromptPlaceholder')"
             maxlength="65535"
           />
+          <div v-if="parsedPromptVariables.length > 0" class="prompt-var-capsules">
+            <span class="prompt-var-label">{{ t('business.agent.detectedVariables') }}:</span>
+            <el-tag
+              v-for="v in parsedPromptVariables"
+              :key="v.name"
+              size="small"
+              type="info"
+              class="prompt-var-tag"
+            >
+              {{ formatVarTag(v) }}
+            </el-tag>
+          </div>
         </el-form-item>
         <el-row>
           <el-col :span="12">
@@ -273,7 +285,7 @@ import type { Mcp } from '@/modules/business/mcp/types'
 import type { Skill } from '@/modules/business/skill/types'
 import type { KnowledgeBase } from '@/modules/business/knowledge/base/types'
 import type { FormInstance } from 'element-plus'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 const resetForm = useFormReset()
 
@@ -307,6 +319,36 @@ const formState = ref<FormState<AgentForm>>({
     modelId: [{ required: true, message: t('common.requiredMsg', [t('business.agent.model')]), trigger: 'change' }]
   }
 })
+
+interface PromptVarDef {
+  name: string
+  defaultValue?: string
+}
+
+function extractPromptVariables(prompt?: string): PromptVarDef[] {
+  if (!prompt) return []
+  const regex = /\{\{\s*([a-zA-Z0-9_\-\u4e00-\u9fa5]{1,50})(?:\s*:\s*([^}]*?))?\s*\}\}/g
+  const list: PromptVarDef[] = []
+  const seen = new Set<string>()
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(prompt)) !== null) {
+    const name = match[1].trim()
+    if (!seen.has(name) && list.length < 20) {
+      seen.add(name)
+      list.push({
+        name,
+        defaultValue: match[2] !== undefined ? match[2].trim() : undefined
+      })
+    }
+  }
+  return list
+}
+
+const parsedPromptVariables = computed(() => extractPromptVariables(formState.value.form.systemPrompt))
+
+function formatVarTag(v: PromptVarDef): string {
+  return `{{${v.name}${v.defaultValue !== undefined ? `:${v.defaultValue}` : ''}}}`
+}
 
 // --------------------------------- fun ---------------------------------
 function getList() {
@@ -461,3 +503,20 @@ function openAgentUrl(uuid: string) {
 // --------------------------------- page init ---------------------------------
 getList()
 </script>
+
+<style scoped>
+.prompt-var-capsules {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.prompt-var-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.prompt-var-tag {
+  font-family: monospace;
+}
+</style>

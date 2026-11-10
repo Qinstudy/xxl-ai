@@ -8,6 +8,7 @@ export interface AgentChatInfo {
   id: number
   name: string
   intro?: string
+  systemPrompt?: string
   status: number
   publishStatus: number
   [key: string]: unknown

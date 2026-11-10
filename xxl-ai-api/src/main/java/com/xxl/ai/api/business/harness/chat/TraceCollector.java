@@ -392,6 +392,7 @@ public class TraceCollector {
         private long totalElapsedMs;    /* 总耗时(ms) */
         private String errorMsg;        /* 失败或终止原因（可空） */
         private String workerNode;      /* 执行消费节点标识 */
+        private Map<String, String> promptVariables; /* 实际生效的 Prompt 动态变量快照 */
 
         public long getRunId() {
             return runId;
@@ -511,6 +512,14 @@ public class TraceCollector {
 
         public void setWorkerNode(String workerNode) {
             this.workerNode = workerNode;
+        }
+
+        public Map<String, String> getPromptVariables() {
+            return promptVariables;
+        }
+
+        public void setPromptVariables(Map<String, String> promptVariables) {
+            this.promptVariables = promptVariables;
         }
     }
 

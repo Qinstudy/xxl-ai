@@ -209,6 +209,26 @@
             <div class="chat-new-inner">
               <div class="chat-new-title">{{ agent?.name || 'Agent' }}</div>
               <div v-if="agent?.intro" class="chat-new-sub">{{ agent.intro }}</div>
+
+              <!-- 动态参数槽位表单卡片（[FEAT-010]） -->
+              <div v-if="agentPromptVariables.length > 0" class="chat-new-vars-card">
+                <div class="vars-card-title">
+                  <el-icon><Operation /></el-icon>
+                  <span>{{ t('business.chat.promptVariablesTitle') }}</span>
+                </div>
+                <div class="vars-grid">
+                  <div v-for="item in agentPromptVariables" :key="item.name" class="var-item">
+                    <label class="var-name" :title="item.name">{{ item.name }}</label>
+                    <el-input
+                      v-model="currentSessionVariables[item.name]"
+                      size="small"
+                      :placeholder="item.defaultValue || t('business.chat.promptVariablePlaceholder')"
+                      clearable
+                    />
+                  </div>
+                </div>
+              </div>
+
               <el-input
                 ref="newChatInputRef"
                 v-model="inputText"
@@ -240,6 +260,37 @@
       </div>
       <div class="chat-input" v-if="currentSessionId">
         <div class="chat-input-inner">
+          <!-- 运行中会话的动态参数槽位胶囊栏（[FEAT-010]） -->
+          <div v-if="agentPromptVariables.length > 0" class="chat-vars-bar">
+            <div class="chat-vars-bar-header" @click="varsExpanded = !varsExpanded">
+              <span class="chat-vars-bar-title">
+                <el-icon><Operation /></el-icon>
+                {{ t('business.chat.promptVariablesTitle') }}
+              </span>
+              <div class="chat-vars-bar-tags" v-if="!varsExpanded">
+                <span v-for="v in agentPromptVariables.slice(0, 3)" :key="v.name" class="var-pill">
+                  {{ v.name }}: {{ currentSessionVariables[v.name] || v.defaultValue || '-' }}
+                </span>
+                <span v-if="agentPromptVariables.length > 3" class="var-pill-more">+{{ agentPromptVariables.length - 3 }}</span>
+              </div>
+              <el-icon class="vars-arrow" :class="{ 'is-active': varsExpanded }"><ArrowDown /></el-icon>
+            </div>
+            <div v-show="varsExpanded" class="chat-vars-bar-body">
+              <div class="vars-grid">
+                <div v-for="item in agentPromptVariables" :key="item.name" class="var-item">
+                  <label class="var-name" :title="item.name">{{ item.name }}</label>
+                  <el-input
+                    v-model="currentSessionVariables[item.name]"
+                    size="small"
+                    :placeholder="item.defaultValue || t('business.chat.promptVariablePlaceholder')"
+                    clearable
+                    @change="handleSessionVarChange"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <el-input
             v-model="inputText"
             type="textarea"
@@ -309,7 +360,7 @@ import modal from '@/utils/modal'
 import { copyText } from '@/utils/clipboard'
 import { SvgIcon } from '@/components'
 import { useFullscreen } from '@vueuse/core'
-import { nextTick, onMounted, ref, type ComponentPublicInstance } from 'vue'
+import { computed, nextTick, onMounted, ref, type ComponentPublicInstance } from 'vue'
 
 const { sendMessage, resumeMessage, stopMessage } = useChatStream()
 
@@ -322,6 +373,76 @@ const { isFullscreen, toggle: toggleFullscreen } = useFullscreen()
 const uuid = ref<string>(String(route.params.uuid || ''))
 const visitorId = ref<string>('')
 const agent = ref<AgentChatInfo>()
+
+/** Prompt 动态变量定义与提取（[FEAT-010]） */
+interface PromptVarDef {
+  name: string
+  defaultValue?: string
+}
+
+function extractPromptVariables(prompt?: string): PromptVarDef[] {
+  if (!prompt) return []
+  const regex = /\{\{\s*([a-zA-Z0-9_\-\u4e00-\u9fa5]{1,50})(?:\s*:\s*([^}]*?))?\s*\}\}/g
+  const list: PromptVarDef[] = []
+  const seen = new Set<string>()
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(prompt)) !== null) {
+    const name = match[1].trim()
+    if (!seen.has(name) && list.length < 20) {
+      seen.add(name)
+      list.push({
+        name,
+        defaultValue: match[2] !== undefined ? match[2].trim() : undefined
+      })
+    }
+  }
+  return list
+}
+
+const agentPromptVariables = computed(() => extractPromptVariables(agent.value?.systemPrompt))
+const currentSessionVariables = ref<Record<string, string>>({})
+const varsExpanded = ref(false)
+
+function getSessionVarsStorageKey(sessionId: number): string {
+  return `xxl_ai_vars_${uuid.value}_${sessionId}`
+}
+
+function initVariablesForNewChat() {
+  const vars: Record<string, string> = {}
+  for (const item of agentPromptVariables.value) {
+    vars[item.name] = item.defaultValue ?? ''
+  }
+  currentSessionVariables.value = vars
+}
+
+function loadSessionVariables(sessionId: number) {
+  const key = getSessionVarsStorageKey(sessionId)
+  const stored = sessionStorage.getItem(key)
+  if (stored) {
+    try {
+      currentSessionVariables.value = JSON.parse(stored)
+      return
+    } catch (e) {
+      // ignore
+    }
+  }
+  // 从已有助手消息快照恢复
+  for (const msg of messages.value) {
+    if (msg.role === 'assistant' && msg.extData?.runMeta?.promptVariables) {
+      currentSessionVariables.value = { ...msg.extData.runMeta.promptVariables }
+      sessionStorage.setItem(key, JSON.stringify(currentSessionVariables.value))
+      return
+    }
+  }
+  // 兜底回退为 Agent 默认值
+  initVariablesForNewChat()
+}
+
+function handleSessionVarChange() {
+  if (currentSessionId.value) {
+    sessionStorage.setItem(getSessionVarsStorageKey(currentSessionId.value), JSON.stringify(currentSessionVariables.value))
+  }
+}
 
 const sessionList = ref<Session[]>([])
 const sessionLoading = ref(false)
@@ -407,6 +528,7 @@ async function init() {
     void selectSession(targetSessionId)
   } else {
     newChat.value = true
+    initVariablesForNewChat()
   }
 }
 
@@ -434,6 +556,7 @@ function handleNewChat() {
   currentSessionId.value = undefined
   messages.value = []
   newChat.value = true
+  initVariablesForNewChat()
   syncUrlSessionId()
   nextTick(() => newChatInputRef.value?.focus())
 }
@@ -460,6 +583,8 @@ async function selectSession(sessionId: number) {
   syncUrlSessionId(sessionId)
   messages.value = []
   await loadMessages(sessionId)
+  // 恢复会话参数槽位快照：优先从 sessionStorage 取，其次从消息历史快照取，最后回退默认值
+  loadSessionVariables(sessionId)
   // 进入会话（含刷新）默认定位到底部，并等待图片等资源加载完成后再校准
   await jumpToBottom()
   pinBottomAfterAssets()
@@ -716,9 +841,14 @@ async function handleSend() {
   const assistantIdx = messages.value.push(assistantMsg) - 1
   await jumpToBottom()
 
+  const varsPayload = Object.keys(currentSessionVariables.value).length > 0 ? { ...currentSessionVariables.value } : undefined
+  if (sessionId) {
+    sessionStorage.setItem(getSessionVarsStorageKey(sessionId), JSON.stringify(currentSessionVariables.value))
+  }
+
   try {
     await sendMessage(
-      { uuid: uuid.value, visitorId: visitorId.value, sessionId, content },
+      { uuid: uuid.value, visitorId: visitorId.value, sessionId, content, variables: varsPayload },
       (chunk) => {
         const msg = messages.value[assistantIdx]
         if (msg) msg.reasoning += chunk
@@ -1279,6 +1409,119 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* 新建对话参数槽位卡片 */
+.chat-new-vars-card {
+  background: var(--el-bg-color-overlay, #ffffff);
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.vars-card-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary, #303133);
+  margin-bottom: 12px;
+}
+
+.vars-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.var-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.var-name {
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 运行中会话参数槽位胶囊栏 */
+.chat-vars-bar {
+  background: #ffffff;
+  border: 1px solid var(--el-border-color-lighter, #e2e8f0);
+  border-radius: 10px;
+  padding: 6px 12px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.chat-vars-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+  min-height: 24px;
+}
+
+.chat-vars-bar-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-regular, #606266);
+}
+
+.chat-vars-bar-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  margin: 0 8px;
+  flex: 1;
+}
+
+.var-pill {
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--el-text-color-secondary, #909399);
+  background: var(--el-fill-color-light, #f8fafc);
+  border: 1px solid var(--el-border-color-light, #e4e7ed);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.var-pill-more {
+  font-size: 11px;
+  color: var(--el-text-color-placeholder, #a8abb2);
+}
+
+.vars-arrow {
+  font-size: 12px;
+  color: var(--el-text-color-placeholder, #a8abb2);
+  transition: transform 0.2s ease;
+}
+
+.vars-arrow.is-active {
+  transform: rotate(180deg);
+}
+
+.chat-vars-bar-body {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--el-border-color-lighter, #ebeef5);
 }
 
 :deep(.chat-new .el-textarea__inner),

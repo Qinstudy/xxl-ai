@@ -66,6 +66,26 @@
         </div>
       </div>
 
+      <!-- 动态注入变量槽位快照（[FEAT-010]） -->
+      <div
+        v-if="traceData.runMeta?.promptVariables && Object.keys(traceData.runMeta.promptVariables).length > 0"
+        class="trace-prompt-vars-bar"
+      >
+        <span class="prompt-vars-title">{{ t('business.chat.tracePromptVars') }}:</span>
+        <div class="prompt-vars-tags">
+          <el-tag
+            v-for="(val, key) in traceData.runMeta.promptVariables"
+            :key="key"
+            size="small"
+            type="info"
+            effect="plain"
+            class="prompt-var-capsule"
+          >
+            <strong>{{ key }}</strong>: {{ val }}
+          </el-tag>
+        </div>
+      </div>
+
       <!-- 错误提示横幅（若 Run 失败或被终止） -->
       <div v-if="traceData.runMeta?.errorMsg" class="trace-error-banner">
         {{ traceData.runMeta.errorMsg }}
@@ -627,5 +647,34 @@ function formatJsonText(raw?: string): string {
 
 .log-msg {
   color: #f1f5f9;
+}
+
+.trace-prompt-vars-bar {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background-color: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+
+.prompt-vars-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+  white-space: nowrap;
+  line-height: 24px;
+}
+
+.prompt-vars-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.prompt-var-capsule {
+  font-family: monospace;
 }
 </style>

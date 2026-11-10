@@ -11,6 +11,7 @@ public class ChatSendDTO {
     private String visitorId;   /* 访客标识 */
     private long sessionId;     /* 对话ID */
     private String content;     /* 用户消息内容 */
+    private java.util.Map<String, String> variables; /* 动态提示词变量键值对（可选） */
 
     public String getUuid() {
         return uuid;
@@ -42,6 +43,14 @@ public class ChatSendDTO {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public java.util.Map<String, String> getVariables() {
+        return variables;
+    }
+
+    public void setVariables(java.util.Map<String, String> variables) {
+        this.variables = variables;
     }
 
 }

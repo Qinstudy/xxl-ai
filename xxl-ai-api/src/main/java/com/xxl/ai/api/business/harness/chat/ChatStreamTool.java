@@ -19,6 +19,7 @@ import com.xxl.ai.api.business.supplier.service.SupplierService;
 import com.xxl.ai.api.framework.util.I18nUtil;
 import com.xxl.tool.core.StringTool;
 import com.xxl.tool.id.UUIDTool;
+import com.xxl.tool.json.GsonTool;
 import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
@@ -287,7 +288,11 @@ public class ChatStreamTool implements SmartLifecycle {
      *  - 本质：通过 Redis Stream XADD 投递任务（worker 以消费组身份竞争消费）；
      */
     public void submit(long msgId, long agentId, long sessionId, String content) {
-        addTask(msgId, agentId, sessionId, content);
+        submit(msgId, agentId, sessionId, content, null);
+    }
+
+    public void submit(long msgId, long agentId, long sessionId, String content, Map<String, String> variables) {
+        addTask(msgId, agentId, sessionId, content, variables);
     }
 
     /**
@@ -356,12 +361,23 @@ public class ChatStreamTool implements SmartLifecycle {
      * @param content 消息内容
      */
     public void addTask(long msgId, long agentId, long sessionId, String content) {
+        addTask(msgId, agentId, sessionId, content, null);
+    }
+
+    /**
+     * 投递生成任务（支持动态变量槽位参数）：XADD 任务队列
+     */
+    public void addTask(long msgId, long agentId, long sessionId, String content, Map<String, String> variables) {
+        Map<String, String> payload = new HashMap<>();
+        payload.put("msgId", String.valueOf(msgId));
+        payload.put("agentId", String.valueOf(agentId));
+        payload.put("sessionId", String.valueOf(sessionId));
+        payload.put("content", content != null ? content : "");
+        if (variables != null && !variables.isEmpty()) {
+            payload.put("variables", GsonTool.toJson(variables));
+        }
         stringRedisTemplate.opsForStream().add(
-                StreamRecords.mapBacked(Map.of(
-                                "msgId", String.valueOf(msgId),
-                                "agentId", String.valueOf(agentId),
-                                "sessionId", String.valueOf(sessionId),
-                                "content", content))
+                StreamRecords.mapBacked(payload)
                         .withStreamKey(AI_CHAT_TASK_TOPIC),
                 RedisStreamCommands.XAddOptions
                         .maxlen(TASK_STREAM_MAXLEN)
@@ -496,6 +512,15 @@ public class ChatStreamTool implements SmartLifecycle {
         long sessionId = parseLong(fields.get("sessionId"));
         long agentId = parseLong(fields.get("agentId"));
         String content = str(fields.get("content"));
+        String variablesJson = str(fields.get("variables"));
+        Map<String, String> variables = null;
+        if (StringTool.isNotBlank(variablesJson)) {
+            try {
+                variables = GsonTool.fromJsonMap(variablesJson, String.class, String.class);
+            } catch (Exception e) {
+                logger.warn("解析任务 variables 失败, msgId={}, err={}", msgId, e.getMessage());
+            }
+        }
 
         // 2、初始化全链路追踪收集器与运行上下文
         TraceCollector traceCollector = new TraceCollector(msgId, sessionId, agentId, consumer);
@@ -524,7 +549,7 @@ public class ChatStreamTool implements SmartLifecycle {
         ArtifactBaseline artifactBaseline = new ArtifactBaseline();
         try {
             // Agent 校验 → 装配历史/记忆/显式RAG/可观测工具 → harness 流式对话
-            chatText = llmChat(msgId, agentId, sessionId, content, onThinking, onContent, context.shellTracker, traceCollector, artifactBaseline, context.cancelled());
+            chatText = llmChat(msgId, agentId, sessionId, content, variables, onThinking, onContent, context.shellTracker, traceCollector, artifactBaseline, context.cancelled());
         } catch (Throwable e) {
             failure = e;
         } finally {
@@ -797,6 +822,7 @@ public class ChatStreamTool implements SmartLifecycle {
                                          long agentId,
                                          long sessionId,
                                          String content,
+                                         Map<String, String> variables,
                                          java.util.function.Consumer<String> onThinking,
                                          java.util.function.Consumer<String> onContent,
                                          SkillShellTracker shellTracker,
@@ -850,6 +876,14 @@ public class ChatStreamTool implements SmartLifecycle {
 
         // 2.2、系统指令：
         String systemPrompt = buildSystemPrompt(agent);
+
+        // 2.2.1、动态变量注入（[FEAT-010]）：解析 {{var:default}} 槽位并注入 session 变量
+        Map<String, String> resolvedVariables = new LinkedHashMap<>();
+        systemPrompt = PromptVariableTool.render(systemPrompt, variables, resolvedVariables);
+        if (!resolvedVariables.isEmpty()) {
+            traceCollector.getRunMeta().setPromptVariables(resolvedVariables);
+            traceCollector.addLog("INFO", "context", "Prompt 动态变量渲染完成，共注入 " + resolvedVariables.size() + " 个槽位：" + resolvedVariables.keySet());
+        }
 
         // 2.3、长期记忆注入：
         systemPrompt = injectMemory(agent, sessionId, systemPrompt, traceCollector);
