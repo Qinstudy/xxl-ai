@@ -103,6 +103,12 @@ service.interceptors.request.use((config: InternalAxiosRequestConfig) => {
     config.headers['xxl-space-id'] = currentSpaceId
   }
 
+  // 3. 访客令牌注入：若本地存有访客凭证，自动注入 X-Visitor-Token（[SEC-001] IDOR 防护）
+  const visitorToken = localStorage.getItem('xxl-ai-visitor-token')
+  if (visitorToken) {
+    config.headers['X-Visitor-Token'] = visitorToken
+  }
+
   // POST / PUT 防重复提交
   if (!isRepeatSubmit && (config.method === 'post' || config.method === 'put')) {
     // FormData / Blob 无法序列化比对，跳过
@@ -155,6 +161,12 @@ service.interceptors.response.use(
   (res) => {
     const data = res.data as Response
     const code = data.code || 200
+
+    // 捕获并存储服务端下发/刷新的 X-Visitor-Token（[SEC-001] IDOR 防护）
+    const vToken = res.headers ? (res.headers['x-visitor-token'] || res.headers['X-Visitor-Token']) : null
+    if (vToken && typeof vToken === 'string') {
+      localStorage.setItem('xxl-ai-visitor-token', vToken)
+    }
 
     // 1. blob / arraybuffer 透传
     if (res.request.responseType === 'blob' || res.request.responseType === 'arraybuffer') {

@@ -23,25 +23,25 @@ export function listSession(uuid: string, visitorId: string): Promise<Response<S
 }
 
 /** 修改对话标题 */
-export function renameSession(sessionId: number, title: string): Promise<Response<string>> {
-  return request({ url: '/chat/session/rename', method: 'get', params: { sessionId, title } })
+export function renameSession(sessionId: number, visitorId: string, title: string): Promise<Response<string>> {
+  return request({ url: '/chat/session/rename', method: 'get', params: { sessionId, visitorId, title } })
 }
 
 /** 删除对话 */
-export function deleteSession(sessionId: number): Promise<Response<string>> {
-  return request({ url: '/chat/session/delete', method: 'get', params: { sessionId } })
+export function deleteSession(sessionId: number, visitorId: string): Promise<Response<string>> {
+  return request({ url: '/chat/session/delete', method: 'get', params: { sessionId, visitorId } })
 }
 
-/** 消息列表（公开访问，按对话ID） */
-export function listMsg(sessionId: number): Promise<Response<SessionMsg[]>> {
-  return request({ url: '/chat/session/msgList', method: 'get', params: { sessionId } })
+/** 消息列表（公开访问，按对话ID与访客隔离） */
+export function listMsg(sessionId: number, visitorId: string): Promise<Response<SessionMsg[]>> {
+  return request({ url: '/chat/session/msgList', method: 'get', params: { sessionId, visitorId } })
 }
 
 // ==================== 对话流式（运行时） ====================
 
-/** Load Agent 基础信息 */
-export function loadAgentInfo(uuid: string): Promise<Response<AgentChatInfo>> {
-  return request({ url: '/chat/load', method: 'get', params: { uuid } })
+/** Load Agent 基础信息（可携带 visitorId 换取/刷新 VisitorToken） */
+export function loadAgentInfo(uuid: string, visitorId?: string): Promise<Response<AgentChatInfo>> {
+  return request({ url: '/chat/load', method: 'get', params: { uuid, visitorId } })
 }
 
 /**
@@ -56,9 +56,12 @@ export async function sendStream(
   variables?: Record<string, string>,
   signal?: AbortSignal
 ): Promise<ReadableStreamDefaultReader<Uint8Array> | null> {
+  const token = localStorage.getItem('xxl-ai-visitor-token')
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers['X-Visitor-Token'] = token
   const response = await fetch(`${BASE}/chat/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ uuid, visitorId, sessionId, content, variables }),
     signal
   })
@@ -70,16 +73,21 @@ export async function sendStream(
 
 /**
  * 断线续传（SSE 流式）
- * 携带 msgId（助手消息ID）+ 已收到的 lastEventId，从断点之后继续读取结果流
+ * 携带 msgId（助手消息ID）+ visitorId + 已收到的 lastEventId，从断点之后继续读取结果流
  */
 export async function resumeStream(
   msgId: number,
+  visitorId?: string,
   lastEventId?: string,
   signal?: AbortSignal
 ): Promise<ReadableStreamDefaultReader<Uint8Array> | null> {
   const params = new URLSearchParams({ msgId: String(msgId) })
+  if (visitorId) params.set('visitorId', visitorId)
   if (lastEventId) params.set('lastEventId', lastEventId)
-  const response = await fetch(`${BASE}/chat/resume?${params.toString()}`, { method: 'POST', signal })
+  const token = localStorage.getItem('xxl-ai-visitor-token')
+  const headers: Record<string, string> = {}
+  if (token) headers['X-Visitor-Token'] = token
+  const response = await fetch(`${BASE}/chat/resume?${params.toString()}`, { method: 'POST', headers, signal })
   if (!response.ok || !response.body) {
     throw new Error(`请求失败，HTTP ${response.status}`)
   }
@@ -89,8 +97,8 @@ export async function resumeStream(
 /**
  * 主动终止会话（停止生成）：中断后端进行中的生成并清理工具调用进程
  */
-export function stopStream(sessionId: number): Promise<Response<string>> {
-  return request({ url: '/chat/stop', method: 'post', params: { sessionId } })
+export function stopStream(sessionId: number, visitorId?: string): Promise<Response<string>> {
+  return request({ url: '/chat/stop', method: 'post', params: { sessionId, visitorId } })
 }
 
 /** 在线预览对话交付物内容（C端公开） */

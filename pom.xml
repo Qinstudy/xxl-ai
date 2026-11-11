@@ -26,6 +26,7 @@
 		<maven.test.skip>true</maven.test.skip>
 		<!-- plugin -->
 		<maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
+		<maven-surefire-plugin.version>3.2.5</maven-surefire-plugin.version>
 		<maven-source-plugin.version>3.4.0</maven-source-plugin.version>
 		<maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
 		<maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
@@ -186,6 +187,12 @@
 							<target>${maven.compiler.target}</target>
 							<parameters>true</parameters>
 						</configuration>
+					</plugin>
+					<!-- Test -->
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<version>${maven-surefire-plugin.version}</version>
 					</plugin>
 				</plugins>
 			</build>

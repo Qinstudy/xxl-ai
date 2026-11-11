@@ -5,10 +5,13 @@ import com.xxl.ai.api.business.chat.model.dto.ChatSendDTO;
 import com.xxl.ai.api.business.chat.service.ChatService;
 import com.xxl.ai.api.business.session.model.dto.ArtifactDownloadDTO;
 import com.xxl.ai.api.business.session.model.dto.ArtifactPreviewDTO;
+import com.xxl.ai.api.framework.util.VisitorSecurityTool;
 import com.xxl.sso.core.annotation.XxlSso;
+import com.xxl.tool.core.StringTool;
 import com.xxl.tool.json.GsonTool;
 import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,6 +28,7 @@ import java.nio.file.Files;
  *
  * 承载 agent loop 的入口（SSE 流式对话 / 断线续传 / 交付物预览与下载）；会话与消息元数据（创建/列表/改名/删除、消息列表）
  * 由 session 模块的 SessionController / ChatSessionController 承载。
+ * [SEC-001]：全量入口强校验访客身份与 VisitorToken 签名，根绝 IDOR 水平越权。
  *
  * @author xxl-ai 2026-09-05
  */
@@ -34,44 +38,72 @@ public class ChatController {
 
     @Resource
     private ChatService chatService;
+    @Resource
+    private VisitorSecurityTool visitorSecurityTool;
 
     /**
-     * Load Agent 基础信息（公开）
+     * Load Agent 基础信息（公开，可选携带 visitorId 自动初始化/刷新签名令牌）
      */
     @RequestMapping("/load")
     @XxlSso(login = false)
-    public Response<Agent> load(@RequestParam("uuid") String uuid) {
+    public Response<Agent> load(HttpServletRequest request,
+                                HttpServletResponse response,
+                                @RequestParam("uuid") String uuid,
+                                @RequestParam(value = "visitorId", required = false) String visitorId) {
+        if (StringTool.isNotBlank(visitorId)) {
+            visitorSecurityTool.validateAndRefreshToken(request, response, visitorId);
+        }
         return chatService.load(uuid);
     }
 
     /**
-     * 对话（公开，SSE 流式返回）
+     * 对话（公开，SSE 流式返回，强校验访客令牌与会话归属）
      */
     @RequestMapping("/send")
     @XxlSso(login = false)
-    public SseEmitter send(@RequestBody ChatSendDTO dto) {
+    public SseEmitter send(HttpServletRequest request, @RequestBody ChatSendDTO dto) {
+        Response<String> check = visitorSecurityTool.validateVisitor(request, dto.getVisitorId());
+        if (!check.isSuccess()) {
+            throw new IllegalArgumentException(check.getMsg());
+        }
         return chatService.send(dto.getUuid(), dto.getVisitorId(), dto.getSessionId(), dto.getContent(), dto.getVariables());
     }
 
     /**
-     * 对话断线续传（公开，SSE 流式返回）
+     * 对话断线续传（公开，SSE 流式返回，校验访客归属）
      *
      * 从结果流的 lastEventId 之后继续转发，不重新生成；msgId 为助手消息ID（即结果流标识）
      */
     @RequestMapping("/resume")
     @XxlSso(login = false)
-    public SseEmitter resume(@RequestParam("msgId") long msgId,
+    public SseEmitter resume(HttpServletRequest request,
+                             @RequestParam("msgId") long msgId,
+                             @RequestParam(value = "visitorId", required = false) String visitorId,
                              @RequestParam(value = "lastEventId", required = false) String lastEventId) {
-        return chatService.resume(msgId, lastEventId);
+        if (StringTool.isNotBlank(visitorId)) {
+            Response<String> check = visitorSecurityTool.validateVisitor(request, visitorId);
+            if (!check.isSuccess()) {
+                throw new IllegalArgumentException(check.getMsg());
+            }
+        }
+        return chatService.resume(msgId, visitorId, lastEventId);
     }
 
     /**
-     * 主动终止会话（公开）：中断进行中的生成，并清理工具调用进程
+     * 主动终止会话（公开，校验访客与会话归属）：中断进行中的生成，并清理工具调用进程
      */
     @RequestMapping("/stop")
     @XxlSso(login = false)
-    public Response<String> stop(@RequestParam("sessionId") long sessionId) {
-        return chatService.stop(sessionId);
+    public Response<String> stop(HttpServletRequest request,
+                                 @RequestParam("sessionId") long sessionId,
+                                 @RequestParam(value = "visitorId", required = false) String visitorId) {
+        if (StringTool.isNotBlank(visitorId)) {
+            Response<String> check = visitorSecurityTool.validateVisitor(request, visitorId);
+            if (!check.isSuccess()) {
+                return check;
+            }
+        }
+        return chatService.stop(sessionId, visitorId);
     }
 
     /**
@@ -79,11 +111,16 @@ public class ChatController {
      */
     @RequestMapping("/artifact/preview")
     @XxlSso(login = false)
-    public Response<ArtifactPreviewDTO> previewArtifact(@RequestParam("uuid") String uuid,
+    public Response<ArtifactPreviewDTO> previewArtifact(HttpServletRequest request,
+                                                        @RequestParam("uuid") String uuid,
                                                         @RequestParam("visitorId") String visitorId,
                                                         @RequestParam("sessionId") long sessionId,
                                                         @RequestParam("msgId") long msgId,
                                                         @RequestParam("artifactId") String artifactId) {
+        Response<String> check = visitorSecurityTool.validateVisitor(request, visitorId);
+        if (!check.isSuccess()) {
+            return Response.ofFail(check.getMsg());
+        }
         return chatService.previewArtifact(uuid, visitorId, sessionId, msgId, artifactId);
     }
 
@@ -92,12 +129,20 @@ public class ChatController {
      */
     @RequestMapping("/artifact/download")
     @XxlSso(login = false)
-    public void downloadArtifact(HttpServletResponse response,
+    public void downloadArtifact(HttpServletRequest request,
+                                 HttpServletResponse response,
                                  @RequestParam("uuid") String uuid,
                                  @RequestParam("visitorId") String visitorId,
                                  @RequestParam("sessionId") long sessionId,
                                  @RequestParam("msgId") long msgId,
                                  @RequestParam("artifactId") String artifactId) throws Exception {
+        Response<String> check = visitorSecurityTool.validateVisitor(request, visitorId);
+        if (!check.isSuccess()) {
+            response.setStatus(HttpServletResponse.SC_OK);
+            response.setContentType("application/json;charset=UTF-8");
+            response.getWriter().write(GsonTool.toJson(Response.ofFail(check.getMsg())));
+            return;
+        }
         Response<ArtifactDownloadDTO> fileResp = chatService.downloadArtifact(uuid, visitorId, sessionId, msgId, artifactId);
         if (!fileResp.isSuccess() || fileResp.getData() == null) {
             response.setStatus(HttpServletResponse.SC_OK);

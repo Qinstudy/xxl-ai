@@ -17,15 +17,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class ChatContextWindowToolTest {
 
-    private ChatContextWindowTool windowTool;
+    private ChatContextWindowTool windowTool = new ChatContextWindowTool();
 
     @BeforeEach
-    void setUp() {
+    public void setUp() {
         windowTool = new ChatContextWindowTool();
     }
 
     @Test
-    void estimateTokensReturnsAccurateCount() {
+    public void testEstimateTokensReturnsAccurateCount() {
         assertEquals(0, windowTool.estimateTokens(null));
         assertEquals(0, windowTool.estimateTokens(""));
 
@@ -37,7 +37,7 @@ public class ChatContextWindowToolTest {
     }
 
     @Test
-    void pruneHistoryWithinBudgetKeepsAllMessages() {
+    public void testPruneHistoryWithinBudgetKeepsAllMessages() {
         windowTool.setMaxTokens(1000);
 
         List<String> roleList = new ArrayList<>(List.of(
@@ -61,7 +61,7 @@ public class ChatContextWindowToolTest {
     }
 
     @Test
-    void pruneHistoryExceedingBudgetPrunesOldestMessages() {
+    public void testPruneHistoryExceedingBudgetPrunesOldestMessages() {
         // 设置极小预算，只够容纳系统指令、当前提问以及最近一轮对话
         windowTool.setMaxTokens(60);
 
@@ -89,7 +89,7 @@ public class ChatContextWindowToolTest {
     }
 
     @Test
-    void pruneHistoryEnsuresHistoryStartsWithUser() {
+    public void testPruneHistoryEnsuresHistoryStartsWithUser() {
         windowTool.setMaxTokens(40);
 
         // 构造三条历史：user1, assistant1, assistant2（异常连续）
@@ -114,7 +114,7 @@ public class ChatContextWindowToolTest {
     }
 
     @Test
-    void pruneHistoryBudgetExhaustedClearsAllHistory() {
+    public void testPruneHistoryBudgetExhaustedClearsAllHistory() {
         // 总预算极小，甚至不足以支撑系统指令与当前提问
         windowTool.setMaxTokens(10);
 

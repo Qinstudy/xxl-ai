@@ -510,15 +510,15 @@ function ensureVisitorId() {
 
 /** 初始化：加载 Agent 元信息 + 对话列表；带对话参数则定位单个对话，否则默认展示新建对话内容 */
 async function init() {
+  ensureVisitorId()
   try {
-    const res = await loadAgentInfo(uuid.value)
+    const res = await loadAgentInfo(uuid.value, visitorId.value)
     agent.value = res.data
     document.title = agent.value?.name || 'Agent'
   } catch (e) {
     agent.value = undefined
     return
   }
-  ensureVisitorId()
   await loadSessionList()
   // 定位指定对话：优先路径参数 /chat/:uuid/:session，其次查询参数 /chat/:uuid?sessionId=；合法则自动切换，否则默认进入新建对话内容
   const sessionParam = Array.isArray(route.params.session) ? route.params.session[0] : (route.params.session as string | undefined)
@@ -598,7 +598,7 @@ async function selectSession(sessionId: number) {
 
 /** 拉取会话消息，并重置前端流式展示状态 */
 async function loadMessages(sessionId: number) {
-  const res = await listMsg(sessionId)
+  const res = await listMsg(sessionId, visitorId.value)
   messages.value = res.data.map((m) => ({
     ...m,
     showThinking: false,
@@ -721,6 +721,7 @@ async function resumeGenerating(msg: SessionMsgItem) {
   try {
     await resumeMessage(
       msg.id,
+      visitorId.value,
       (chunk) => {
         const m = messages.value[idx]
         if (m) m.reasoning = (m.reasoning || '') + chunk
@@ -757,7 +758,7 @@ function saveSessionTitle(session: Session) {
   editingSessionId.value = undefined
   editingTitle.value = ''
   if (!title || title === session.title) return
-  renameSession(session.id, title)
+  renameSession(session.id, visitorId.value, title)
     .then(() => {
       session.title = title
     })
@@ -775,7 +776,7 @@ function deleteSession(session: Session) {
   modal
     .confirm(t('business.chat.deleteSessionConfirm', [session.title]))
     .then(async () => {
-      await removeSession(session.id)
+      await removeSession(session.id, visitorId.value)
       if (currentSessionId.value === session.id) {
         currentSessionId.value = undefined
         messages.value = []
@@ -902,7 +903,7 @@ async function handleStop() {
 async function requestStop(sessionId: number): Promise<boolean> {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      await stopStream(sessionId)
+      await stopStream(sessionId, visitorId.value)
       return true
     } catch (e) {
       if (attempt < 2) {

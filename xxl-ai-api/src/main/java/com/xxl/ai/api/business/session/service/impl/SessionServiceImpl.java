@@ -80,28 +80,39 @@ public class SessionServiceImpl implements SessionService {
     }
 
     /**
-     * 修改对话标题（最长50个字符）
+     * 修改对话标题（校验访客归属，最长50个字符）
      */
     @Override
-    public Response<String> rename(long sessionId, String title) {
+    public Response<String> rename(long sessionId, String visitorId, String title) {
         if (StringTool.isBlank(title)) {
             return Response.ofFail("对话标题不能为空");
         }
         if (title.trim().length() > 50) {
             return Response.ofFail("对话标题最长50个字符");
         }
-        if (sessionMapper.load(sessionId) == null) {
+        Session session = sessionMapper.load(sessionId);
+        if (session == null) {
             return Response.ofFail("对话不存在");
+        }
+        if (session.getVisitorId() != null && (StringTool.isBlank(visitorId) || !session.getVisitorId().equals(visitorId.trim()))) {
+            return Response.ofFail("无权操作该对话");
         }
         sessionMapper.updateTitle(sessionId, title.trim());
         return Response.ofSuccess();
     }
 
     /**
-     * 删除对话（连带消息与归档交付物）
+     * 删除对话（校验访客归属，连带消息与归档交付物）
      */
     @Override
-    public Response<String> delete(long sessionId) {
+    public Response<String> delete(long sessionId, String visitorId) {
+        Session session = sessionMapper.load(sessionId);
+        if (session == null) {
+            return Response.ofFail("对话不存在");
+        }
+        if (session.getVisitorId() != null && (StringTool.isBlank(visitorId) || !session.getVisitorId().equals(visitorId.trim()))) {
+            return Response.ofFail("无权操作该对话");
+        }
         sessionMsgMapper.deleteBySessionId(sessionId);
         int ret = sessionMapper.delete(sessionId);
         skillArtifactTool.deleteBySession(sessionId);
@@ -109,11 +120,34 @@ public class SessionServiceImpl implements SessionService {
     }
 
     /**
-     * 消息列表（公开访问，按对话ID）
+     * 消息列表（公开访问，校验访客归属）
      */
     @Override
-    public Response<List<SessionMsg>> msgList(long sessionId) {
+    public Response<List<SessionMsg>> msgList(long sessionId, String visitorId) {
+        Session session = sessionMapper.load(sessionId);
+        if (session == null) {
+            return Response.ofFail("对话不存在");
+        }
+        if (session.getVisitorId() != null && (StringTool.isBlank(visitorId) || !session.getVisitorId().equals(visitorId.trim()))) {
+            return Response.ofFail("无权访问该对话");
+        }
         return Response.ofSuccess(sessionMsgMapper.listBySessionId(sessionId));
+    }
+
+    /**
+     * 校验并返回归属于指定访客的会话，不满足抛 IllegalArgumentException
+     */
+    @Override
+    public Session requireVisitorSession(long sessionId, String visitorId) {
+        Session session = sessionMapper.load(sessionId);
+        if (session == null) {
+            throw new IllegalArgumentException("对话不存在或已删除");
+        }
+        if (StringTool.isBlank(visitorId) || StringTool.isBlank(session.getVisitorId())
+                || !session.getVisitorId().equals(visitorId.trim())) {
+            throw new IllegalArgumentException("无权访问该对话");
+        }
+        return session;
     }
 
     // ==================== 管理端 ====================

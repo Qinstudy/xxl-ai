@@ -33,19 +33,21 @@
 
 ```mermaid
 flowchart TD
-    subgraph Done["当前主干已落地核心能力（含 1.2.0 与近期演进）"]
-        D1["Agent 长期记忆 (Memory) + 会话体系解耦<br/>(xxl_ai_memory / xxl_ai_session / 水位线提炼)"]
-        D2["生成中断单机闭环 + 基础检索弹窗 + 180s 长超时<br/>(Stop 控制 / doc.vue 检索 / OkHttp 超时对齐 LLM-001)"]
-        D3["双级配置指纹缓存与首页看板租户隔离修复<br/>(CACHE-001 / SPACE-CORE-001 均已闭环)"]
-        D4["全链路可观测 + RAG引用 + 工具证据链 + 日志流<br/>(手术 1/2/3：FEAT-001 / FEAT-003 / FEAT-007 / FEAT-012 / TOOL-001)"]
-        D5["Agent 交付物产物沙箱 (Artifacts)<br/>(FEAT-005：.sql/.html/.csv/.md 隔离归档、在线预览与下载)"]
+    subgraph Done["当前主干已落地核心能力（持续演进落地）"]
+        D1["Agent 长期记忆 + 会话体系解耦 (xxl_ai_memory / xxl_ai_session)"]
+        D2["双级配置指纹自失效 + 看板租户隔离 (CACHE-001 / SPACE-CORE-001)"]
+        D3["全链路可观测 + 工具证据链 + 产物沙箱 (FEAT-001 / FEAT-003 / FEAT-007 / FEAT-012 / FEAT-005)"]
+        D4["RAG 深度治理：阈值拦截 + 语义分块 + 多路RRF + 测试台与QA对 (RAG-CORE-002 / RAG-CORE-001 / FEAT-004 / FEAT-011)"]
+        D5["上下文治理：Token预算滑动窗口裁剪 + 后置拼装保前缀缓存 (CTX-001 / CTX-002)"]
+        D6["推理超参数动态配置 + Prompt槽位变量 + SubAgents多智能体委派 (FEAT-006 / FEAT-010 / FEAT-013)"]
+        D7["公开端免登录水平越权防御 (HMAC VisitorToken + DB归属强校验 SEC-001)"]
     end
 
-    subgraph StillGaps["当前主干依然存在的关键短板"]
-        G1["【P0 致命】RAG 检索无相似度阈值 (硬取 Top-K 灌入垃圾，引发严重幻觉 RAG-CORE-002)"]
-        G2["【P1 高优】RAG 字符暴力分块 (RAG-CORE-001) & 上下文50条截断 (CTX-001)"]
-        G3["【P1 高优】动态 RAG 切片拼入头部 SystemMessage 击穿前缀缓存 (CTX-002)"]
-        G4["【P2/P3 演进】动态参数(FEAT-006)、Prompt变量(FEAT-010)、多路RRF(FEAT-004)<br/>SubAgents协作(FEAT-013)、Workflow DAG(FEAT-009)、评测体系(FEAT-014)"]
+    subgraph StillGaps["当前依然待办的缺陷与功能缺口"]
+        G1["【P2 安全防护】Skill宿主机命令白名单门禁与沙箱隔离 (SEC-002)"]
+        G2["【P2 运行时容灾】Stream任务超限熔断 (DATA-001) & PEL防重锁 (RUN-001) & 【P4】集群停止广播 (RUN-002)"]
+        G3["【P2/P3 工具治理】多工具中间迷失治理 (TOOL-002) & 动态工具检索与路由 (FEAT-008)"]
+        G4["【P3 体系演进】Workflow可视化编排 (FEAT-009) & RAG质量量化评测 (FEAT-014) & 知识图谱 (FEAT-015)"]
     end
 
     Done -.-> StillGaps
@@ -76,8 +78,9 @@ flowchart TD
 ### 3.1 评级准则
 - **P0（致命/核心止血与精度命脉）**：破坏系统核心可用性、导致后台配置热改失效、RAG 检索无阈值灌入垃圾切片导致模型严重幻觉、跨租户敏感数据穿透。
 - **P1（高优/核心算法质量与上下文治理）**：RAG 字符分块暴力腰斩代码/单词、固定条数截断打爆上下文 Token 限制、动态 RAG 切片拼入头部 `SystemMessage` 击穿多轮前缀缓存（Prefix KV Cache）。
-- **P2（中优/公网防御、并发容灾与长任务稳定性）**：公开端免登录水平越权遍历 (IDOR)、Skill 宿主机裸奔公网 RCE、任务流超限丢弃、PEL 接管无幂等、OkHttp 60s 隐式超时、流式中断 Token 统计漏记、超长 ToolCall 超时、RAG 静默黑盒、61 工具中间迷失、自动化测试不足、多实例集群停止失效。
+- **P2（中优/公网防御、并发容灾与长任务稳定性）**：公开端免登录水平越权遍历 (IDOR)、Skill 宿主机裸奔公网 RCE、任务流超限丢弃、PEL 接管无幂等、OkHttp 60s 隐式超时、流式中断 Token 统计漏记、超长 ToolCall 超时、RAG 静默黑盒、61 工具中间迷失、自动化测试不足。
 - **P3（低优/规范与协议边缘判定）**：MCP `/sse` 字符串误判等边缘代码异味。
+- **P4（远期/极端多实例集群低频运维）**：多实例集群部署下 `/stop` 跨节点终止失效（单机已闭环，集群广播依赖分布式 Pub/Sub，归入远期增强）。
 
 ---
 
@@ -86,16 +89,16 @@ flowchart TD
 | 级别 | 缺陷编号 | 缺陷分类 | 缺陷名称与源码证据位置 | 影响与危害表现 | 修复状态 / 改造建议 |
 |---|---|---|---|---|---|
 | **P0** | **[CACHE-001]** | 元数据一致性 | **供应商与模型缓存未驱逐（双级连环死锁）**<br>`LlmModelFactory.java#L79-85,L145-174`<br>`RagTool.java#L143-149,L474-482` | 早期改 Key/URL 后对话与向量化继续复用旧实例报错 401，非重启不可恢复。 | **【已完成】** 已采用双级指纹自失效（配置哈希 + `identityHashCode`）+ `evictSupplier/evictModel/evict` 显式驱逐闭环。 |
-| **P0** | **[RAG-CORE-002]** | 算法精度 | **检索无相似度阈值（硬取 Top-K 垃圾注入）**<br>`RagTool.java#L209-212`<br>`KnowledgeBase.java` | `SearchRequest` 未配置 `similarityThreshold`。用户问无关闲聊也会强行将低相关切片喂给大模型，**诱发严重幻觉**。 | 知识库表增加 `similarity_threshold`（默认 0.40），低于阈值的无关切片在底层过滤拦截。 |
+| **P0** | **[RAG-CORE-002]** | 算法精度 | **检索无相似度阈值（硬取 Top-K 垃圾注入）**<br>`RagTool.java#L209-212`<br>`KnowledgeBase.java` | `SearchRequest` 未配置 `similarityThreshold`。用户问无关闲聊也会强行将低相关切片喂给大模型，**诱发严重幻觉**。 | **【已完成】** 知识库配置增加 `similarity_threshold`（默认 0.40），底座向量检索与多路融合后置均已实现阈值过滤拦截。 |
 | **P0** | **[SPACE-CORE-001]** | 租户安全 | **首页看板统计跨租户全量泄露**<br>`DashboardController.java#L48-98`<br>`SessionMsgMapper.xml#L143-164` | 早期图表与统计 SQL 缺少 `space_id` 过滤，可透视全平台消息量与他租户 Agent 名称。 | **【已完成】** `/stats`、`/sessionMsgTrend`、`/sessionMsgShare` 均已校验 `spaceService.checkSpace` 并隔离至 `countBySpaceId`、`trendListBySpace`、`agentShareBySpace`。 |
-| **P1** | **[RAG-CORE-001]** | 算法精度 | **字符暴力截断导致的破词与断句**<br>`RagTool.java#L530-548` | `split()` 纯按字符长度 `substring` 截断，长单词与代码行被腰斩，破坏语义原子性导致召回率骤降。 | 引入段落（`\n\n`）、句子（标点符号）、空格逐级递进的递归语义分块器。 |
-| **P1** | **[CTX-001]** | 上下文治理 | **历史上下文按固定条数截断易爆 Token**<br>`ChatStreamTool.java#L151,L795` | 历史消息固定取最近 `historyLimit` 条（默认 50 条）。遇到长代码或长文档总结易打穿模型 Context Window 触发 HTTP 400。 | 引入 Token 估算器（如 JTokkit），按上下文预算动态滑动窗口装配提示词、记忆、RAG 与历史。 |
-| **P1** | **[CTX-002]** | 上下文治理 | **动态 RAG 切片拼入 `SystemMessage` 击穿多轮前缀缓存**<br>`RagTool.java#L358-381`<br>`ChatStreamTool.java#L838` | `RagTool#injectContextPrompt` 仍将每轮动态检索到的切片直接拼入头部 `SystemMessage`，导致多轮追问时历史消息的 Prefix KV Cache 全量失效，推高 TTFT 与输入成本。 | 遵循“静态前置、动态后置”原则：将动态检索上下文改拼在队尾**当前 `UserMessage`** 上（不修改 `SystemMessage`，且不污染落库的用户原话）。 |
-| **P2** | **[SEC-001]** | 安全越权 | **公开端免登录接口越权遍历 (IDOR)**<br>`ChatController.java` | 接口免登录，仅凭客户端入参遍历或伪造 `visitorId`/`sessionId`，存在越权读取或删除其他访客会话风险。 | 签发基于 HMAC 签名的 `visitorToken`（Cookie/Header 传递），强制校验访客与会话归属。 |
+| **P1** | **[RAG-CORE-001]** | 算法精度 | **字符暴力截断导致的破词与断句**<br>`RagTool.java#L530-548` | `split()` 纯按字符长度 `substring` 截断，长单词与代码行被腰斩，破坏语义原子性导致召回率骤降。 | **【已完成】** 引入 `RagTextSplitter` 递归语义分块器（段落 -> 句子 -> 空格逐级切分），并保护 QA 问答对原子切分。 |
+| **P1** | **[CTX-001]** | 上下文治理 | **历史上下文按固定条数截断易爆 Token**<br>`ChatStreamTool.java#L151,L795` | 历史消息固定取最近 `historyLimit` 条（默认 50 条）。遇到长代码或长文档总结易打穿模型 Context Window 触发 HTTP 400。 | **【已完成】** 引入 `ChatContextWindowTool`（基于 JTokkit `cl100k_base` 编码），按 Token 预算倒序滑动窗口裁剪，确保 user 起始轮次完整。 |
+| **P1** | **[CTX-002]** | 上下文治理 | **动态 RAG 切片拼入 `SystemMessage` 击穿多轮前缀缓存**<br>`RagTool.java#L358-381`<br>`ChatStreamTool.java#L838` | `RagTool#injectContextPrompt` 仍将每轮动态检索到的切片直接拼入头部 `SystemMessage`，导致多轮追问时历史消息的 Prefix KV Cache 全量失效，推高 TTFT 与输入成本。 | **【已完成】** 遵循“静态前置、动态后置”原则：采用 `RagTool#buildContextualQuestion` 将动态检索上下文拼在队尾**当前 `UserMessage`** 上（保住前缀缓存，且不污染数据库用户原话）。 |
+| **P2** | **[SEC-001]** | 安全越权 | **公开端免登录接口越权遍历 (IDOR)**<br>`ChatController.java`<br>`ChatSessionController.java`<br>`VisitorSecurityTool.java` | 接口免登录，仅凭客户端入参遍历或伪造 `visitorId`/`sessionId`，存在越权读取或删除其他访客会话风险。 | **【已完成】** 签发基于 HMAC-SHA256 签名的 `X-Visitor-Token`，前后端双向刷新流转；Session/Chat 接口对会话归属做 DB 强校验与阻断。 |
 | **P2** | **[SEC-002]** | 安全隔离 | **Skill 执行器宿主机裸奔导致公网 RCE**<br>`SkillToolFactory.java#L123-136` | 仅限定 `workingDirectory`/`allowedDirectory`，`ShellTools` 在宿主机原生进程执行命令，无容器隔离与命令白名单。 | 增加 `xxl-ai.skill.exec.enabled` 默认阻断门禁；对命令实施白名单或容器沙箱隔离。 |
 | **P2** | **[DATA-001]** | 运行时容灾 | **任务流堆积超限导致静默丢弃任务**<br>`ChatStreamTool.java#L105,L366` | 积压超过 5000 条时 Redis `approximateTrimming` 会静默丢弃旧任务，用户端可能无异常反馈。 | 入队前执行 `XLEN` 预检，超限时主动熔断并返回友好错误。 |
 | **P2** | **[RUN-001]** | 资产损耗 | **PEL 故障接管无幂等导致重复计费**<br>`ChatStreamTool.java#L400-451` | Worker 故障认领未确认任务后直接重新执行，若前节点已部分调用模型，可能引发二次计费。 | 基于 `SETNX xxl:ai:run:lock:{msgId}` 建立分布式防重执行锁。 |
-| **P2** | **[RUN-002]** | 运行时容灾 | **多实例集群部署下 `/stop` 跨节点终止失效**<br>`ChatStreamTool.java#L158,L333` | `runContexts` 保存在单机 JVM 内存中，集群节点 `/stop` 路由到非执行节点时无法中断流。 | 引入 Redis Pub/Sub 广播终止事件，或基于 Redis 取消标记位驱动 Worker 退出。 |
+| **P4** | **[RUN-002]** | 运行时容灾 | **多实例集群部署下 `/stop` 跨节点终止失效**<br>`ChatStreamTool.java#L158,L333` | `runContexts` 保存在单机 JVM 内存中，集群节点 `/stop` 路由到非执行节点时无法中断流。 | 引入 Redis Pub/Sub 广播终止事件，或基于 Redis 取消标记位驱动 Worker 退出。（已降级至 P4 远期支持） |
 | **P2** | **[LLM-001]** | 运行时故障 | **模型底层调用受限于 OkHttp 60s 隐式超时**<br>`LlmModelFactory.java#L48-50,L94` | 推理模型长思考或长文输出超过 60s 被默认 Socket 超时强制掐断。 | **【已完成-261107】** 工厂构建 `OpenAiChatOptions` 时显式设置 `.timeout(Duration.ofMillis(streamTimeout))` 对齐 180s。 |
 | **P2** | **[LLM-002]** | 可观测盲区 | **流式中断/异常终止时 Token 账单漏记（归零缺失）**<br>`LlmChatTool.java#L184-203`<br>`ChatStreamTool.java#L540-570` | 流式协议仅在尾帧下发 `usage`。当流中途异常断流（`FAILED`）或主动停止（`CANCELLED`）时未收到尾帧，导致 `tokenUsage` 落库为 `0`。 | **【已完成-261110】** 尾帧精确值优先 + 中断/异常或未收到尾帧时采用 JTokkit 本地分词器按已输入与已生成文本估算兜底并打标 `estimated: true`。 |
 | **P2** | **[TOOL-001]** | 运行时故障 | **超长 ToolCall 输出导致 SSE 转发通道超时**<br>`ObservableToolCallback.java`<br>`ChatStreamTool.java#L824,L914` | 超大工具调用期间无事件写入，易使流式通道静默超时断开。 | **【已完成-261103】** 通过 `ObservableToolCallback` 装饰器实时下发 `RUNNING/SUCCESS/ERROR` `tool` 帧保活结果流并截断保护（模型侧 16000 字符、Trace 侧 1000 字符）。 |
@@ -115,12 +118,12 @@ flowchart TD
 | **-** | **[FEAT-002]** | Agent 引擎 | **大模型生成的主动终止 (Stop)** | 对齐主流体验 | 前端 Stop 按钮 ➔ 后端 `/chat/stop` ➔ 标记 `cancelled` ➔ 线程 `interrupt()` ➔ 强杀 Skill 子进程 ➔ 回填终止正文。 | **已完成（单机闭环）**<br>*(仅保留集群缺陷 RUN-002)* |
 | **P1** | **[FEAT-001]** | 全链路可观测 | **内聚式 Run 运行实例与 Trace 机制** | 借鉴 `LightBot` 核心理念 | **无需新建 `chat_run` 表**！直接复用 `xxl_ai_session_msg` 助手占位行作为 Run 实体，扩充 `ext_json` 字段沉淀 `runMeta` / `tokenUsage` / `spans` / `references` / `toolTraces` / `logs`。 | **已完成。高（B 级轻量化方案）** |
 | **P2** | **[FEAT-003]** | RAG 知识库 | **RAG 引用来源卡片与元数据可视化** | 借鉴 `LightBot` 的 `QueryKnowledgeResult` | 1. `RagTool#retrieveForChat` 显式检索捕获切片，前置推送 `event: reference`；<br>2. `ext_json` 存储切片快照；<br>3. 前端在气泡上方展示折叠引用卡片与相似度得分。 | **已完成。高（B 级）** |
-| **P2** | **[FEAT-004]** | RAG 知识库 | **向量+BM25多路召回与 RRF 融合** | 借鉴 `AiAgentDemo` 算法漏斗 | **零新增中间件**：基于 MySQL 8 原生全文索引（或轻量内存 BM25）+ Milvus 向量双路召回，通过 RRF（倒数排名融合）加权合并，解决专有名词搜不到问题。 | **未开始。高（B 级克制方案）** |
+| **P2** | **[FEAT-004]** | RAG 知识库 | **向量+BM25多路召回与 RRF 融合** | 借鉴 `AiAgentDemo` 算法漏斗 | **零新增中间件**：基于轻量内存 BM25 倒排索引 + Milvus 向量双路召回，通过加权 RRF（倒数排名融合，QA 享受 1.15x 加成）合并，解决专有名词搜不到问题。 | **已完成 (2026-11-10)。高（B 级克制方案）** |
 | **P2** | **[FEAT-005]** | AI 扩展体系 | **Agent 交付物产物沙箱 (Artifacts)** | 增强 Agent 生产力形态 | 1. Run 前对启用 Skill 的 `agent_{agentId}` 工作目录采集文件基线（含大小/mtime/CRC32）；Run 收尾通过 `SkillArtifactTool` 差异提取 `.sql`/`.html`/`.csv`/`.md` 复制归档至隔离产物区（`session_{sessionId}/run_{msgId}`，支持同目录重名去重与防穿越校验；显式排除 `SKILL.md` 元定义文件）；<br>2. 经 SSE `event: artifact` 与 `ext_json.artifacts` 同步前后端；<br>3. C 端对话页与 B 端对话管理均支持高亮卡片、HTML 沙箱隔离预览 / CSV 结构化表格 / MD 净化渲染 / SQL 源码查看及一键下载，并随会话/Agent 删除级联清理。 | **已完成 (2026-11-08，支持扩展至 .md)。中高（B 级）** |
 | **P2** | **[FEAT-006]** | Agent 引擎 | **大模型推理超参数动态配置 (Options)** | 精准控制生成稳定性 | 在 Agent 编辑页开放 `Temperature`、`Top_P`、`Max_Tokens`，在 `LlmModelFactory` / `ChatStreamTool` 动态注入对应的 `OpenAiChatOptions`。 | **已完成 (2026-11-10)。极高（B 级）** |
 | **P2** | **[FEAT-007]** | 全链路可观测 | **工具调用证据链与 Trace 回放** | 解决模型决策路径黑盒问题 | 基于 `ObservableToolCallback` 装饰器记录 Tool 类型、名字、入参摘要、结果摘要与耗时，前端以状态胶囊与抽屉时间线展开回放。 | **已完成。极高（B 级）** |
 | **P2** | **[FEAT-010]** | Agent 引擎 | **Prompt 动态变量注入与表单槽位** | 增强 Prompt 动态适应能力 | 支持在系统提示词中定义 `{{input}}`、`{{user_role:default}}` 槽位，C 端会话进入与开始前渲染槽位表单，支持 session 级持久化与 Trace 注入快照。 | **已完成 (2026-11-10)。极高（B 级）** |
-| **P2** | **[FEAT-011]** | RAG 知识库 | **检索测试台增强 (Playground) 与问答对 (FAQ)** | 对标 LightBot 检索测试 | 1. **现有弹窗增强**：在 `doc.vue` 检索弹窗中关联回显文档名称 `docName`，开放临时阈值调节；<br>2. **QA 问答对管理**：支持手动录入精细化问答对，走高置信度精确直出。 | **未开始增强。高（B 级）** |
+| **P2** | **[FEAT-011]** | RAG 知识库 | **检索测试台增强 (Playground) 与问答对 (FAQ)** | 对标 LightBot 检索测试 | 1. **测试台多维透视**：在 `doc.vue` 检索测试台中回显文档名 `docName`，支持 HYBRID / VECTOR / BM25 检索模式切换与临时阈值调优；<br>2. **QA 问答对管理**：支持手动录入精细化问答对，自动原子分块，享 1.15x 融合权重。 | **已完成 (2026-11-10)。高（B 级）** |
 | **P2** | **[FEAT-012]** | 全链路可观测 | **全链路 LLM Trace 监控与实时日志流** | 对标 Langfuse / LightBot Trace | 基于 `TraceCollector` 捕获 `runMeta`（状态机/TTFT/总耗时/Worker 节点）、多轮累加 `tokenUsage`、阶段 `spans` 时延瀑布图、`toolTraces`（入出参 1000 字符摘要）、`references` 与 `logs` 实时日志流；前端提供 `TraceInspectorDrawer` 抽屉式回放（注：当前记录结构化指标与入出参摘要，暂未存储模型原始 HTTP Request/Response 全报文）。 | **已完成。中高（B 级）** |
 | **P3** | **[FEAT-008]** | AI 扩展体系 | **动态工具路由与检索 (Tool Retrieval)** | 解决 `[TOOL-002]` 61 工具踩踏 | 根据用户提问，先检索出最相关的 3~5 个工具 Schema 喂给模型，避免塞爆 Prompt 并降低幻觉。 | **未开始。中（C 级）** |
 | **P3** | **[FEAT-009]** | Workflow 编排 | **Workflow 可视化工作流编排 (DAG 画布)** | 借鉴 `LightBot` 18 节点工作流 | **分阶段演进**：<br>- 阶段一：6 类核心基础节点（开始、LLM、知识检索、工具调用、条件分支、结束）轻量 DAG 执行引擎；<br>- 阶段二：支持分类器、代码执行、嵌套子工作流、人工确认等 18 种节点类型与 Vue Flow 拖拽式画布。 | **未开始。中（C 级重型方案）** |
@@ -135,12 +138,12 @@ flowchart TD
 ```text
 【阶段一：核心止血与精度筑基】（P0 致命级攻坚）
   1. [已完成] 修复 [CACHE-001]：LlmModelFactory 引入配置哈希指纹，RagTool 引入模型引用指纹，写后显式驱逐彻底根治双级死锁；
-  2. [待实施] 修复 [RAG-CORE-002]：在知识库配置中引入 similarity_threshold（默认 0.40），彻底拦截低于阈值的弱相关与垃圾切片，杜绝模型闲聊幻觉；
+  2. [已完成] 修复 [RAG-CORE-002]：在知识库配置中引入 similarity_threshold（默认 0.40），并在底座向量与多路检索底层过滤拦截，杜绝模型闲聊幻觉；
   3. [已完成] 修复 [SPACE-CORE-001]：DashboardController 与对应 Mapper 强制追加 space_id 隔离，堵死租户全量看板数据泄露。
 
 【阶段二：算法深化、交互跃迁与可观测】（P1 缺陷 + P2 核心功能）
-  1. [待实施] 修复 [RAG-CORE-001]：将 RagTool 的字符暴力截断重构为递归语义分块（段落 -> 句子 -> 空格）；
-  2. [待实施] 治理 [CTX-001] & [CTX-002]：引入 Token 估算器与滑动窗口动态分配预算；并将 RagTool#injectContextPrompt 改为后置拼装在队尾当前 UserMessage 上（不动头部 SystemMessage），保住 SystemMessage + 全部历史对话 100% 命中前缀缓存；
+  1. [已完成] 修复 [RAG-CORE-001]：将 RagTool 的字符暴力截断重构为递归语义分块（RagTextSplitter 按段落 -> 句子 -> 空格逐级切分，防断词断句）；
+  2. [已完成] 治理 [CTX-001] & [CTX-002]：引入 ChatContextWindowTool（JTokkit cl100k_base 编码）按上下文预算动态滑动窗口装配提示词与历史；并将 RagTool#buildContextualQuestion 改为后置拼装在队尾当前 UserMessage 上（不动头部 SystemMessage），保住 SystemMessage + 全部历史对话 100% 命中前缀缓存；
   3. [已完成-261103] 架构落地【手术 1 & 2】：重构 RAG 为显式前置检索管线，上线 [FEAT-003] 引用来源卡片与 [FEAT-001]/[FEAT-012] 内聚式 Run/Trace 消息模型；
   4. [已完成-261103] 架构落地【手术 3】：引入 ObservableToolCallback 装饰器，上线 [FEAT-007] 工具证据链 Trace，并根治 [TOOL-001] 长任务超时；
   5. [已完成-261108] 落地 [FEAT-005]：上线 Agent 交付物产物沙箱（.sql/.html/.csv/.md 基线差异归档、HTML/CSV/MD/SQL 实时预览、一键下载与会话级清理）；
@@ -153,7 +156,7 @@ flowchart TD
   1. [已完成-261110] 架构落地【手术 4】：以 Agent-as-a-Tool 模式上线 [FEAT-013] SubAgents 多智能体委派体系（单层委派、同空间隔离、Trace/Token 并入主会话、多选关联）；
   2. 落地 [FEAT-009]：打造轻量 Workflow DAG 执行引擎；
   3. 落地 [FEAT-014]：构建 AI 应用与 RAG 质量量化评测体系；
-  4. 加固 P2 级容灾并发与可观测兜底（[DATA-001] 队列超限熔断、[RUN-001] 防重锁、[RUN-002] 集群停止广播、[LLM-001] 长超时(已完成)、[LLM-002] 流式中断 Token 本地估算兜底(已完成)）及公网安全（[SEC-001] IDOR 鉴权、[SEC-002] Skill 沙箱）。
+  4. 加固 P2 级容灾并发与公网安全（[已完成-SEC-001] IDOR 鉴权、[SEC-002] Skill 沙箱门禁、[DATA-001] 队列超限熔断、[RUN-001] 防重锁；[RUN-002] 集群停止广播降至 P4 远期支持）。
 ```
 
 ---
@@ -184,11 +187,12 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    subgraph S1["手术 1：RAG 显式前置检索管线（彻底废除 QuestionAnswerAdvisor）"]
-        A1["ChatStreamTool 消费任务"] --> A2["RagTool.retrieveForChat(...) 显式检索"]
+    subgraph S1["手术 1：RAG 显式前置检索管线与前缀缓存保护【已完成】"]
+        A1["ChatStreamTool 消费任务"] --> A2["RagTool.retrieveForChat(...) 显式检索 + 阈值拦截(RAG-CORE-002)"]
         A2 -->|命中切片| A3["appendResult(msgId, 'reference', json) 实时推前端卡片"]
-        A2 -->|格式化切片| A4["当前仍拼 systemPrompt (待按 CTX-002 迁至 UserMessage)"]
-        A4 --> A5["LlmChatTool.chat(...) 发起流式推理"]
+        A2 -->|格式化切片| A4["RagTool.buildContextualQuestion(CTX-002) 拼入当前 UserMessage 尾部"]
+        A4 --> A5["ChatContextWindowTool 滑动窗口 Token 预算裁剪(CTX-001)"]
+        A5 --> A6["LlmChatTool.chat(...) 发起流式推理 (保 SystemPrompt + 历史前缀缓存)"]
     end
 
     subgraph S2["手术 2：内聚式 Run 实体与多模态 SSE 协议升级【已完成】"]
@@ -203,7 +207,7 @@ flowchart TD
         C3["工具执行后：记录耗时、入参与结果摘要，写入当前对话的 ToolTrace 集合"]
     end
 
-    subgraph S4["手术 4：Agent-as-a-Tool 模式实现 SubAgents 协作【待实施】"]
+    subgraph S4["手术 4：Agent-as-a-Tool 模式实现 SubAgents 协作【已完成-FEAT-013】"]
         D1["xxl_ai_agent 表新增 sub_agent_ids (风格与 mcp_ids/skill_ids 一致)"]
         D2["在 buildTools 中将子 Agent 包装为 FunctionToolCallback"]
         D3["主 Agent 通过标准 Function Call 委派子 Agent，零执行引擎改造"]
@@ -212,22 +216,23 @@ flowchart TD
 
 #### 详细施工设计：
 
-* **手术 1（RAG 显式前置检索管线与前缀缓存演进）**：
-  - 在 [`RagTool.java`](file:///E:/code/spring-ai-project/juejin-gitee/xxl-ai-workbuddy/xxl-ai-api/src/main/java/com/xxl/ai/api/business/harness/rag/RagTool.java) 中已实现 `retrieveForChat(...)`，后续需补充带 `similarity_threshold`（`[RAG-CORE-002]`）的过滤拦截；
-  - 在 [`ChatStreamTool.java#L834`](file:///E:/code/spring-ai-project/juejin-gitee/xxl-ai-workbuddy/xxl-ai-api/src/main/java/com/xxl/ai/api/business/harness/chat/ChatStreamTool.java#L834) 已前置调用 `retrieveForChat`：
+* **手术 1（RAG 显式前置检索管线与前缀缓存演进）**：【已完成-261103，并在 261110 增强多路 RRF 与测试台】
+  - 在 [`RagTool.java`](file:///home/antigravity/Qinstudy/xxl-ai/xxl-ai-api/src/main/java/com/xxl/ai/api/business/harness/rag/RagTool.java) 中已实现 `retrieveForChat(...)`，并全面落实 `similarity_threshold`（`[RAG-CORE-002]`，已完成）过滤拦截；
+  - 在 [`ChatStreamTool.java#L904`](file:///home/antigravity/Qinstudy/xxl-ai/xxl-ai-api/src/main/java/com/xxl/ai/api/business/harness/chat/ChatStreamTool.java#L904) 已前置调用 `retrieveForChat`：
     1. 命中切片非空时，立即 `appendResult(msgId, EVENT_REFERENCE, ...)`，前端即时展示引用卡片（**已完成**）；
-    2. **前缀缓存保护演进（对应 `[CTX-002]`，待实施）**：当前版本 `RagTool#injectContextPrompt` 将命中切片拼入了头部 `systemPrompt`，会导致跨轮追问时排在后面的历史消息 Prefix KV Cache 失效；演进方案需改为把上下文拼在队尾的**当前 `UserMessage`** 上（不动头部的 `SystemMessage`，且不污染落库的用户原话），让前面的 `SystemMessage + 全部历史对话` 100% 命中前缀缓存。
+    2. **前缀缓存保护演进（对应 `[CTX-002]`，已完成）**：采用 `RagTool#buildContextualQuestion` 将动态检索上下文拼在队尾的**当前 `UserMessage`** 上（不动头部的 `SystemMessage`，且不污染落库的用户原话），让前面的 `SystemMessage + 全部历史对话` 100% 命中前缀缓存；
+    3. **Token 滑动窗口预算裁剪（对应 `[CTX-001]`，已完成）**：通过 `ChatContextWindowTool`（JTokkit `cl100k_base` 编码）按全局预算倒序保留完整 user-assistant 对话轮次，防止长文本打穿 Context Window。
 
 * **手术 2（内聚式 Run 实体与多模态 SSE 协议）**：【已完成-261103，并在 261108 扩展 `artifact`】
   - 避免创建冗余的 `xxl_ai_chat_run` 表，复用 `xxl_ai_session_msg.ext_json`；
-  - [`ChatStreamTool.java`](file:///E:/code/spring-ai-project/juejin-gitee/xxl-ai-workbuddy/xxl-ai-api/src/main/java/com/xxl/ai/api/business/harness/chat/ChatStreamTool.java) 的 Redis 结果流与 SSE 事件支持：`reference`、`tool`、`usage`、`artifact`、`trace`；
+  - [`ChatStreamTool.java`](file:///home/antigravity/Qinstudy/xxl-ai/xxl-ai-api/src/main/java/com/xxl/ai/api/business/harness/chat/ChatStreamTool.java) 的 Redis 结果流与 SSE 事件支持：`reference`、`tool`、`usage`、`artifact`、`trace`；
   - `saveAssistant` 结束时将运行快照统一写入 `ext_json`，前端刷新后回读与流式推送 100% 保持一致。
 
 * **手术 3（`ObservableToolCallback` 装饰器）**：【已完成-261103】
   - 在 `com.xxl.ai.api.business.harness.chat` 下落地 `ObservableToolCallback implements ToolCallback`；
   - 在 `call()` / POJO `@Tool` 代理内部加入环绕拦截：前置写事件保活 Redis 结果流，后置收集耗时 `elapsedMs` 与入参出参摘要（1000 字符截断；返回大模型侧 16000 字符截断），同时解决工具 Trace 回放与长 ToolCall 超时断流问题。
 
-* **手术 4（`Agent-as-a-Tool` 模式落地 SubAgents）**：【待实施】
+* **手术 4（`Agent-as-a-Tool` 模式落地 SubAgents）**：【已完成-FEAT-013】
   - `xxl_ai_agent` 表增加 `sub_agent_ids VARCHAR(500)`；
   - 在 `ChatStreamTool#buildObservableTools` 中为每个子 Agent 构建一个 `FunctionToolCallback`，工具名称为 `agent__{subAgentId}`，描述为子 Agent 简介，函数体委托 `llmChatTool.chat` 执行单轮生成；
   - 零侵入复用现有 ToolCalling 架构，实现真正的父子智能体委派协作。

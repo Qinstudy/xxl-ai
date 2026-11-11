@@ -35,19 +35,39 @@ public interface SessionService {
     Response<List<Session>> list(String uuid, String visitorId);
 
     /**
-     * 修改对话标题（最长50个字符）
+     * 修改对话标题（校验访客归属，最长50个字符）
      */
-    Response<String> rename(long sessionId, String title);
+    Response<String> rename(long sessionId, String visitorId, String title);
+
+    @Deprecated
+    default Response<String> rename(long sessionId, String title) {
+        return rename(sessionId, null, title);
+    }
 
     /**
-     * 删除对话（连带消息）
+     * 删除对话（校验访客归属，连带消息与归档交付物）
      */
-    Response<String> delete(long sessionId);
+    Response<String> delete(long sessionId, String visitorId);
+
+    @Deprecated
+    default Response<String> delete(long sessionId) {
+        return delete(sessionId, null);
+    }
 
     /**
-     * 消息列表（公开访问，按对话ID）
+     * 消息列表（公开访问，校验访客归属）
      */
-    Response<List<SessionMsg>> msgList(long sessionId);
+    Response<List<SessionMsg>> msgList(long sessionId, String visitorId);
+
+    @Deprecated
+    default Response<List<SessionMsg>> msgList(long sessionId) {
+        return msgList(sessionId, null);
+    }
+
+    /**
+     * 校验并返回归属于指定访客的会话，不满足抛 IllegalArgumentException
+     */
+    Session requireVisitorSession(long sessionId, String visitorId);
 
     // ==================== 管理端 ====================
 
