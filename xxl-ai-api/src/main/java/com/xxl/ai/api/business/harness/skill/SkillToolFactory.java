@@ -120,14 +120,34 @@ public class SkillToolFactory {
      * 与 buildTool 配套：提供 SKILL.md 依赖的执行能力（Shell / FileSystem / Glob / Grep / ListDirectory），
      * 全部限定于 Agent 物化根。Shell 命令经 tracker 执行，会话终止或生成结束时统一回收，避免进程泄露。
      */
+    /**
+     * 构建 Agent 装配的终端/文件执行工具集（无技能时返回空列表表示不注册）
+     * 默认策略：仅未发布（内部调试态）Agent 挂载 ShellTools，已发布到公网的 Agent 默认关闭 Shell，仅允许安全沙箱文件工具
+     */
     public List<Object> buildExecutorTools(Agent agent, SkillShellTracker tracker) {
+        return buildExecutorTools(agent, tracker, agent != null && agent.getPublishStatus() == 0);
+    }
+
+    /**
+     * 构建 Agent 装配的终端/文件执行工具集（无技能时返回空列表表示不注册）
+     *
+     * 与 buildTool 配套：提供 SKILL.md 依赖的执行能力（Shell / FileSystem / Glob / Grep / ListDirectory），
+     * 全部限定于 Agent 物化根。Shell 命令经 tracker 执行，会话终止或生成结束时统一回收，避免进程泄露。
+     *
+     * @param agent Agent 实例
+     * @param tracker Shell 进程跟踪器
+     * @param includeShell 是否允许挂载 ShellTools（发布到公网的 Agent 默认关闭 Shell，仅允许安全沙箱文件工具）
+     */
+    public List<Object> buildExecutorTools(Agent agent, SkillShellTracker tracker, boolean includeShell) {
         SkillSnapshot snapshot = sync(agent);
         if (snapshot == null) {
             return new ArrayList<>();
         }
         Path agentRoot = snapshot.root();
         List<Object> tools = new ArrayList<>();
-        tools.add(ShellTools.builder().execBackend(tracker).build());
+        if (includeShell) {
+            tools.add(ShellTools.builder().execBackend(tracker).build());
+        }
         tools.add(FileSystemTools.builder().allowedDirectory(agentRoot).build());
         tools.add(GlobTool.builder().workingDirectory(agentRoot).allowedDirectory(agentRoot).build());
         tools.add(GrepTool.builder().workingDirectory(agentRoot).allowedDirectory(agentRoot).build());
@@ -136,12 +156,36 @@ public class SkillToolFactory {
     }
 
     /**
-     * 构建 Agent 的 Shell 进程跟踪器：工作目录限定于 Agent 物化根，进程经其登记以便回收
+     * 构建 Agent 的 Shell 进程跟踪器：工作目录限定于 Agent 物化根，进程经其登记以便回收；
+     * 清理脱敏敏感环境变量，阻断通过 env 导出数据库或缓存秘钥。
      *
      * @param agentId Agent ID
      */
     public SkillShellTracker newShellTracker(long agentId) {
-        return new SkillShellTracker(LocalExecBackend.builder().workingDirectory(agentRoot(agentId)).build());
+        Map<String, String> safeEnv = buildSafeEnvironment();
+        LocalExecBackend backend = LocalExecBackend.builder()
+                .workingDirectory(agentRoot(agentId))
+                .cleanEnvironment(true)
+                .environment(safeEnv)
+                .build();
+        return new SkillShellTracker(backend);
+    }
+
+    /**
+     * 构建脱敏后的安全环境变量（排除包含 PASSWORD/SECRET/KEY/TOKEN/AUTH/CREDENTIAL 的敏感变量）
+     */
+    public static Map<String, String> buildSafeEnvironment() {
+        Map<String, String> safeEnv = new HashMap<>(System.getenv());
+        safeEnv.keySet().removeIf(key -> {
+            String upper = key.toUpperCase();
+            return upper.contains("PASS")
+                    || upper.contains("SECRET")
+                    || upper.contains("KEY")
+                    || upper.contains("TOKEN")
+                    || upper.contains("AUTH")
+                    || upper.contains("CREDENTIAL");
+        });
+        return safeEnv;
     }
 
     /**
@@ -237,7 +281,11 @@ public class SkillToolFactory {
         Map<Long, String> pathCache = new HashMap<>();
         boolean hasMain = false;
         for (SkillFile file : fileList) {
-            Path target = skillDir.resolve(resolvePath(file, fileMap, pathCache));
+            String relPath = resolvePath(file, fileMap, pathCache);
+            Path target = skillDir.resolve(relPath).normalize();
+            if (!target.startsWith(skillDir)) {
+                throw new SecurityException("非法 Skill 文件路径穿越，拒绝物化: " + file.getName());
+            }
             if (file.getType() == 1) {
                 if (SKILL_FILE_NAME.equals(file.getName())) {
                     hasMain = true;

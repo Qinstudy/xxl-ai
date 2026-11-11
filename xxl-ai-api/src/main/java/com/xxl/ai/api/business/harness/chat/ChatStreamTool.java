@@ -1072,7 +1072,11 @@ public class ChatStreamTool implements SmartLifecycle {
         if (skillTool != null) {
             taggedTools.add(new ObservableToolCallback.TaggedTool("SKILL", skillTool));
         }
-        for (Object execTool : skillToolFactory.buildExecutorTools(agent, tracker)) {
+        boolean includeShell = agent != null && agent.getPublishStatus() == 0;
+        if (!includeShell && agent != null && StringTool.isNotBlank(agent.getSkillIds())) {
+            traceCollector.addLog("WARN", "security", "Agent 已处于公网发布状态，遵循 [SEC-002] 规范剥离宿主 ShellTools 执行特权");
+        }
+        for (Object execTool : skillToolFactory.buildExecutorTools(agent, tracker, includeShell)) {
             taggedTools.add(new ObservableToolCallback.TaggedTool("EXEC", execTool));
         }
         for (Object subAgentToolItem : subAgentTool.buildTools(agent, traceCollector, cancelled, eventConsumer)) {

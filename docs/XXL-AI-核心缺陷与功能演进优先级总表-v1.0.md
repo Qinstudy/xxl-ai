@@ -41,13 +41,13 @@ flowchart TD
         D5["上下文治理：Token预算滑动窗口裁剪 + 后置拼装保前缀缓存 (CTX-001 / CTX-002)"]
         D6["推理超参数动态配置 + Prompt槽位变量 + SubAgents多智能体委派 (FEAT-006 / FEAT-010 / FEAT-013)"]
         D7["公开端免登录水平越权防御 (HMAC VisitorToken + DB归属强校验 SEC-001)"]
+        D8["Skill 宿主机 RCE 深度防御 (公网剥离Shell特权 + 环境脱敏 + 防穿越 SEC-002)"]
     end
 
     subgraph StillGaps["当前依然待办的缺陷与功能缺口"]
-        G1["【P2 安全防护】Skill宿主机命令白名单门禁与沙箱隔离 (SEC-002)"]
-        G2["【P2 运行时容灾】Stream任务超限熔断 (DATA-001) & PEL防重锁 (RUN-001) & 【P4】集群停止广播 (RUN-002)"]
-        G3["【P2/P3 工具治理】多工具中间迷失治理 (TOOL-002) & 动态工具检索与路由 (FEAT-008)"]
-        G4["【P3 体系演进】Workflow可视化编排 (FEAT-009) & RAG质量量化评测 (FEAT-014) & 知识图谱 (FEAT-015)"]
+        G1["【P2 运行时容灾】Stream任务超限熔断 (DATA-001) & PEL防重锁 (RUN-001) & 【P4】集群停止广播 (RUN-002)"]
+        G2["【P2/P3 工具治理】多工具中间迷失治理 (TOOL-002) & 动态工具检索与路由 (FEAT-008)"]
+        G3["【P3 体系演进】Workflow可视化编排 (FEAT-009) & RAG质量量化评测 (FEAT-014) & 知识图谱 (FEAT-015)"]
     end
 
     Done -.-> StillGaps
@@ -95,7 +95,7 @@ flowchart TD
 | **P1** | **[CTX-001]** | 上下文治理 | **历史上下文按固定条数截断易爆 Token**<br>`ChatStreamTool.java#L151,L795` | 历史消息固定取最近 `historyLimit` 条（默认 50 条）。遇到长代码或长文档总结易打穿模型 Context Window 触发 HTTP 400。 | **【已完成】** 引入 `ChatContextWindowTool`（基于 JTokkit `cl100k_base` 编码），按 Token 预算倒序滑动窗口裁剪，确保 user 起始轮次完整。 |
 | **P1** | **[CTX-002]** | 上下文治理 | **动态 RAG 切片拼入 `SystemMessage` 击穿多轮前缀缓存**<br>`RagTool.java#L358-381`<br>`ChatStreamTool.java#L838` | `RagTool#injectContextPrompt` 仍将每轮动态检索到的切片直接拼入头部 `SystemMessage`，导致多轮追问时历史消息的 Prefix KV Cache 全量失效，推高 TTFT 与输入成本。 | **【已完成】** 遵循“静态前置、动态后置”原则：采用 `RagTool#buildContextualQuestion` 将动态检索上下文拼在队尾**当前 `UserMessage`** 上（保住前缀缓存，且不污染数据库用户原话）。 |
 | **P2** | **[SEC-001]** | 安全越权 | **公开端免登录接口越权遍历 (IDOR)**<br>`ChatController.java`<br>`ChatSessionController.java`<br>`VisitorSecurityTool.java` | 接口免登录，仅凭客户端入参遍历或伪造 `visitorId`/`sessionId`，存在越权读取或删除其他访客会话风险。 | **【已完成】** 签发基于 HMAC-SHA256 签名的 `X-Visitor-Token`，前后端双向刷新流转；Session/Chat 接口对会话归属做 DB 强校验与阻断。 |
-| **P2** | **[SEC-002]** | 安全隔离 | **Skill 执行器宿主机裸奔导致公网 RCE**<br>`SkillToolFactory.java#L123-136` | 仅限定 `workingDirectory`/`allowedDirectory`，`ShellTools` 在宿主机原生进程执行命令，无容器隔离与命令白名单。 | 增加 `xxl-ai.skill.exec.enabled` 默认阻断门禁；对命令实施白名单或容器沙箱隔离。 |
+| **P2** | **[SEC-002]** | 安全隔离 | **Skill 执行器宿主机公网 RCE**<br>`SkillToolFactory.java`<br>`SkillShellTracker.java`<br>`ChatStreamTool.java` | 仅限定 `workingDirectory`/`allowedDirectory`，公网免登录端通过 Prompt 注入直接调用 `ShellTools` 执行系统级 Bash 命令。 | **【已完成】** 公网发布态自动剥离 `ShellTools` 执行特权（保留安全文件工具与知识库）；环境变量全面脱敏（剔除密码/秘钥）；物化阶段增加规范路径强防穿越校验；命令执行施加 120s 强制超时熔断。 |
 | **P2** | **[DATA-001]** | 运行时容灾 | **任务流堆积超限导致静默丢弃任务**<br>`ChatStreamTool.java#L105,L366` | 积压超过 5000 条时 Redis `approximateTrimming` 会静默丢弃旧任务，用户端可能无异常反馈。 | 入队前执行 `XLEN` 预检，超限时主动熔断并返回友好错误。 |
 | **P2** | **[RUN-001]** | 资产损耗 | **PEL 故障接管无幂等导致重复计费**<br>`ChatStreamTool.java#L400-451` | Worker 故障认领未确认任务后直接重新执行，若前节点已部分调用模型，可能引发二次计费。 | 基于 `SETNX xxl:ai:run:lock:{msgId}` 建立分布式防重执行锁。 |
 | **P4** | **[RUN-002]** | 运行时容灾 | **多实例集群部署下 `/stop` 跨节点终止失效**<br>`ChatStreamTool.java#L158,L333` | `runContexts` 保存在单机 JVM 内存中，集群节点 `/stop` 路由到非执行节点时无法中断流。 | 引入 Redis Pub/Sub 广播终止事件，或基于 Redis 取消标记位驱动 Worker 退出。（已降级至 P4 远期支持） |
@@ -156,7 +156,7 @@ flowchart TD
   1. [已完成-261110] 架构落地【手术 4】：以 Agent-as-a-Tool 模式上线 [FEAT-013] SubAgents 多智能体委派体系（单层委派、同空间隔离、Trace/Token 并入主会话、多选关联）；
   2. 落地 [FEAT-009]：打造轻量 Workflow DAG 执行引擎；
   3. 落地 [FEAT-014]：构建 AI 应用与 RAG 质量量化评测体系；
-  4. 加固 P2 级容灾并发与公网安全（[已完成-SEC-001] IDOR 鉴权、[SEC-002] Skill 沙箱门禁、[DATA-001] 队列超限熔断、[RUN-001] 防重锁；[RUN-002] 集群停止广播降至 P4 远期支持）。
+  4. 加固 P2 级容灾并发与公网安全（[已完成-SEC-001] IDOR 鉴权、[已完成-SEC-002] Skill 深度防御、[DATA-001] 队列超限熔断、[RUN-001] 防重锁；[RUN-002] 集群停止广播降至 P4 远期支持）。
 ```
 
 ---
@@ -168,7 +168,7 @@ flowchart TD
 | **1. Agent 引擎** | 支持系统提示词、变量注入、多模型切换、海量模型自定义参数配置 | • 提示词：静态已有<br>• 模型切换：已有（指纹自失效缓存已闭环）<br>• 自定义参数：已有（`[FEAT-006]` 已完成）<br>• 变量注入：已有（`[FEAT-010]` 已完成） | • `[FEAT-006]` (P2) 大模型推理超参数动态配置（已完成）<br>• `[FEAT-010]` (P2) Prompt 动态变量注入与表单槽位（已完成） | **已全面闭环**。<br>超参数与动态变量模板槽位均已完成闭环支持。 |
 | **2. Workflow 可视化编排** | 基于 DAG 的工作流引擎，18 种节点类型，拖拽式编排 | 仅有基于 Redis Stream 的单对话流，尚无 DAG 工作流引擎 | • `[FEAT-009]` (P3) Workflow 工作流编排 (DAG 画布) | **已纳入路线**。<br>阶段一实现 6 节点轻量 DAG 引擎，阶段二扩展为 18 节点与 Vue Flow 拖拽画布。 |
 | **3. RAG 知识库** | 文档上传 → 分块 → 向量化 → 检索 → 生成，完整 Pipeline，并支持高级检索测试、知识图谱、问答对等 | • 基础 Pipeline + 引用卡片：已有（`[FEAT-003]` 已完成）<br>• 嵌入模型缓存指纹失效：已修复（`[CACHE-001]`）<br>• 语义断句、相似度拦截、上下文后置：已完成（`[RAG-CORE-001]`、`[RAG-CORE-002]`、`[CTX-002]`）<br>• 向量+BM25多路召回与加权RRF重排：已完成（`[FEAT-004]`）<br>• 检索测试台增强与QA问答对：已完成（`[FEAT-011]`） | • `[CACHE-001]` (P0) 嵌入模型指纹自失效（已完成）<br>• `[RAG-CORE-002]` (P0) 检索相似度阈值拦截（已完成）<br>• `[RAG-CORE-001]` (P1) 递归语义分块断句（已完成）<br>• `[CTX-002]` (P1) 动态 RAG 后置拼入当前 `UserMessage` 保前缀缓存（已完成）<br>• `[FEAT-003]` (P2) 引用来源卡片（已完成）<br>• `[FEAT-004]` (P2) 向量+BM25多路召回与 RRF 融合（**已完成-261110**）<br>• `[FEAT-011]` (P2) 检索测试台增强与 QA 问答对（**已完成-261110**）<br>• `[FEAT-015]` (P3) 知识图谱与 GraphRAG 增强 | **高优精度、多路召回与测试台全面闭环**。<br>已落地 BM25 稀疏索引与加权 RRF 融合重排、QA 问答对原子切分与录入、Playground 多模式/临时阈值多维打分透视。下一步关注图谱增强。 |
-| **4. AI 扩展体系** | 工具 、 MCP、Skill、SubAgents 等 | • 内置执行工具 & Skill：已有<br>• MCP：已有客户端<br>• Agent 交付物产物沙箱：已完成（`[FEAT-005]`）<br>• SubAgents 多智能体协作：已完成（`[FEAT-013]`）<br>• 工具路由：尚无 | • `[FEAT-005]` (P2) Agent 交付物产物沙箱（**已完成-261108**）<br>• `[SEC-002]` (P2) Skill 宿主机沙箱与白名单隔离<br>• `[TOOL-002]` (P2) 61 工具中间迷失治理<br>• `[FEAT-008]` (P3) 动态工具检索与路由<br>• `[FEAT-013]` (P3) SubAgents 多智能体协作体系（**已完成-261110**） | **多智能体协作已落地**。<br>已完成基于 Agent-as-a-Tool 模式的 SubAgents 委派与汇总，下一步关注 `[SEC-002]` 宿主机安全边界与 `[FEAT-008]` 工具路由。 |
+| **4. AI 扩展体系** | 工具 、 MCP、Skill、SubAgents 等 | • 内置执行工具 & Skill：已有<br>• MCP：已有客户端<br>• Agent 交付物产物沙箱：已完成（`[FEAT-005]`）<br>• SubAgents 多智能体协作：已完成（`[FEAT-013]`）<br>• 工具路由：尚无 | • `[FEAT-005]` (P2) Agent 交付物产物沙箱（**已完成-261108**）<br>• `[SEC-002]` (P2) Skill 宿主机深度防御（**已完成-261111**）<br>• `[TOOL-002]` (P2) 61 工具中间迷失治理<br>• `[FEAT-008]` (P3) 动态工具检索与路由<br>• `[FEAT-013]` (P3) SubAgents 多智能体协作体系（**已完成-261110**） | **多智能体与安全防线全面落地**。<br>已完成基于 Agent-as-a-Tool 模式的 SubAgents 委派、公网发布剥离 Shell 执行器、环境脱敏及物化防穿越，下一步关注 `[TOOL-002]` 与 `[FEAT-008]` 工具路由。 |
 | **5. 评测体系** | 数据集 + 评估器 + 实验，量化 AI 应用质量 | 尚未建设 | • `[FEAT-014]` (P3) AI 应用与 RAG 质量量化评测体系 | **已纳入路线**。<br>规划 Benchmark 评测集、RAG 评估器与对比实验。 |
 | **6. 全链路可观测** | LLM Trace、工具调用日志、实时日志流 | • 已基于 `xxl_ai_session_msg.ext_json` 完整落地 Run 状态机、TTFT/总耗时、多轮 Token 统计、时延瀑布图、工具入出参摘要证据链及实时 SSE 日志流抽屉（流式异常断流时的 Token 估算兜底纳入规划） | • `[FEAT-001]` (P1) 内聚式 Run 实体与状态机（已完成）<br>• `[FEAT-007]` (P2) 工具证据链与 Trace 回放（已完成）<br>• `[FEAT-012]` (P2) 全链路 LLM Trace 监控与实时日志流（已完成）<br>• `[LLM-002]` (P2) 流式中断 Token 估算兜底（后续规划） | **主体已完成**。<br>已全面打通前后端 Trace 观测体系，后续补齐断流/终止场景本地 Token 估算兜底。 |
 
