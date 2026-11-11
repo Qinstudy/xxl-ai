@@ -28,7 +28,17 @@ public final class RagTextSplitter {
     }
 
     /**
-     * 递归切分文本为分块
+     * 判断文本是否符合标准 QA 结构化格式（含【问题】与【答案】）
+     */
+    public static boolean isQaFormatted(String content) {
+        if (content == null || content.isEmpty()) {
+            return false;
+        }
+        return content.contains("【问题】") && content.contains("【答案】");
+    }
+
+    /**
+     * 递归切分文本为分块（支持 QA 问答结构化对原子保护）
      *
      * @param content      待分片原始文本
      * @param chunkSize    目标分片大小（字符数，>=1）
@@ -42,10 +52,59 @@ public final class RagTextSplitter {
         int size = Math.max(chunkSize, 1);
         int overlap = Math.min(Math.max(chunkOverlap, 0), size - 1);
 
+        // 若包含【问题】与【答案】标准 QA 结构，按问答对原子切分，防问答首尾割裂与多对混叠
+        if (isQaFormatted(content)) {
+            List<String> qaChunks = splitQaBlocks(content, size, overlap);
+            if (!qaChunks.isEmpty()) {
+                return qaChunks;
+            }
+        }
+
         if (content.length() <= size) {
             return Collections.singletonList(content);
         }
 
+        return splitPlain(content, size, overlap);
+    }
+
+    /**
+     * 按【问题】...【答案】...结构切分问答对，保持问答原子性
+     */
+    private static List<String> splitQaBlocks(String content, int size, int overlap) {
+        List<String> chunks = new ArrayList<>();
+        int firstIdx = content.indexOf("【问题】");
+        if (firstIdx > 0) {
+            String prefix = content.substring(0, firstIdx).trim();
+            if (!prefix.isEmpty()) {
+                chunks.addAll(splitPlain(prefix, size, overlap));
+            }
+        }
+
+        int maxAtomicLen = Math.max(size * 2, 1000);
+        int currentIdx = firstIdx;
+        while (currentIdx != -1) {
+            int nextIdx = content.indexOf("【问题】", currentIdx + 4);
+            String block = (nextIdx != -1) ? content.substring(currentIdx, nextIdx).trim() : content.substring(currentIdx).trim();
+            if (block.endsWith("---")) {
+                block = block.substring(0, block.length() - 3).trim();
+            }
+            if (!block.isEmpty()) {
+                if (block.length() <= maxAtomicLen) {
+                    chunks.add(block);
+                } else {
+                    // 超长问答对降级递归切分
+                    chunks.addAll(splitPlain(block, size, overlap));
+                }
+            }
+            currentIdx = nextIdx;
+        }
+        return chunks;
+    }
+
+    /**
+     * 常规非 QA 文本的递归分块逻辑
+     */
+    public static List<String> splitPlain(String content, int size, int overlap) {
         // 1. 递归细化切分为原子语义片段
         List<String> pieces = breakDown(content, 0, size);
         if (pieces.isEmpty()) {

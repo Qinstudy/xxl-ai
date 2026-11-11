@@ -148,7 +148,7 @@ public class KnowledgeDocController {
     }
 
     /**
-     * 向量检索：按查询文本召回知识库相关内容分片
+     * 向量检索：按查询文本召回知识库相关内容分片（支持 HYBRID / VECTOR / BM25 模式与临时阈值）
      */
     @RequestMapping("/search")
     @XxlSso(permission = "knowledge:doc")
@@ -156,12 +156,14 @@ public class KnowledgeDocController {
                                                       @RequestHeader(value = "xxl-space-id", required = false) Integer spaceId,
                                                       @RequestParam("baseId") long baseId,
                                                       @RequestParam("query") String query,
-                                                      @RequestParam(required = false, defaultValue = "0") int topK) {
+                                                      @RequestParam(required = false, defaultValue = "0") int topK,
+                                                      @RequestParam(required = false, defaultValue = "HYBRID") String mode,
+                                                      @RequestParam(required = false) Double threshold) {
         Response<SpaceContext> spaceResp = spaceService.checkSpace(request, spaceId);
         if (!spaceResp.isSuccess()) {
             return Response.ofFail(spaceResp.getMsg());
         }
-        return knowledgeDocService.search(spaceResp.getData().getSpaceId(), baseId, query, topK);
+        return knowledgeDocService.search(spaceResp.getData().getSpaceId(), baseId, query, topK, mode, threshold);
     }
 
 }

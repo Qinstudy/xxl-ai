@@ -30,9 +30,15 @@ export function updateKnowledgeBase(data: KnowledgeBase): Promise<Response<strin
   return request({ url: '/knowledge/base/update', method: 'post', data: data })
 }
 
-/** 向量检索（文档接口：/knowledge/doc/search） */
-export function searchKnowledgeDoc(baseId: number, query: string, topK?: number): Promise<Response<KnowledgeHit[]>> {
-  return request({ url: '/knowledge/doc/search', method: 'get', params: { baseId, query, topK } })
+/** 向量与多路检索（文档接口：/knowledge/doc/search） */
+export function searchKnowledgeDoc(
+  baseId: number,
+  query: string,
+  topK?: number,
+  mode?: string,
+  threshold?: number
+): Promise<Response<KnowledgeHit[]>> {
+  return request({ url: '/knowledge/doc/search', method: 'get', params: { baseId, query, topK, mode, threshold } })
 }
 
 /** 查询当前空间知识库列表（Agent 绑定下拉） */

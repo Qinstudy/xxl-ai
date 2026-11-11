@@ -44,6 +44,11 @@
           <el-button type="primary" plain icon="Plus" @click="handleAdd" v-hasPermi="['knowledge:doc']">{{ t('common.add') }}</el-button>
         </el-col>
         <el-col :span="1.5">
+          <el-button type="warning" plain icon="ChatDotSquare" @click="handleAddQa" v-hasPermi="['knowledge:doc']">
+            {{ t('business.knowledge.addQa') }}
+          </el-button>
+        </el-col>
+        <el-col :span="1.5">
           <el-upload
             :show-file-list="false"
             accept=".txt,.md"
@@ -86,7 +91,14 @@
       <el-table v-loading="table.loading" :data="table.list" @selection-change="handleSelectionChange">
         <el-table-column type="selection" width="45" align="center" />
         <el-table-column :label="t('common.serialNo')" align="center" prop="id" width="70" />
-        <el-table-column :label="t('business.knowledge.docName')" align="center" prop="name" min-width="2.5" :show-overflow-tooltip="true" />
+        <el-table-column :label="t('business.knowledge.docName')" align="left" prop="name" min-width="2.5" :show-overflow-tooltip="true">
+          <template #default="scope">
+            <el-tag v-if="isQaDoc(scope.row.name)" type="warning" size="small" effect="plain" class="mr4">{{
+              t('business.knowledge.qaTag')
+            }}</el-tag>
+            <span>{{ scope.row.name }}</span>
+          </template>
+        </el-table-column>
         <el-table-column :label="t('business.knowledge.docStatus')" align="center" min-width="1">
           <template #default="scope">
             <el-tag :type="docStatusType(scope.row.status)">
@@ -150,8 +162,41 @@
       </template>
     </el-dialog>
 
-    <!-- 向量检索对话框 -->
-    <el-dialog :title="t('business.knowledge.searchTitle', [baseName])" v-model="search.visible" width="860px" append-to-body>
+    <!-- 添加或修改问答对 (QA) 对话框（[FEAT-011]） -->
+    <el-dialog :title="qaState.title" v-model="qaState.visible" width="750px" append-to-body>
+      <el-form ref="qaFormRef" :model="qaState.form" :rules="qaState.rules" label-width="90px">
+        <el-form-item :label="t('business.knowledge.qaQuestion')" prop="question">
+          <el-input
+            v-model="qaState.form.question"
+            maxlength="200"
+            :placeholder="t('business.knowledge.qaQuestionPlaceholder')"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item :label="t('business.knowledge.qaAnswer')" prop="answer">
+          <el-input
+            v-model="qaState.form.answer"
+            type="textarea"
+            :rows="11"
+            class="doc-content-input"
+            maxlength="16777215"
+            :placeholder="t('business.knowledge.qaAnswerPlaceholder')"
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-switch v-model="qaState.autoVectorize" :active-text="t('business.knowledge.autoVectorize')" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button type="primary" :loading="qaState.submitting" @click="submitQaForm">{{ t('modal.confirmButton') }}</el-button>
+          <el-button @click="qaState.visible = false">{{ t('modal.cancelButton') }}</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 向量与多路召回检索测试台对话框（[FEAT-011]） -->
+    <el-dialog :title="t('business.knowledge.searchTitle', [baseName])" v-model="search.visible" width="1050px" append-to-body>
       <el-alert
         :title="t('business.knowledge.searchTestAlert', [search.kbThreshold ? search.kbThreshold.toFixed(2) : '0.40'])"
         type="info"
@@ -159,14 +204,35 @@
         show-icon
         style="margin-bottom: 16px"
       />
-      <el-form :inline="true" @submit.prevent="handleSearchSubmit">
+      <el-form :inline="true" @submit.prevent="handleSearchSubmit" class="search-playground-form">
         <el-form-item :label="t('business.knowledge.searchQuery')">
           <el-input
             v-model="search.query"
             :placeholder="t('business.knowledge.searchQueryPlaceholder')"
             clearable
-            class="search-query-input"
+            style="width: 250px"
             @keyup.enter="handleSearchSubmit"
+          />
+        </el-form-item>
+        <el-form-item :label="t('business.knowledge.searchMode')">
+          <el-select v-model="search.mode" style="width: 175px">
+            <el-option value="HYBRID" :label="t('business.knowledge.modeHybrid')" />
+            <el-option value="VECTOR" :label="t('business.knowledge.modeVector')" />
+            <el-option value="BM25" :label="t('business.knowledge.modeBm25')" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="t('business.knowledge.tempTopK')">
+          <el-input-number v-model="search.topK" :min="1" :max="20" style="width: 95px" />
+        </el-form-item>
+        <el-form-item :label="t('business.knowledge.tempThreshold')">
+          <el-input-number
+            v-model="search.threshold"
+            :min="0"
+            :max="1"
+            :step="0.05"
+            :precision="2"
+            style="width: 120px"
+            :placeholder="t('business.knowledge.tempThresholdPlaceholder')"
           />
         </el-form-item>
         <el-form-item>
@@ -175,17 +241,44 @@
           }}</el-button>
         </el-form-item>
       </el-form>
-      <el-table v-loading="search.loading" :data="search.list" max-height="380">
-        <el-table-column :label="t('common.serialNo')" align="center" type="index" width="60" />
-        <el-table-column :label="t('business.knowledge.docName')" align="center" width="150" :show-overflow-tooltip="true">
-          <template #default="scope">{{ scope.row.docName || scope.row.docId }}</template>
+      <el-table v-loading="search.loading" :data="search.list" max-height="420">
+        <el-table-column :label="t('common.serialNo')" align="center" type="index" width="55" />
+        <el-table-column :label="t('business.knowledge.docName')" align="left" width="160" :show-overflow-tooltip="true">
+          <template #default="scope">
+            <el-tag v-if="scope.row.qaChunk || isQaDoc(scope.row.docName)" size="small" type="warning" effect="plain" class="mr4">{{
+              t('business.knowledge.qaTag')
+            }}</el-tag>
+            <span>{{ scope.row.docName || scope.row.docId }}</span>
+          </template>
         </el-table-column>
-        <el-table-column :label="t('business.knowledge.score')" align="center" width="180">
+        <el-table-column :label="t('business.knowledge.matchType')" align="center" width="105">
+          <template #default="scope">
+            <el-tag v-if="scope.row.matchType === 'HYBRID'" type="success" size="small" effect="dark">
+              {{ t('business.knowledge.modeHybrid').split(' ')[0] }}
+            </el-tag>
+            <el-tag v-else-if="scope.row.matchType === 'BM25'" type="warning" size="small" effect="dark">
+              {{ t('business.knowledge.modeBm25').split(' ')[0] }}
+            </el-tag>
+            <el-tag v-else type="primary" size="small" effect="dark">
+              {{ t('business.knowledge.modeVector').split(' ')[0] }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('business.knowledge.score')" align="center" width="150">
           <template #default="scope">
             <div style="display: flex; align-items: center; justify-content: center; gap: 6px">
-              <span>{{ Number(scope.row.score).toFixed(4) }}</span>
+              <span style="font-weight: 600">{{ Number(scope.row.score).toFixed(4) }}</span>
               <el-tag v-if="scope.row.passed" type="success" size="small">{{ t('business.knowledge.scorePassed') }}</el-tag>
               <el-tag v-else type="info" size="small">{{ t('business.knowledge.scoreFiltered') }}</el-tag>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column :label="t('business.knowledge.scoreBreakdown')" align="center" width="195">
+          <template #default="scope">
+            <div class="score-breakdown">
+              <span>Vec: <b>{{ scope.row.vectorScore != null ? Number(scope.row.vectorScore).toFixed(4) : '-' }}</b></span>
+              <span>BM25: <b>{{ scope.row.bm25NormScore != null ? Number(scope.row.bm25NormScore).toFixed(4) : (scope.row.bm25Score != null ? Number(scope.row.bm25Score).toFixed(2) : '-') }}</b></span>
+              <span>RRF: <b>{{ scope.row.rrfScore != null ? Number(scope.row.rrfScore).toFixed(6) : '-' }}</b></span>
             </div>
           </template>
         </el-table-column>
@@ -222,6 +315,7 @@ interface KnowledgeDocForm extends KnowledgeDoc {}
 
 // --------------------------------- ref data ---------------------------------
 const formRef = ref<FormInstance>() /* 编辑表单 ref */
+const qaFormRef = ref<FormInstance>() /* QA 表单 ref */
 const baseId = ref<number>(Number((route.query.baseId as string) ?? 0))
 const baseName = ref<string>((route.query.baseName as string) ?? '')
 const uploading = ref(false)
@@ -234,9 +328,28 @@ const table = ref<TableState<KnowledgeDoc>>({ list: [], total: 0, loading: true,
 const search = ref({
   visible: false,
   query: '',
+  mode: 'HYBRID',
+  topK: 5,
+  threshold: undefined as number | undefined,
   list: [] as KnowledgeHit[],
   loading: false,
   kbThreshold: 0
+})
+
+const qaState = ref({
+  visible: false,
+  title: '',
+  docId: undefined as number | undefined,
+  form: {
+    question: '',
+    answer: ''
+  },
+  autoVectorize: true,
+  submitting: false,
+  rules: {
+    question: [{ required: true, message: t('common.requiredMsg', [t('business.knowledge.qaQuestion')]), trigger: 'blur' }],
+    answer: [{ required: true, message: t('common.requiredMsg', [t('business.knowledge.qaAnswer')]), trigger: 'blur' }]
+  }
 })
 
 const formState = ref<FormState<KnowledgeDocForm>>({
@@ -250,6 +363,25 @@ const formState = ref<FormState<KnowledgeDocForm>>({
 })
 
 // --------------------------------- fun ---------------------------------
+function isQaDoc(name?: string) {
+  return typeof name === 'string' && name.startsWith('[QA]')
+}
+
+function parseQaContent(content?: string) {
+  if (!content) return { question: '', answer: '' }
+  let q = ''
+  let a = ''
+  const qIdx = content.indexOf('【问题】')
+  const aIdx = content.indexOf('【答案】')
+  if (qIdx !== -1 && aIdx !== -1) {
+    q = content.substring(qIdx + 4, aIdx).trim()
+    a = content.substring(aIdx + 4).trim()
+  } else {
+    q = content
+  }
+  return { question: q, answer: a }
+}
+
 function docStatusTitle(status: number) {
   return docStatusOptions.value.find((i) => i.code === status)?.title ?? String(status)
 }
@@ -288,12 +420,29 @@ function handleAdd() {
   formState.value.visible = true
   formState.value.title = t('common.titleAdd', [t('business.knowledge.doc')])
 }
+function handleAddQa() {
+  qaState.value.docId = undefined
+  qaState.value.form = { question: '', answer: '' }
+  qaState.value.autoVectorize = true
+  qaState.value.visible = true
+  qaState.value.title = t('business.knowledge.addQa')
+  resetForm('qaFormRef')
+}
 function handleUpdate(row: any) {
   reset()
   const id = row?.id ?? table.value.ids[0]
   if (id == null) return
   const current = table.value.list.find((item) => item.id === id)
   if (!current) return
+  if (isQaDoc(current.name)) {
+    qaState.value.docId = current.id
+    const parsed = parseQaContent(current.content)
+    qaState.value.form = { question: parsed.question, answer: parsed.answer }
+    qaState.value.autoVectorize = true
+    qaState.value.visible = true
+    qaState.value.title = t('business.knowledge.editQa')
+    return
+  }
   formState.value.form = { ...current }
   formState.value.visible = true
   formState.value.title = t('common.titleEdit', [t('business.knowledge.doc')])
@@ -322,6 +471,52 @@ function submitForm() {
       formState.value.visible = false
       getList()
     })
+  })
+}
+function submitQaForm() {
+  qaFormRef.value!.validate(async (valid) => {
+    if (!valid) return
+    qaState.value.submitting = true
+    const question = qaState.value.form.question.trim()
+    const answer = qaState.value.form.answer.trim()
+    const docName = `[QA] ${question}`
+    const docContent = `【问题】\n${question}\n\n【答案】\n${answer}`
+
+    try {
+      if (qaState.value.docId != null) {
+        await updateKnowledgeDoc({
+          id: qaState.value.docId,
+          baseId: baseId.value,
+          name: docName,
+          content: docContent
+        })
+        modal.msgSuccess(t('common.updateSuccess'))
+        if (qaState.value.autoVectorize) {
+          await vectorizeKnowledgeDoc(qaState.value.docId)
+        }
+      } else {
+        await addKnowledgeDoc({
+          baseId: baseId.value,
+          name: docName,
+          content: docContent,
+          status: 0
+        })
+        modal.msgSuccess(t('common.addSuccess'))
+        if (qaState.value.autoVectorize) {
+          const listRes = await listKnowledgeDoc({ baseId: baseId.value, pageNum: 1, pageSize: 1, name: docName, status: -1 } as any)
+          const newDoc = listRes.data?.data?.[0]
+          if (newDoc?.id) {
+            await vectorizeKnowledgeDoc(newDoc.id)
+          }
+        }
+      }
+      qaState.value.visible = false
+      getList()
+    } catch (e) {
+      // handled by request interceptor
+    } finally {
+      qaState.value.submitting = false
+    }
   })
 }
 function cancel() {
@@ -408,10 +603,13 @@ function goBack() {
 }
 
 // --------------------------------- 向量检索 ---------------------------------
-/** 打开向量检索弹窗（检索当前知识库全量文档） */
+/** 打开向量与多路召回检索测试台弹窗（检索当前知识库全量文档） */
 function openSearch() {
   search.value.visible = true
   search.value.query = ''
+  search.value.mode = 'HYBRID'
+  search.value.topK = 5
+  search.value.threshold = undefined
   search.value.list = []
   if (baseId.value) {
     loadKnowledgeBase(baseId.value)
@@ -429,7 +627,7 @@ function handleSearchSubmit() {
     return
   }
   search.value.loading = true
-  searchKnowledgeDoc(baseId.value, search.value.query)
+  searchKnowledgeDoc(baseId.value, search.value.query, search.value.topK, search.value.mode, search.value.threshold)
     .then((response) => {
       search.value.list = response.data || []
       if (response.data && response.data.length > 0 && response.data[0].threshold != null) {
@@ -457,5 +655,22 @@ getList()
 .doc-content-input :deep(.el-textarea__inner) {
   max-height: 52vh;
   overflow-y: auto;
+}
+.search-playground-form :deep(.el-form-item) {
+  margin-bottom: 12px;
+  margin-right: 12px;
+}
+.score-breakdown {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--el-text-color-secondary);
+}
+.score-breakdown b {
+  color: var(--el-text-color-primary);
+}
+.mr4 {
+  margin-right: 4px;
 }
 </style>

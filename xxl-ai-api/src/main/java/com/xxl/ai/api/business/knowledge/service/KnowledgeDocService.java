@@ -66,6 +66,13 @@ public interface KnowledgeDocService {
     /**
      * 向量检索：按查询文本召回知识库相关内容分片
      */
-    Response<List<Map<String, Object>>> search(long spaceId, long baseId, String query, int topK);
+    default Response<List<Map<String, Object>>> search(long spaceId, long baseId, String query, int topK) {
+        return search(spaceId, baseId, query, topK, "HYBRID", null);
+    }
+
+    /**
+     * 向量检索（支持模式与临时阈值，[FEAT-011]）
+     */
+    Response<List<Map<String, Object>>> search(long spaceId, long baseId, String query, int topK, String mode, Double threshold);
 
 }

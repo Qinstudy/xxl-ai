@@ -31,6 +31,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -81,6 +82,8 @@ public class RagTool {
     private KnowledgeBaseMapper knowledgeBaseMapper;
     @Resource
     private KnowledgeDocMapper knowledgeDocMapper;
+    @Resource
+    private RagBm25Tool ragBm25Tool;
 
     /** 向量存储缓存（baseId → 配置指纹 + MilvusVectorStore），5min 过期 */
     private final Cache<Long, VectorStoreEntry> vectorStoreCache = CacheTool.<Long, VectorStoreEntry>newLRUCache(CACHE_MAX)
@@ -114,6 +117,13 @@ public class RagTool {
      */
     public List<Map<String, Object>> searchForTest(long baseId, String query, int topK) {
         return searchForTest(requireBase(baseId), query, topK);
+    }
+
+    /**
+     * 向量检索调试探针（支持检索模式与临时阈值，供文档管理测试弹窗使用）
+     */
+    public List<Map<String, Object>> searchForTest(long baseId, String query, int topK, String mode, Double customThreshold) {
+        return searchForTest(requireBase(baseId), query, topK, mode, customThreshold);
     }
 
     /**
@@ -163,14 +173,20 @@ public class RagTool {
                 }
             }
         }
-        logger.debug("知识库向量清理完成, baseId={}, count={}", baseId, docIds == null ? 0 : docIds.size());
+        if (ragBm25Tool != null) {
+            ragBm25Tool.evict(baseId);
+        }
+        logger.debug("知识库向量与BM25索引清理完成, baseId={}, count={}", baseId, docIds == null ? 0 : docIds.size());
     }
 
     /**
-     * 失效知识库向量存储缓存（知识库删除时调用）
+     * 失效知识库向量存储与 BM25 倒排索引缓存（知识库删除时调用）
      */
     public void evict(long baseId) {
         vectorStoreCache.remove(baseId);
+        if (ragBm25Tool != null) {
+            ragBm25Tool.evict(baseId);
+        }
     }
 
     // ==================== 面向知识库实体的向量操作 ====================
@@ -202,6 +218,9 @@ public class RagTool {
                 documents.add(buildDocument(docId, i, chunks.get(i)));
             }
             vectorStore.add(documents);
+            if (ragBm25Tool != null) {
+                ragBm25Tool.evict(kb.getId());
+            }
             logger.debug("文档向量化完成, baseId={}, docId={}, chunks={}", kb.getId(), docId, chunks.size());
             return chunks.size();
         } catch (Exception e) {
@@ -210,109 +229,170 @@ public class RagTool {
     }
 
     /**
-     * 向量相似度检索：按 topK 检索相似片段并带回元数据
+     * 向量与 BM25 多路召回融合检索（[FEAT-004]）：
+     * 1. 向量路候选召回（宽容降级：模型未配或连接异常时不阻断流程）；
+     * 2. BM25 稀疏检索召回（分片级精确命中专有名词、错误码）；
+     * 3. RRF 倒数排名融合重排（加权融合，QA问答对 1.15x 权重增益，关键词强命中救援召回）。
      *
-     * @return 命中列表，每个元素包含 {text, docId, chunkIndex, score}
-     * @throws IllegalArgumentException 检索内容为空 / 未配置嵌入模型
-     * @throws IllegalStateException    检索失败
+     * @return 命中列表，每个元素包含 {text, docId, chunkIndex, score, matchType, vectorScore, bm25Score, rrfScore}
      */
     public List<Map<String, Object>> search(KnowledgeBase kb, String query, int topK) {
         if (StringTool.isBlank(query)) {
             throw new IllegalArgumentException("检索内容不能为空");
         }
-        MilvusVectorStore vectorStore = resolveVectorStore(kb);
-        if (vectorStore == null) {
-            throw new IllegalArgumentException("知识库未配置有效的向量化模型，请先配置");
-        }
+        int limit = topK > 0 ? topK : defaultTopK(kb);
+        double threshold = kb.getSimilarityThreshold();
+
+        // 1. 向量路候选召回
+        List<Map<String, Object>> vectorHits = new ArrayList<>();
+        MilvusVectorStore vectorStore = null;
         try {
-            int limit = topK > 0 ? topK : defaultTopK(kb);
-            double threshold = kb.getSimilarityThreshold();
-            SearchRequest.Builder requestBuilder = SearchRequest.builder()
-                    .query(query)
-                    .topK(limit);
-            if (threshold > 0.0) {
-                requestBuilder.similarityThreshold(threshold);
-            }
-            List<Document> documents = vectorStore.similaritySearch(requestBuilder.build());
-            List<Map<String, Object>> result = new ArrayList<>();
-            if (CollectionTool.isNotEmpty(documents)) {
-                for (Document doc : documents) {
-                    Double score = doc.getScore();
-                    // 阈值后置兜底过滤（防止个别向量存储实现未透传 similarityThreshold 参数）
-                    if (threshold > 0.0 && score != null && score < threshold) {
-                        continue;
+            vectorStore = resolveVectorStore(kb);
+            if (vectorStore != null) {
+                int candidateLimit = Math.max(limit * 2, 10);
+                List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder()
+                        .query(query)
+                        .topK(candidateLimit)
+                        .build());
+                if (CollectionTool.isNotEmpty(documents)) {
+                    for (Document doc : documents) {
+                        Map<String, Object> item = new HashMap<>();
+                        item.put("text", doc.getText());
+                        item.put("score", doc.getScore() != null ? doc.getScore() : 0.0d);
+                        Map<String, Object> meta = doc.getMetadata();
+                        if (meta != null) {
+                            item.put("docId", meta.get("docId"));
+                            item.put("chunkIndex", meta.get("chunkIndex"));
+                        }
+                        vectorHits.add(item);
                     }
-                    Map<String, Object> item = new HashMap<>();
-                    item.put("text", doc.getText());
-                    item.put("score", doc.getScore());
-                    Map<String, Object> meta = doc.getMetadata();
-                    if (meta != null) {
-                        item.put("docId", meta.get("docId"));
-                        item.put("chunkIndex", meta.get("chunkIndex"));
-                    }
-                    result.add(item);
                 }
             }
-            return result;
         } catch (Exception e) {
-            throw new IllegalStateException("向量检索异常, baseId=" + kb.getId(), e);
+            logger.warn("知识库向量检索异常（降级至 BM25 检索）, baseId={}, err={}", kb.getId(), e.getMessage());
         }
+
+        // 2. BM25 稀疏检索路
+        List<RagBm25Tool.Bm25Hit> bm25Hits = Collections.emptyList();
+        if (ragBm25Tool != null) {
+            try {
+                bm25Hits = ragBm25Tool.searchBm25(kb.getId(), kb.getChunkSize(), kb.getChunkOverlap(), query, Math.max(limit * 2, 10));
+            } catch (Exception e) {
+                logger.warn("知识库 BM25 检索异常, baseId={}, err={}", kb.getId(), e.getMessage());
+            }
+        }
+
+        // 若向量服务未配置且无 BM25 结果，阻断报错
+        if (vectorStore == null && vectorHits.isEmpty() && bm25Hits.isEmpty()) {
+            throw new IllegalArgumentException("知识库未配置有效的向量化模型，请先配置");
+        }
+
+        // 3. RRF 融合重排并进行阈值过滤
+        if (ragBm25Tool != null) {
+            return ragBm25Tool.fuseWithRrf(vectorHits, bm25Hits, "HYBRID", threshold, limit, false);
+        }
+
+        // 兜底降级处理
+        List<Map<String, Object>> fallback = new ArrayList<>();
+        for (Map<String, Object> hit : vectorHits) {
+            double s = parseDoubleObj(hit.get("score"));
+            if (threshold <= 0.0 || s >= threshold) {
+                fallback.add(hit);
+                if (fallback.size() >= limit) {
+                    break;
+                }
+            }
+        }
+        return fallback;
     }
 
     /**
-     * 向量检索调试探针（供文档管理测试弹窗使用）：
-     * 1. 禁用 similarityThreshold 截断，获取原始 Top-K 命中文档及真实相似度得分；
-     * 2. 补齐文档名称（docName）、知识库设定阈值（threshold）与是否达标状态（passed）；
-     * 3. 辅助管理员洞察底层高维空间打分分布，用于微调知识库的相似度阈值。
-     *
-     * @param kb    知识库
-     * @param query 检索内容
-     * @param topK  检索数量
-     * @return 原始命中列表（含 score / docName / threshold / passed 等元数据）
+     * 检索调试探针（默认 HYBRID 模式，供测试弹窗使用）
      */
     public List<Map<String, Object>> searchForTest(KnowledgeBase kb, String query, int topK) {
+        return searchForTest(kb, query, topK, "HYBRID", null);
+    }
+
+    /**
+     * 检索调试探针（支持多检索模式与临时阈值，[FEAT-011]）：
+     * 1. 支持 HYBRID（多路融合）/ VECTOR（纯向量）/ BM25（纯关键词）；
+     * 2. 覆盖临时阈值，不截断 Top-K，透视原始真实打分与 passed 准入状态；
+     * 3. 补齐文档名称、分片类型与多维分数（score/vectorScore/bm25Score/rrfScore）。
+     *
+     * @param kb              知识库
+     * @param query           检索内容
+     * @param topK            检索数量
+     * @param mode            检索模式（HYBRID / VECTOR / BM25）
+     * @param customThreshold 临时阈值（null 或 &lt;= 0 则使用知识库设定阈值）
+     * @return 原始命中列表（含各维度打分与准入状态）
+     */
+    public List<Map<String, Object>> searchForTest(KnowledgeBase kb, String query, int topK, String mode, Double customThreshold) {
         if (StringTool.isBlank(query)) {
             throw new IllegalArgumentException("检索内容不能为空");
         }
-        MilvusVectorStore vectorStore = resolveVectorStore(kb);
-        if (vectorStore == null) {
-            throw new IllegalArgumentException("知识库未配置有效的向量化模型，请先配置");
-        }
-        try {
-            int limit = topK > 0 ? topK : defaultTopK(kb);
-            double threshold = kb.getSimilarityThreshold();
-            // 调试探针不传 similarityThreshold，获取全部原始 Top-K
-            List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder()
-                    .query(query)
-                    .topK(limit)
-                    .build());
-            List<Map<String, Object>> result = new ArrayList<>();
-            if (CollectionTool.isNotEmpty(documents)) {
-                Map<Long, String> docNameCache = new HashMap<>();
-                for (Document doc : documents) {
-                    Map<String, Object> item = new HashMap<>();
-                    item.put("text", doc.getText());
-                    double score = doc.getScore() != null ? doc.getScore() : 0.0;
-                    score = Math.round(score * 10000.0d) / 10000.0d;
-                    item.put("score", score);
-                    Map<String, Object> meta = doc.getMetadata();
-                    long docId = 0L;
-                    if (meta != null) {
-                        docId = parseLongObj(meta.get("docId"));
-                        item.put("docId", docId);
-                        item.put("chunkIndex", meta.get("chunkIndex"));
+        int limit = topK > 0 ? topK : defaultTopK(kb);
+        double activeThreshold = (customThreshold != null && customThreshold >= 0.0d)
+                ? customThreshold
+                : kb.getSimilarityThreshold();
+
+        String activeMode = StringTool.isNotBlank(mode) ? mode.trim().toUpperCase(Locale.ROOT) : "HYBRID";
+
+        // 1. 向量路检索
+        List<Map<String, Object>> vectorHits = new ArrayList<>();
+        if (!"BM25".equals(activeMode)) {
+            try {
+                MilvusVectorStore vectorStore = resolveVectorStore(kb);
+                if (vectorStore != null) {
+                    List<Document> documents = vectorStore.similaritySearch(SearchRequest.builder()
+                            .query(query)
+                            .topK(Math.max(limit * 2, 10))
+                            .build());
+                    if (CollectionTool.isNotEmpty(documents)) {
+                        for (Document doc : documents) {
+                            Map<String, Object> item = new HashMap<>();
+                            item.put("text", doc.getText());
+                            item.put("score", doc.getScore() != null ? doc.getScore() : 0.0d);
+                            Map<String, Object> meta = doc.getMetadata();
+                            if (meta != null) {
+                                item.put("docId", meta.get("docId"));
+                                item.put("chunkIndex", meta.get("chunkIndex"));
+                            }
+                            vectorHits.add(item);
+                        }
                     }
-                    item.put("docName", resolveDocName(docId, docNameCache));
-                    item.put("threshold", threshold);
-                    boolean passed = threshold <= 0.0 || score >= threshold;
-                    item.put("passed", passed);
-                    result.add(item);
                 }
+            } catch (Exception e) {
+                logger.warn("测试探针向量检索异常, baseId={}, err={}", kb.getId(), e.getMessage());
             }
-            return result;
-        } catch (Exception e) {
-            throw new IllegalStateException("向量检索调试探针异常, baseId=" + kb.getId(), e);
         }
+
+        // 2. BM25 路检索
+        List<RagBm25Tool.Bm25Hit> bm25Hits = Collections.emptyList();
+        if (!"VECTOR".equals(activeMode) && ragBm25Tool != null) {
+            try {
+                bm25Hits = ragBm25Tool.searchBm25(kb.getId(), kb.getChunkSize(), kb.getChunkOverlap(), query, Math.max(limit * 2, 10));
+            } catch (Exception e) {
+                logger.warn("测试探针 BM25 检索异常, baseId={}, err={}", kb.getId(), e.getMessage());
+            }
+        }
+
+        // 3. RRF 融合或单路处理（测试模式保持全量 Top-K，标记 passed 状态）
+        List<Map<String, Object>> fusedResults;
+        if (ragBm25Tool != null) {
+            fusedResults = ragBm25Tool.fuseWithRrf(vectorHits, bm25Hits, activeMode, activeThreshold, limit, true);
+        } else {
+            fusedResults = vectorHits;
+        }
+
+        // 4. 补齐文档名称、当前生效阈值等元数据
+        Map<Long, String> docNameCache = new HashMap<>();
+        for (Map<String, Object> item : fusedResults) {
+            long docId = parseLongObj(item.get("docId"));
+            item.put("docName", resolveDocName(docId, docNameCache));
+            item.put("threshold", Math.round(activeThreshold * 10000.0d) / 10000.0d);
+        }
+
+        return fusedResults;
     }
 
     /**

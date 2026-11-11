@@ -41,13 +41,19 @@ export interface KnowledgeBaseQuery {
 /** 列表接口请求参数 */
 export type KnowledgeBaseListQuery = ListQuery<KnowledgeBaseQuery>
 
-/** 向量检索命中项 */
+/** 检索命中项（多路召回 + RRF 融合打分透视） */
 export interface KnowledgeHit {
   text: string
   docId: number
   docName?: string
   chunkIndex?: number
   score: number
+  matchType?: 'HYBRID' | 'VECTOR' | 'BM25'
+  vectorScore?: number
+  bm25Score?: number
+  bm25NormScore?: number
+  rrfScore?: number
+  qaChunk?: boolean
   threshold?: number
   passed?: boolean
   [key: string]: unknown
