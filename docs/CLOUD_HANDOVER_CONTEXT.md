@@ -70,6 +70,13 @@ flowchart TD
 * **前端面板**：`eval/pages/index.vue` 双页签（数据集管理 + 实验中心）与 `ExperimentDetailDrawer.vue` 报告抽屉；
 * **数据库**：`doc/db/patch_20261112_feat014_eval.sql`（`xxl_ai_eval_dataset` 与 `xxl_ai_eval_experiment` 2 表内聚架构）。
 
+### 6. 工作流编排与轻量 DAG 执行引擎（FEAT-009 阶段一）
+* **执行引擎**：`WorkflowDagEngine.java`（Kahn 算法拓扑排序与环路检测、分支剪枝、50步防死循环熔断、180s超时保护）；
+* **基础节点**：6 类节点处理器（`START`、`LLM`、`RETRIEVAL`、`TOOL`、`CONDITION`、`END`）；
+* **上下文流转**：`WorkflowContext.java` 全局变量池与 `WorkflowVariableResolver.java` 纯静态变量插值（`{{nodeId.outputKey}}`），解耦反向依赖防循环死锁；
+* **前端面板**：`workflow/pages/index.vue` 双页签（定义管理 + 执行历史）与 `WorkflowDebugDrawer.vue` 调试抽屉（含时延瀑布与节点快照）；
+* **数据库**：`doc/db/patch_20261112_feat009_workflow.sql`（`xxl_ai_workflow` 与 `xxl_ai_workflow_execution` 2 表微创架构）。
+
 ---
 
 ## 三、核心参考文档与测试指南导航

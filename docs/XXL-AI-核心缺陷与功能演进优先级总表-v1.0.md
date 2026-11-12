@@ -42,12 +42,14 @@ flowchart TD
         D6["推理超参数动态配置 + Prompt槽位变量 + SubAgents多智能体委派 (FEAT-006 / FEAT-010 / FEAT-013)"]
         D7["公开端免登录水平越权防御 (HMAC VisitorToken + DB归属强校验 SEC-001)"]
         D8["Skill 宿主机 RCE 深度防御 (公网剥离Shell特权 + 环境脱敏 + 防穿越 SEC-002)"]
+        D9["AI 应用与 RAG 质量量化评测体系 (FEAT-014)"]
+        D10["Workflow 轻量 DAG 拓扑执行引擎与基础节点 (FEAT-009 阶段一)"]
     end
 
     subgraph StillGaps["当前依然待办的缺陷与功能缺口"]
         G1["【P2 运行时容灾】Stream任务超限熔断 (DATA-001) & PEL防重锁 (RUN-001) & 【P4】集群停止广播 (RUN-002)"]
         G2["【P2/P3 工具治理】多工具中间迷失治理 (TOOL-002) & 动态工具检索与路由 (FEAT-008)"]
-        G3["【P3 体系演进】Workflow可视化编排 (FEAT-009) & RAG质量量化评测 (FEAT-014) & 知识图谱 (FEAT-015)"]
+        G3["【P3 体系演进】Workflow可视化画布高级节点 (FEAT-009 阶段二) & 知识图谱 (FEAT-015)"]
     end
 
     Done -.-> StillGaps
@@ -126,7 +128,7 @@ flowchart TD
 | **P2** | **[FEAT-011]** | RAG 知识库 | **检索测试台增强 (Playground) 与问答对 (FAQ)** | 对标 LightBot 检索测试 | 1. **测试台多维透视**：在 `doc.vue` 检索测试台中回显文档名 `docName`，支持 HYBRID / VECTOR / BM25 检索模式切换与临时阈值调优；<br>2. **QA 问答对管理**：支持手动录入精细化问答对，自动原子分块，享 1.15x 融合权重。 | **已完成 (2026-11-10)。高（B 级）** |
 | **P2** | **[FEAT-012]** | 全链路可观测 | **全链路 LLM Trace 监控与实时日志流** | 对标 Langfuse / LightBot Trace | 基于 `TraceCollector` 捕获 `runMeta`（状态机/TTFT/总耗时/Worker 节点）、多轮累加 `tokenUsage`、阶段 `spans` 时延瀑布图、`toolTraces`（入出参 1000 字符摘要）、`references` 与 `logs` 实时日志流；前端提供 `TraceInspectorDrawer` 抽屉式回放（注：当前记录结构化指标与入出参摘要，暂未存储模型原始 HTTP Request/Response 全报文）。 | **已完成。中高（B 级）** |
 | **P3** | **[FEAT-008]** | AI 扩展体系 | **动态工具路由与检索 (Tool Retrieval)** | 解决 `[TOOL-002]` 61 工具踩踏 | 根据用户提问，先检索出最相关的 3~5 个工具 Schema 喂给模型，避免塞爆 Prompt 并降低幻觉。 | **未开始。中（C 级）** |
-| **P3** | **[FEAT-009]** | Workflow 编排 | **Workflow 可视化工作流编排 (DAG 画布)** | 借鉴 `LightBot` 18 节点工作流 | **分阶段演进**：<br>- 阶段一：6 类核心基础节点（开始、LLM、知识检索、工具调用、条件分支、结束）轻量 DAG 执行引擎；<br>- 阶段二：支持分类器、代码执行、嵌套子工作流、人工确认等 18 种节点类型与 Vue Flow 拖拽式画布。 | **未开始。中（C 级重型方案）** |
+| **P3** | **[FEAT-009]** | Workflow 编排 | **Workflow 可视化工作流编排 (DAG 画布)** | 借鉴 `LightBot` 18 节点工作流 | **分阶段演进**：<br>- 阶段一：6 类核心基础节点（开始、LLM、知识检索、工具调用、条件分支、结束）轻量 DAG 执行引擎与试跑调试抽屉；<br>- 阶段二：支持分类器、代码执行、嵌套子工作流、人工确认等 18 种节点类型与 Vue Flow 拖拽式画布。 | **阶段一已完成 (2026-11-12)。中（C 级微创 2 表方案）** |
 | **P3** | **[FEAT-013]** | AI 扩展体系 | **SubAgents 多智能体协作体系** | 借鉴 LightBot SubAgent 协作 | **Agent-as-a-Tool 模式**：将子 Agent 包装为标准 Spring AI `ToolCallback`，主 Agent 自主规划拆解并将子任务委派给 SubAgent 执行后汇总。 | **已完成 (2026-11-10)。高（C 级微创方案）** |
 | **P3** | **[FEAT-014]** | 评测体系 | **AI 应用与 RAG 质量量化评测体系** | 对标 LightBot 评测集与实验 | 上传 Benchmark 评测集（Question + Ground Truth），内置 RAG 评估器（HitRate@K/MRR/忠实度/相关性）与 Agent 任务达成率评估，输出批量对比实验报告。 | **已完成 (2026-11-12)。中（C 级微创独立模块）** |
 | **P3** | **[FEAT-015]** | RAG 知识库 | **知识图谱与 GraphRAG 增强** | 借鉴 LightBot 图谱检索 | 结合轻量图存储，实现文档实体与关系三元组抽取、图谱可视化与全局图检索，解决跨多文档关联推理难题。（**克制引入，不作核心依赖**） | **未开始。低（视资源选配）** |

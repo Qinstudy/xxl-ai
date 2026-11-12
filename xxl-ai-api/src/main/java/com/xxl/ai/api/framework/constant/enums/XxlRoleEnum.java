@@ -109,6 +109,9 @@ public enum XxlRoleEnum {
         // 质量评测
         resources.add(res(75, 0, "质量评测", ResourceTypeEnum.MENU, "eval:default", "/eval", "data-analysis", 750));
 
+        // 工作流编排
+        resources.add(res(76, 0, "工作流编排", ResourceTypeEnum.MENU, "workflow:default", "/workflow", "tree", 760));
+
         // 系统管理（仅管理员）
         if (role == ADMIN) {
             resources.add(res(8, 0, "系统管理", ResourceTypeEnum.CATALOG, "system", "/system", "system", 800));
