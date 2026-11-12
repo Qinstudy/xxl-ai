@@ -64,15 +64,25 @@ flowchart TD
 ### 4. 传输超时穿透
 * `LlmModelFactory.java` 读取 `@Value("${xxl-ai.chat.stream.timeout:180000}")`，向 `OpenAiChatOptions` 显式注入 `.timeout(Duration.ofMillis(streamTimeout))`，彻底解决 OkHttpClient 默认 60s 超时中断长文本生成的致命痛点。
 
+### 5. AI 应用与 RAG 质量量化评测体系（FEAT-014）
+* **后端引擎**：`EvalEngineTool.java` 提供离散检索指标（HitRate@K、MRR）及 LLM-as-a-Judge（Faithfulness 防幻觉、Answer Relevance 相关性、Goal Completion 达成率）；
+* **业务与调度**：`EvalExperimentServiceImpl.java` 定长线程池（并发度 3）跑批，实时打点更新进度，快照防基线漂移；
+* **前端面板**：`eval/pages/index.vue` 双页签（数据集管理 + 实验中心）与 `ExperimentDetailDrawer.vue` 报告抽屉；
+* **数据库**：`doc/db/patch_20261112_feat014_eval.sql`（`xxl_ai_eval_dataset` 与 `xxl_ai_eval_experiment` 2 表内聚架构）。
+
 ---
 
-## 三、核心参考文档导航
+## 三、核心参考文档与测试指南导航
 
-云端 Agent 在进行方案设计时，以仓库内保留的 **2 份核心文档** 作为最高权威参考：
+云端与本地研发以仓库内以下核心文档作为基准与验收依据：
 1. **`docs/XXL-AI-核心缺陷与功能演进优先级总表-v1.0.md`**：
    * 包含缺陷总表（P0~P3）与功能演进蓝图，标注了当前各任务的状态与优先级。
 2. **`docs/三项目对标总表-v2.0.md`**：
    * 对标 `LightBot` 与 `aiagentdemo` 的架构全景、算法选型（模型路由、记忆压缩、提示词工程），是后续架构优化的设计库。
+3. **`docs/XXL-AI-近期核心特性页面端到端测试验证指南.md`**：
+   * 近期交付特性的完整 Web 页面测试实操手册（覆盖 FEAT-014 评测中心、FEAT-010 动态变量、FEAT-011/004 检索测试台与多路 RRF、SEC-001/002 安全防线）。
+4. **`docs/XXL-AI-FEAT-006与FEAT-013本地测试验证指南.md`**：
+   * 包含大模型推理超参数动态配置与 SubAgents 多智能体委派体系的端到端测试步骤。
 
 ---
 
