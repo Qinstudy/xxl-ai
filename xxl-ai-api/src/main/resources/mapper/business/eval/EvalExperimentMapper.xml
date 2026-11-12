@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xxl.ai.api.business.eval.mapper.EvalExperimentMapper">
+
+	<resultMap id="EvalExperiment" type="com.xxl.ai.api.business.eval.model.entity.EvalExperiment">
+		<result column="id" property="id" />
+		<result column="space_id" property="spaceId" />
+		<result column="dataset_id" property="datasetId" />
+		<result column="name" property="name" />
+		<result column="eval_type" property="evalType" />
+		<result column="target_id" property="targetId" />
+		<result column="target_name" property="targetName" />
+		<result column="judge_model_id" property="judgeModelId" />
+		<result column="status" property="status" />
+		<result column="total_cases" property="totalCases" />
+		<result column="completed_cases" property="completedCases" />
+		<result column="avg_hit_rate" property="avgHitRate" />
+		<result column="avg_mrr" property="avgMrr" />
+		<result column="avg_faithfulness" property="avgFaithfulness" />
+		<result column="avg_relevance" property="avgRelevance" />
+		<result column="avg_goal_completion" property="avgGoalCompletion" />
+		<result column="avg_latency_ms" property="avgLatencyMs" />
+		<result column="total_tokens" property="totalTokens" />
+		<result column="summary_json" property="summaryJson" />
+		<result column="error_msg" property="errorMsg" />
+		<result column="add_time" property="addTime" />
+		<result column="update_time" property="updateTime" />
+	</resultMap>
+
+	<sql id="Base_Column_List">
+		t.id,
+		t.space_id,
+		t.dataset_id,
+		t.name,
+		t.eval_type,
+		t.target_id,
+		t.target_name,
+		t.judge_model_id,
+		t.status,
+		t.total_cases,
+		t.completed_cases,
+		t.avg_hit_rate,
+		t.avg_mrr,
+		t.avg_faithfulness,
+		t.avg_relevance,
+		t.avg_goal_completion,
+		t.avg_latency_ms,
+		t.total_tokens,
+		t.summary_json,
+		t.error_msg,
+		t.add_time,
+		t.update_time
+	</sql>
+
+	<insert id="insert" parameterType="com.xxl.ai.api.business.eval.model.entity.EvalExperiment" useGeneratedKeys="true" keyProperty="id">
+		INSERT INTO xxl_ai_eval_experiment (
+			space_id, dataset_id, name, eval_type, target_id, target_name,
+			judge_model_id, status, total_cases, completed_cases, avg_hit_rate,
+			avg_mrr, avg_faithfulness, avg_relevance, avg_goal_completion,
+			avg_latency_ms, total_tokens, summary_json, error_msg, add_time, update_time
+		) VALUES (
+			#{spaceId}, #{datasetId}, #{name}, #{evalType}, #{targetId}, #{targetName},
+			#{judgeModelId}, #{status}, #{totalCases}, #{completedCases}, #{avgHitRate},
+			#{avgMrr}, #{avgFaithfulness}, #{avgRelevance}, #{avgGoalCompletion},
+			#{avgLatencyMs}, #{totalTokens}, #{summaryJson}, #{errorMsg}, NOW(), NOW()
+		);
+	</insert>
+
+	<delete id="delete">
+		DELETE FROM xxl_ai_eval_experiment WHERE id = #{id}
+	</delete>
+
+	<delete id="deleteByIds">
+		DELETE FROM xxl_ai_eval_experiment
+		WHERE id IN
+		<foreach collection="ids" item="item" open="(" separator="," close=")">
+			#{item}
+		</foreach>
+	</delete>
+
+	<update id="update" parameterType="com.xxl.ai.api.business.eval.model.entity.EvalExperiment">
+		UPDATE xxl_ai_eval_experiment
+		SET name = #{name},
+			judge_model_id = #{judgeModelId},
+			status = #{status},
+			total_cases = #{totalCases},
+			completed_cases = #{completedCases},
+			avg_hit_rate = #{avgHitRate},
+			avg_mrr = #{avgMrr},
+			avg_faithfulness = #{avgFaithfulness},
+			avg_relevance = #{avgRelevance},
+			avg_goal_completion = #{avgGoalCompletion},
+			avg_latency_ms = #{avgLatencyMs},
+			total_tokens = #{totalTokens},
+			summary_json = #{summaryJson},
+			error_msg = #{errorMsg},
+			update_time = NOW()
+		WHERE id = #{id}
+	</update>
+
+	<update id="updateProgress" parameterType="com.xxl.ai.api.business.eval.model.entity.EvalExperiment">
+		UPDATE xxl_ai_eval_experiment
+		SET status = #{status},
+			completed_cases = #{completedCases},
+			avg_hit_rate = #{avgHitRate},
+			avg_mrr = #{avgMrr},
+			avg_faithfulness = #{avgFaithfulness},
+			avg_relevance = #{avgRelevance},
+			avg_goal_completion = #{avgGoalCompletion},
+			avg_latency_ms = #{avgLatencyMs},
+			total_tokens = #{totalTokens},
+			summary_json = #{summaryJson},
+			error_msg = #{errorMsg},
+			update_time = NOW()
+		WHERE id = #{id}
+	</update>
+
+	<select id="load" resultMap="EvalExperiment">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_ai_eval_experiment t
+		WHERE t.id = #{id}
+	</select>
+
+	<select id="listByDatasetId" resultMap="EvalExperiment">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_ai_eval_experiment t
+		WHERE t.dataset_id = #{datasetId}
+		ORDER BY t.id DESC
+	</select>
+
+	<select id="pageList" resultMap="EvalExperiment">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_ai_eval_experiment t
+		WHERE t.space_id = #{spaceId}
+		<if test="name != null and name != ''">
+			AND t.name LIKE CONCAT('%', #{name}, '%')
+		</if>
+		<if test="datasetId != null and datasetId > 0">
+			AND t.dataset_id = #{datasetId}
+		</if>
+		<if test="status != null and status >= 0">
+			AND t.status = #{status}
+		</if>
+		ORDER BY t.id DESC
+		LIMIT #{offset}, #{pagesize}
+	</select>
+
+	<select id="pageListCount" resultType="java.lang.Integer">
+		SELECT count(1)
+		FROM xxl_ai_eval_experiment t
+		WHERE t.space_id = #{spaceId}
+		<if test="name != null and name != ''">
+			AND t.name LIKE CONCAT('%', #{name}, '%')
+		</if>
+		<if test="datasetId != null and datasetId > 0">
+			AND t.dataset_id = #{datasetId}
+		</if>
+		<if test="status != null and status >= 0">
+			AND t.status = #{status}
+		</if>
+	</select>
+
+	<select id="countBySpaceId" resultType="java.lang.Integer">
+		SELECT count(1)
+		FROM xxl_ai_eval_experiment t
+		WHERE t.space_id = #{spaceId}
+	</select>
+
+</mapper>

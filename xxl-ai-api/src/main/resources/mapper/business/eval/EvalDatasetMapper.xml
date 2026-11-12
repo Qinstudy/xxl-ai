@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+	"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.xxl.ai.api.business.eval.mapper.EvalDatasetMapper">
+
+	<resultMap id="EvalDataset" type="com.xxl.ai.api.business.eval.model.entity.EvalDataset">
+		<result column="id" property="id" />
+		<result column="space_id" property="spaceId" />
+		<result column="name" property="name" />
+		<result column="eval_type" property="evalType" />
+		<result column="target_id" property="targetId" />
+		<result column="target_name" property="targetName" />
+		<result column="sample_count" property="sampleCount" />
+		<result column="content_json" property="contentJson" />
+		<result column="description" property="description" />
+		<result column="add_time" property="addTime" />
+		<result column="update_time" property="updateTime" />
+	</resultMap>
+
+	<sql id="Base_Column_List">
+		t.id,
+		t.space_id,
+		t.name,
+		t.eval_type,
+		t.target_id,
+		t.target_name,
+		t.sample_count,
+		t.content_json,
+		t.description,
+		t.add_time,
+		t.update_time
+	</sql>
+
+	<insert id="insert" parameterType="com.xxl.ai.api.business.eval.model.entity.EvalDataset" useGeneratedKeys="true" keyProperty="id">
+		INSERT INTO xxl_ai_eval_dataset (
+			space_id, name, eval_type, target_id, target_name,
+			sample_count, content_json, description, add_time, update_time
+		) VALUES (
+			#{spaceId}, #{name}, #{evalType}, #{targetId}, #{targetName},
+			#{sampleCount}, #{contentJson}, #{description}, NOW(), NOW()
+		);
+	</insert>
+
+	<delete id="delete">
+		DELETE FROM xxl_ai_eval_dataset WHERE id = #{id}
+	</delete>
+
+	<delete id="deleteByIds">
+		DELETE FROM xxl_ai_eval_dataset
+		WHERE id IN
+		<foreach collection="ids" item="item" open="(" separator="," close=")">
+			#{item}
+		</foreach>
+	</delete>
+
+	<update id="update" parameterType="com.xxl.ai.api.business.eval.model.entity.EvalDataset">
+		UPDATE xxl_ai_eval_dataset
+		SET name = #{name},
+			eval_type = #{evalType},
+			target_id = #{targetId},
+			target_name = #{targetName},
+			sample_count = #{sampleCount},
+			content_json = #{contentJson},
+			description = #{description},
+			update_time = NOW()
+		WHERE id = #{id}
+	</update>
+
+	<select id="load" resultMap="EvalDataset">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_ai_eval_dataset t
+		WHERE t.id = #{id}
+	</select>
+
+	<select id="listBySpace" resultMap="EvalDataset">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_ai_eval_dataset t
+		WHERE t.space_id = #{spaceId}
+		ORDER BY t.id DESC
+	</select>
+
+	<select id="pageList" resultMap="EvalDataset">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_ai_eval_dataset t
+		WHERE t.space_id = #{spaceId}
+		<if test="name != null and name != ''">
+			AND t.name LIKE CONCAT('%', #{name}, '%')
+		</if>
+		<if test="evalType != null and evalType != ''">
+			AND t.eval_type = #{evalType}
+		</if>
+		ORDER BY t.id DESC
+		LIMIT #{offset}, #{pagesize}
+	</select>
+
+	<select id="pageListCount" resultType="java.lang.Integer">
+		SELECT count(1)
+		FROM xxl_ai_eval_dataset t
+		WHERE t.space_id = #{spaceId}
+		<if test="name != null and name != ''">
+			AND t.name LIKE CONCAT('%', #{name}, '%')
+		</if>
+		<if test="evalType != null and evalType != ''">
+			AND t.eval_type = #{evalType}
+		</if>
+	</select>
+
+	<select id="countBySpaceId" resultType="java.lang.Integer">
+		SELECT count(1)
+		FROM xxl_ai_eval_dataset t
+		WHERE t.space_id = #{spaceId}
+	</select>
+
+</mapper>

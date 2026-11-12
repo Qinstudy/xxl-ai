@@ -106,6 +106,9 @@ public enum XxlRoleEnum {
         resources.add(res(7, 0, "供应商模型", ResourceTypeEnum.MENU, "supplier:default", "/supplier", "server", 700));
         resources.add(resHidden(71, 0, "供应商模型", ResourceTypeEnum.MENU, "supplier:default", "/supplier/model", "", 701));
 
+        // 质量评测
+        resources.add(res(75, 0, "质量评测", ResourceTypeEnum.MENU, "eval:default", "/eval", "data-analysis", 750));
+
         // 系统管理（仅管理员）
         if (role == ADMIN) {
             resources.add(res(8, 0, "系统管理", ResourceTypeEnum.CATALOG, "system", "/system", "system", 800));
