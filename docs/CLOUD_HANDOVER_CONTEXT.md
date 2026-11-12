@@ -97,6 +97,10 @@ flowchart TD
    * 自定义请求头必须挂到每个 `model.headers`，而不是 `provider.headers`（Spring AI 底层只有 model 级 header 会被合并）。
 4. **外部参考库隔离**：
    * `refs/` 与 `xxl-ai-spec/` 属本地历史文件，禁止 `git add` 推送，保持仓库纯净。
+5. **Spring AI Options 动态超参数隐式篡改模型名陷阱（防 400 模型不存在）**：
+   * `OpenAiChatOptions.builder()` 在仅设置 `temperature/topP/maxTokens` 而未显式调用 `.model(...)` 时，Spring AI 构造函数默认隐式赋值为 `DEFAULT_CHAT_MODEL`（`gpt-5-mini`）；
+   * 通过 `ChatClientRequestSpec.options(...)` 注入 Prompt 级超参数时，拥有更高优先级的 options 会将 `gpt-5-mini` 覆盖到底层配置的真实模型名上，导致请求智谱 GLM、DeepSeek、Ollama 等第三方兼容 OpenAI 协议的模型全量报 `400: 模型不存在，请检查模型代码`；
+   * **避坑红线**：凡在运行时构建或变异 `OpenAiChatOptions`，必须强制显式绑定 `runtime.getModelName()`；并在调用层（`LlmChatTool`）二次强校验兜底，严禁裸跑 Options Builder。
 
 ---
 

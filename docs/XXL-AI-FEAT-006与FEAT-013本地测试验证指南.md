@@ -177,3 +177,13 @@ ResultSet rs = stmt.executeQuery(sql);
 
 3. **子 Agent 出现 `[SubAgent 委派失败]` 提示？**
    - **原因**：检查子 Agent 所绑定的模型供应商 API Key 是否有效、网络是否通畅、或者绑定的模型是否为非对话类型。Trace 抽屉的日志中会明确打印出具体的异常信息。
+
+4. **设置了推理超参数（Temperature/Top P/Max Tokens）后，请求国产大模型（如智谱 GLM、DeepSeek 等）报 `400: 模型不存在，请检查模型代码`？**
+   - **故障现场与表象**：在 Agent 编辑弹窗中，一旦配置了【采样温度】、【核采样】或【单次最大 Token】中任意一个参数，发起对话就会报 `400: 模型不存在，请检查模型代码`（如 `com.openai.errors.BadRequestException`）；而一旦清空这三个参数（置空保存），对话立刻恢复正常。
+   - **底层因果排雷（Spring AI 2.x 隐式覆写陷阱）**：
+     - Spring AI 的 `OpenAiChatOptions.builder()` 内部存在默认行为：如果仅设置了 `temperature`、`topP`、`maxTokens` 而**未显式调用 `.model(...)`**，其构造函数会默认回退为 `DEFAULT_CHAT_MODEL = ChatModel.GPT_5_MINI.asString()`（即 OpenAI 的 `"gpt-5-mini"`）。
+     - 随后在 `LlmChatTool` 执行 `spec.options(chatOptions.mutate())` 时，Prompt 级别的 Options 拥有最高优先级，**直接将 `LlmModelFactory` 底层绑定的真实模型（如 `glm-4.7`、`glm-4-flash`）强制覆盖为了 `"gpt-5-mini"`**。
+     - 请求发送至智谱 GLM、DeepSeek 等兼容 OpenAI 协议的第三方 API 网关时，网关识别到模型代码为不存在的 `"gpt-5-mini"`，直接拒绝并返回 HTTP 400。
+   - **闭环防坑解法（双重防御）**：
+     1. **构建处显式绑定**：在 `ChatStreamTool.buildChatOptions(agent, runtime.getModelName(), traceCollector)` 及 `SubAgentTool` 构建超参数时，显式将当前运行时的真实 `modelName` 写入 Builder，阻止 Spring AI 回退默认值。
+     2. **调用层强校验兜底**：在 `LlmChatTool.chat(...)` 执行 Prompt 注入前，若检测到 `OpenAiChatOptions`，强制重新设置 `.model(runtime.getModelName())`，建立不可穿透的底线防御。
