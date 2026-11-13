@@ -36,7 +36,10 @@ public class WorkflowExecutionServiceImpl implements WorkflowExecutionService {
                 dtoList.add(WorkflowAdaptor.adapt2dto(item));
             }
         }
-        return new PageModel<>(offset, pagesize, total, dtoList);
+        PageModel<WorkflowExecutionDTO> pageModel = new PageModel<>();
+        pageModel.setData(dtoList);
+        pageModel.setTotal(total);
+        return pageModel;
     }
 
     @Override

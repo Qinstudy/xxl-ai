@@ -7,7 +7,7 @@ import com.xxl.ai.api.business.workflow.model.entity.Workflow;
 import com.xxl.ai.api.business.workflow.model.entity.WorkflowExecution;
 import com.xxl.tool.core.DateTool;
 import com.xxl.tool.core.StringTool;
-import com.xxl.tool.gson.GsonTool;
+import com.xxl.tool.json.GsonTool;
 
 /**
  * 工作流模块实体与 DTO 互相转换适配器

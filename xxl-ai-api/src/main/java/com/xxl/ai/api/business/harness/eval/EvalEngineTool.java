@@ -256,7 +256,7 @@ public class EvalEngineTool {
         try {
             // 1、执行前置真实检索
             List<String> degradeNotices = new ArrayList<>();
-            TraceCollector traceCollector = new TraceCollector("eval-" + evalCase.getId());
+            TraceCollector traceCollector = new TraceCollector(0L, 0L, 0L, "eval-" + evalCase.getId());
             List<TraceCollector.RagReference> references = ragTool.retrieveForChat(
                     spaceId, kbIds, evalCase.getQuery(), degradeNotices, traceCollector);
             result.setRetrievedChunks(references);

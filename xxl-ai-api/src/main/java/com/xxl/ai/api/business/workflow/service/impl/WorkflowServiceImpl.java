@@ -22,7 +22,7 @@ import com.xxl.ai.api.business.workflow.model.entity.WorkflowExecution;
 import com.xxl.ai.api.business.workflow.service.WorkflowService;
 import com.xxl.tool.core.CollectionTool;
 import com.xxl.tool.core.StringTool;
-import com.xxl.tool.gson.GsonTool;
+import com.xxl.tool.json.GsonTool;
 import com.xxl.tool.response.PageModel;
 import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
@@ -77,7 +77,10 @@ public class WorkflowServiceImpl implements WorkflowService {
                 dtoList.add(WorkflowAdaptor.adapt2dto(item));
             }
         }
-        return new PageModel<>(offset, pagesize, total, dtoList);
+        PageModel<WorkflowDTO> pageModel = new PageModel<>();
+        pageModel.setData(dtoList);
+        pageModel.setTotal(total);
+        return pageModel;
     }
 
     @Override
