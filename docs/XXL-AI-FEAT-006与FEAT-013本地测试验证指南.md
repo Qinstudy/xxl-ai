@@ -1,189 +1,243 @@
 # XXL-AI 本地测试与验证指南：FEAT-006 & FEAT-013
 
-> 本手册用于在本地环境（Web 页面）完整复现与测试已提交的两项核心能力：
-> - **[FEAT-006]** 大模型推理超参数动态配置 (Options)
-> - **[FEAT-013]** SubAgents 多智能体协作与结果汇总体系 (Agent-as-a-Tool)
+> 本手册基于 `dev-cloud` 分支当前源码实现（菜单、表单校验与自适应单门面 SubAgent 运行时），用于在 Web 页面与接口层完整测试以下两项核心能力：
+> - **[FEAT-006]** 大模型推理超参数动态配置 (`temperature` / `topP` / `maxTokens`)
+> - **[FEAT-013]** SubAgents 多智能体协作、自主任务拆解与路由纠偏体系（`delegate_specialist` / `decompose_and_spawn` / `dispatch_subagents`）
 
 ---
 
 ## 目录
-- [零、 前置准备（数据库升级与服务启动）](#零-前置准备数据库升级与服务启动)
+- [零、 前置准备（数据库升级、模型配置与服务启动）](#零-前置准备数据库升级模型配置与服务启动)
 - [一、 [FEAT-006] 大模型推理超参数配置测试](#一-feat-006-大模型推理超参数配置测试)
-  - [1.1 表单交互与回显验证](#11-表单交互与回显验证)
+  - [1.1 表单交互、Tooltip 与置空保存验证](#11-表单交互tooltip-与置空保存验证)
   - [1.2 对话与 Trace 注入日志验证](#12-对话与-trace-注入日志验证)
-  - [1.3 边界值合法性拦截验证](#13-边界值合法性拦截验证)
-- [二、 [FEAT-013] SubAgents 多智能体协作与结果汇总测试](#二-feat-013-subagents-多智能体协作与结果汇总测试)
+  - [1.3 前端自动夹逼与后端边界合法性拦截验证](#13-前端自动夹逼与后端边界合法性拦截验证)
+- [二、 [FEAT-013] SubAgents 多智能体协作与自主拆解测试](#二-feat-013-subagents-多智能体协作与自主拆解测试)
   - [2.1 准备 2 个角色分工明确的子 Agent](#21-准备-2-个角色分工明确的子-agent)
-  - [2.2 配置主控 Agent（挂载 SubAgents）](#22-配置主控-agent挂载-subagents)
-  - [2.3 发起复合任务对话与自动委派测试](#23-发起复合任务对话与自动委派测试)
-  - [2.4 四维全景验收指标对照表](#24-四维全景验收指标对照表)
+  - [2.2 模式 A：纯预置专家并行委派（delegate_specialist）](#22-模式-a纯预置专家并行委派delegate_specialist)
+  - [2.3 模式 B：纯自主任务拆解（decompose_and_spawn）](#23-模式-b纯自主任务拆解decompose_and_spawn)
+  - [2.4 模式 C：混合双开与运行时路由纠偏（dispatch_subagents）](#24-模式-c混合双开与运行时路由纠偏dispatch_subagents)
+  - [2.5 四维全景验收指标对照表](#25-四维全景验收指标对照表)
 - [三、 常见排错与避坑指南](#三-常见排错与避坑指南)
 
 ---
 
-## 零、 前置准备（数据库升级与服务启动）
+## 零、 前置准备（数据库升级、模型配置与服务启动）
 
-由于两项特性在 `xxl_ai_agent` 表中新增了数据列，在启动服务前**必须先在本地 MySQL 执行以下 DDL 语句**：
+### 1. 数据库就绪（区分全新建库与存量升级）
+- **全新空库**：仓库主脚本 [tables_xxl_ai.sql](../doc/db/tables_xxl_ai.sql) 已内置 FEAT-006 与 FEAT-013 的全部字段，直接导入即可：
+  ```bash
+  mysql --default-character-set=utf8mb4 -h127.0.0.1 -P3306 -uroot -p123456 < doc/db/tables_xxl_ai.sql
+  ```
+- **存量旧库升级**：若本地库缺少近期新增列，必须按顺序补齐 **`p2`（推理超参数）+ `p3`（关联 SubAgent）+ `p4`（自主拆解开关 `auto_decompose_status`）**，漏执行 `p4` 将直接导致页面报错：
+  ```bash
+  mysql --default-character-set=utf8mb4 -h127.0.0.1 -P3306 -uroot -p123456 xxl_ai < doc/db/patch_20261110_p2_agent_options.sql
+  mysql --default-character-set=utf8mb4 -h127.0.0.1 -P3306 -uroot -p123456 xxl_ai < doc/db/patch_20261110_p3_agent_subagent.sql
+  mysql --default-character-set=utf8mb4 -h127.0.0.1 -P3306 -uroot -p123456 xxl_ai < doc/db/patch_20261110_p4_auto_decompose.sql
+  ```
+  > 执行后可在 MySQL 中运行 `DESC xxl_ai_agent;` 确认存在 `sub_agent_ids`、`auto_decompose_status`、`temperature`、`top_p`、`max_tokens` 5 个字段。
 
-```sql
-SET NAMES utf8mb4;
-
--- 补齐 FEAT-006 与 FEAT-013 所需的数据列
-ALTER TABLE `xxl_ai_agent`
-    ADD COLUMN `temperature` DOUBLE NULL DEFAULT NULL COMMENT '模型采样温度(0.0~2.0)，为空采用模型默认值' AFTER `memory_status`,
-    ADD COLUMN `top_p` DOUBLE NULL DEFAULT NULL COMMENT '模型核采样(0.0~1.0)，为空采用模型默认值' AFTER `temperature`,
-    ADD COLUMN `max_tokens` INT NULL DEFAULT NULL COMMENT '单次生成最大Token数，为空采用模型默认值' AFTER `top_p`,
-    ADD COLUMN `sub_agent_ids` VARCHAR(500) NULL DEFAULT NULL COMMENT '关联SubAgent ID集合(逗号分隔，最多5个)' AFTER `skill_ids`;
-```
-
-> **启动本地工程**：
-> 1. 后端：启动 `xxl-ai-api`（默认端口 `8080`）；
-> 2. 前端：在 `xxl-ai-ui` 目录下执行 `npm run dev`（默认端口 `3000`）；
-> 3. 浏览器访问：`http://localhost:3000` 并登录。
+### 2. 启动工程与模型前置配置
+1. **中间件**：确认本地 MySQL（`3306`）与 Redis（`6379`）正常运行（若子 Agent 需测试知识库透传检索，还需启动 Milvus `19530` 并完成文档向量化）。
+2. **后端 API**：根目录运行 `mvn -pl xxl-ai-api spring-boot:run`（端口 `8080`）。
+3. **前端 UI**：`xxl-ai-ui/` 目录运行 `npm run dev`（端口 `3000`）。
+4. **登录与模型配置**：访问 `http://localhost:3000` 使用 `admin / 123456` 登录；**务必先进入左侧【供应商模型】菜单**，为所用对话供应商（如 Deepseek、智谱GLM 或本地 Ollama）填入有效 `API密钥`（种子 SQL 默认留空）并启用至少 1 个支持 Function Calling / Tool Use 的对话模型。
 
 ---
 
 ## 一、 [FEAT-006] 大模型推理超参数配置测试
 
-### 1.1 表单交互与回显验证
-1. 进入系统左侧菜单：**【应用管理】 $\to$ 【Agent 管理】**。
-2. 点击右上角 **【新建】** 或编辑现有 Agent。
-3. 滚动到弹窗底部，检查表单是否出现 **【模型推理高级参数】** 分割线与 3 个输入框：
+### 1.1 表单交互、Tooltip 与置空保存验证
+1. 点击左侧一级菜单：**【Agent管理】**（路由 `/#/agent/index`，非子菜单）。
+2. 点击工具栏 **【新增】**（或操作列 **【修改】** 编辑现有 Agent）。
+3. 滚动到弹窗底部，检查表单是否出现 **【模型推理高级参数】** 分割线与 3 个数字输入组件：
    - **采样温度 (Temperature)**：
-     - 输入 `0.7`（支持范围：`0.0 ~ 2.0`，步进：`0.1`）；
-     - 鼠标悬停旁边 `?` 图标，检查 Tooltip 提示是否正常显示。
+     - 输入 `0.7`（`min=0, max=2, step=0.1, precision=1`）；
+     - 鼠标悬停标签旁 `?` 图标，检查 Tooltip 提示正常显示。
    - **核采样 (Top P)**：
-     - 输入 `0.9`（支持范围：`0.0 ~ 1.0`，步进：`0.05`）；
-     - 鼠标悬停旁边 `?` 图标检查提示。
+     - 输入 `0.9`（`min=0, max=1, step=0.05, precision=2`）；
+     - 悬停 `?` 图标检查 Tooltip 提示。
    - **单次最大 Token (Max Tokens)**：
-     - 输入 `2048`（支持范围：`1 ~ 131072`，步进：`128`）；
-     - 鼠标悬停旁边 `?` 图标检查提示。
+     - 输入 `2048`（`min=1, max=131072, step=128`）；
+     - 悬停 `?` 图标检查 Tooltip 提示。
 4. 点击 **【确定】** 保存。
-5. 刷新页面后再次点击该 Agent 的 **【编辑】**，确认 3 个参数能正确回显。
-6. 测试清空这 3 个参数（置空状态）并保存，确认允许留空（留空表示使用底层大模型的默认参数）。
-
-### 1.2 对话与 Trace 注入日志验证
-1. 编辑该 Agent，设置明确的超参数（如 `temperature=0.7`, `topP=0.9`, `maxTokens=2048`）并保存。
-2. 点击该 Agent 行操作列的 **【发布】**，使其进入已发布状态。
-3. 点击 **【对话】**（或打开该 Agent 的外网 UUID 访问链接）进入聊天界面。
-4. 向 Agent 发送任意消息，例如：
-   ```text
-   请写一首关于江南烟雨的七言绝句。
-   ```
-5. 模型流式回复完毕后，点击界面右上角（或消息气泡下方工具条）的 **【Trace 链路追踪】** 抽屉。
-6. 在 Trace 抽屉中切换到 **阶段日志 (Logs)**，核对 `context` 阶段是否包含如下 INFO 级别日志：
-   ```text
-   [INFO][context] 注入推理超参数：temperature=0.7, topP=0.9, maxTokens=2048
-   ```
-
-### 1.3 边界值合法性拦截验证
-1. 在编辑弹窗中，通过直接键盘输入非法值尝试触发后端拦截：
-   - 输入 `temperature = 3.0` $\to$ 保存，预期弹出错误提示：`采样温度 (Temperature) 必须在 0.0 到 2.0 之间`；
-   - 输入 `topP = 1.5` $\to$ 保存，预期弹出错误提示：`核采样 (Top P) 必须在 0.0 到 1.0 之间`；
-   - 输入 `maxTokens = 0` 或 `200000` $\to$ 保存，预期弹出错误提示：`单次最大 Token 数 (Max Tokens) 必须在 1 到 131072 之间`。
+5. 刷新页面后再次点击该 Agent 操作列的 **【修改】**，确认 `0.7`、`0.9`、`2048` 均正确回显。
+6. **置空回退默认值测试**：清空这 3 个输入框（点空或退格删净），点击 **【确定】** 保存，再次打开 **【修改】** 确认均保持为空（留空表示下发时不覆盖模型默认值）。
 
 ---
 
-## 二、 [FEAT-013] SubAgents 多智能体协作与结果汇总测试
+### 1.2 对话与 Trace 注入日志验证
+1. 点击目标 Agent 操作列的 **【修改】**，重新填入 `temperature=0.7`、`topP=0.9`、`maxTokens=2048` 并点击 **【确定】**。
+2. 在列表该行将 **【发布状态】** 列的开关拨动为 **开启（已发布）**，**【访问URL】** 列出现 **【前往Agent】** 链接（列表无独立的 `发布` 或 `对话` 按钮）。
+3. 点击 **【前往Agent】** 在新标签页打开公开对话页 `/#/chat/{uuid}`。
+4. 发送测试消息：
+   ```text
+   请写一首关于江南烟雨的七言绝句。
+   ```
+5. 回复生成完毕后，点击该条助手消息气泡**底部的【全链路追踪】** 链接打开追踪抽屉。
+6. 切换到 **【实时日志流】** 页签，核对 `context` 阶段存在如下 `INFO` 日志：
+   ```text
+   [INFO][context] 注入推理超参数：temperature=0.7, topP=0.9, maxTokens=2048
+   ```
+7. 同时核对抽屉顶部 **推理模型** 卡片显示的是实际配置的模型标识（如 `deepseek-v4.1-flash`、`glm-5.3` 等），而非被误覆盖为 `gpt-5-mini`。
 
-该特性基于 **Agent-as-a-Tool** 架构：每个 SubAgent 被自动注册为 Spring AI 的 `ToolCallback`，由主 Agent 根据意图自主决策何时调用，并将多个子 Agent 的结论进行交叉比对与汇总。
+---
+
+### 1.3 前端自动夹逼与后端边界合法性拦截验证
+> ⚠️ **UI 与后端校验分层说明**：前端表单使用了 Element Plus `<el-input-number>` 并设置了 `:min` / `:max` 边界约束（Temperature `0~2`、Top P `0~1`、Max Tokens `1~131072`）。**直接在页面键盘输入 `3.0`、`1.5` 或 `0`，失焦时会被浏览器 UI 组件自动夹逼回 `2.0`、`1.0`、`1`，因此无法通过纯页面点击触发后端越界报错。** 需分以下两步验证：
+
+1. **前端 UI 自动夹逼验证**：
+   - 在 Agent 编辑弹窗中尝试向 **采样温度** 键盘输入 `3.0` 后失焦 → 自动修正为 `2.0`；
+   - 向 **核采样** 输入 `1.5` 后失焦 → 自动修正为 `1.0`；
+   - 向 **单次最大 Token** 输入 `0` 后失焦 → 自动修正为 `1`。
+2. **后端防绕过校验验证（通过浏览器 Console 直调接口）**：
+   - 在已登录后台的页面打开 `DevTools -> Console`，依次运行以下脚本测试 [`AgentServiceImpl.validateOptions`](../xxl-ai-api/src/main/java/com/xxl/ai/api/business/agent/service/impl/AgentServiceImpl.java#L110-L130) 后端硬拦截：
+   ```javascript
+   const ssoToken = document.cookie.match(/(?:^|;\s*)Admin-Token=([^;]*)/)?.[1] || '';
+   const testInvalidOption = (payload) => fetch('/api/agent/insert', {
+     method: 'POST',
+     headers: {
+       'Content-Type': 'application/json',
+       'xxl-sso-login-token': decodeURIComponent(ssoToken),
+       'xxl-space-id': '1'
+     },
+     body: JSON.stringify({
+       name: '边界值测试Agent',
+       modelSupplierId: 1,
+       modelId: 1,
+       ...payload
+     })
+   }).then(r => r.json()).then(d => console.log(payload, '=>', d));
+
+   // 依次触发后端 3 条校验提示
+   testInvalidOption({ temperature: 3.0 });
+   // 预期：{"code":500,"msg":"采样温度 (Temperature) 必须在 0.0 到 2.0 之间"}
+
+   testInvalidOption({ topP: 1.5 });
+   // 预期：{"code":500,"msg":"核采样 (Top P) 必须在 0.0 到 1.0 之间"}
+
+   testInvalidOption({ maxTokens: 0 });
+   // 预期：{"code":500,"msg":"单次最大 Token 数 (Max Tokens) 必须在 1 到 131072 之间"}
+   ```
+
+---
+
+## 二、 [FEAT-013] SubAgents 多智能体协作与自主拆解测试
+
+当前版本采用 **自适应单门面（0 或 1 个工具）+ 并行调度（单批最多 4 项、单项 60s 超时）+ 一层深度硬隔离** 架构（注：早期每子 Agent 注册独立 `subagent_{id}` 工具的方案已演进废弃）。根据主 Agent 配置自动暴露对应门面工具：
+- 仅配置 **关联 SubAgent**：暴露 **`delegate_specialist`**（模式 A）；
+- 仅开启 **自主任务拆解**：暴露 **`decompose_and_spawn`**（模式 B）；
+- 同时配置 **关联 SubAgent** 且开启 **自主任务拆解**：暴露 **`dispatch_subagents`** 并启用运行时 **`[路由纠偏]`**（模式 C）。
 
 ### 2.1 准备 2 个角色分工明确的子 Agent
-在 **【Agent 管理】** 中先创建并发布 2 个专项子 Agent：
+在 **【Agent管理】** 中先创建以下 2 个专项子 Agent（均选择支持工具调用/函数调用的可用对话模型）：
 
 #### 子 Agent 1：SQL 性能专家
-- **名称**：`SQL性能专家`
-- **简介**：`专门分析慢查询 SQL 与索引优化方案`
-- **对话模型**：选择已配置的可用模型
+- **Agent名称**：`SQL性能专家`
+- **Agent介绍**：`专门分析慢查询 SQL 与索引优化方案`
+- **关联知识库 / MCP（可选进阶验证）**：如需验证子 Agent 知识库检索标签 `[子智能体: SQL性能专家]` 或 MCP 工具穿透 `SUBAGENT_MCP`，可为其中一个子 Agent 绑定已向量化的知识库或示例 MCP。
 - **系统指令**：
   ```text
   你是一个资深的 MySQL DBA 与数据库内核专家。你的职责是专门针对用户提供的 SQL 语句从全表扫描、索引覆盖、联合索引顺序、排序缓冲等角度进行深入的性能剖析，并给出精确的执行计划建议与建表/索引优化方案。请只聚焦在数据库性能维度。
   ```
-- **发布状态**：保存并点击 **【发布】**（*注：未发布的 Agent 运行时不会被挂载*）。
+- **发布状态**：保存后，在列表行开启 **【发布状态】** 开关（⚠️ 未发布的子 Agent 在运行时会被安全过滤而不挂载）。
 
 #### 子 Agent 2：代码安全审计专家
-- **名称**：`代码安全审计专家`
-- **简介**：`专门审计代码漏洞、SQL 注入与越权安全风险`
-- **对话模型**：选择已配置的可用模型
+- **Agent名称**：`代码安全审计专家`
+- **Agent介绍**：`专门审计代码漏洞、SQL 注入与越权安全风险`
 - **系统指令**：
   ```text
   你是一个专业的 Web 应用安全专家。你的职责是专门针对用户提供的代码和查询逻辑，深入审计是否存在 SQL 注入风险、字符串拼接漏洞、敏感信息泄露等安全隐患，并给出基于参数化查询 (PreparedStatement) 的标准修复方案。请只聚焦在系统安全防御维度。
   ```
-- **发布状态**：保存并点击 **【发布】**。
+- **发布状态**：保存后，在列表行开启 **【发布状态】** 开关。
 
 ---
 
-### 2.2 配置主控 Agent（挂载 SubAgents）
-
-1. 新建或编辑一个主 Agent（如 `架构总控调度员`）：
-   - **名称**：`架构总控调度员`
-   - **简介**：`总控智能体，负责任务拆解、多子智能体委派与综合报告输出`
-   - **对话模型**：选择通用推理能力较强的对话模型（如 Qwen2.5 / DeepSeek / GPT-4o 等）
-   - **系统指令**（**核心！引导主模型拆解与汇总**）：
+### 2.2 模式 A：纯预置专家并行委派（delegate_specialist）
+1. 在 **【Agent管理】** 点击 **【新增】** 创建主控 Agent `架构总控调度员`：
+   - **对话模型**：选择推理与 Function Calling 能力较强的模型（如 DeepSeek、GLM 或 GPT-4o 系列）；
+   - **系统指令**：
      ```text
      你是一个资深的软件架构总控调度智能体。
      当你面对用户提出的复合技术问题时：
-     1. 请先分析并拆解子任务，按职责合理委派给你拥有的专项子智能体（SubAgent）；
-     2. 严禁凭空猜测，专项领域的专业分析必须委派对应的子智能体完成；
-     3. 在获取到所有子智能体的返回报告后，进行交叉核对与提炼，最终为用户输出一份结构化、有条理的综合评估报告。
+     1. 若任务属于已绑定专家的职责范围，必须委派给对应的专项子智能体并行分析，严禁凭空猜测；
+     2. 获取全部子智能体报告后，交叉核对并输出结构化综合评估报告。
      ```
-   - **关联 SubAgent（表单项）**：
-     - 在下拉多选框中，选择刚创建的 `SQL性能专家` 与 `代码安全审计专家`；
-     - **交互校验点**：
-       - 下拉列表中**不会出现当前主 Agent 自身**（防自环）；
-       - 超过 5 个时会触发 `:multiple-limit="5"` 上限限制；
-       - 未发布时会有 `(未发布)` 标识提示。
-2. 点击 **【确定】** 保存主 Agent，并点击 **【发布】**。
+   - **关联 SubAgent**：下拉勾选 `SQL性能专家` 与 `代码安全审计专家`（**交互校验点**：列表中已排除当前主 Agent 自身防自环；超选第 6 个时受 `:multiple-limit="5"` 限制；若有未发布 Agent 会标注 `(未发布)`）；
+   - **自主任务拆解** 开关：保持 **关闭**。
+2. 保存后开启 **【发布状态】** 开关，点击 **【前往Agent】** 进入公开对话页。
+3. 发送以下复合提问：
+   ```text
+   请评估以下 Java 订单查询代码，从“SQL 执行性能”和“代码安全性”两个维度进行深入分析，并给出最终汇总建议：
+
+   String sql = "SELECT * FROM orders WHERE user_id = " + userId + " ORDER BY create_time DESC";
+   ResultSet rs = stmt.executeQuery(sql);
+   ```
+4. **预期验证点**：
+   - 回复过程中出现实时工具状态胶囊 **`SUBAGENT` `delegate_specialist`**；
+   - 点击底部 **【全链路追踪】** → **【工具证据链】**，可见 `delegate_specialist` 入参 `tasks` 数组中**一次性并行下发了 2 个子任务**（`agentId` 分别为两位专家的 ID）；
+   - 切到 **【时延瀑布图】**，可见 `子智能体 [SQL性能专家] 执行` 与 `子智能体 [代码安全审计专家] 执行` 两条并行 Span。
 
 ---
 
-### 2.3 发起复合任务对话与自动委派测试
-
-1. 点击主 Agent 行操作列的 **【对话】** 进入聊天页面。
-2. 输入一段包含“性能隐患”与“严重 SQL 注入”的典型 Java 数据查询代码：
-
-```text
-请评估以下 Java 订单查询代码，从“SQL 执行性能”和“代码安全性”两个维度进行深入分析，并给出最终汇总建议：
-
-String sql = "SELECT * FROM orders WHERE user_id = " + userId + " ORDER BY create_time DESC";
-ResultSet rs = stmt.executeQuery(sql);
-```
-
-3. 点击发送，观察生成过程与最终回复。
+### 2.3 模式 B：纯自主任务拆解（decompose_and_spawn）
+1. 修改 `架构总控调度员`（或新建主控 Agent）：
+   - **关联 SubAgent**：**清空全部选中项**；
+   - **自主任务拆解** 开关：**开启**；
+   - （可选）为该主 Agent 绑定已向量化的知识库（如 `三体知识库`），以验证动态瞬态专家对父 Agent 知识库的继承检索。
+2. 保存后前往对话页，新建对话并发送一个无预设子 Agent 覆盖的跨维度分析问题：
+   ```text
+   请从企业架构稳定性、成本预算控制、安全合规治理三个独立视角，深入分析自建私有化大模型知识库平台的关键风险与落地策略，最终汇总成一份执行方案。
+   ```
+3. **预期验证点**：
+   - 工具状态胶囊展示 **`SUBAGENT` `decompose_and_spawn`**；
+   - **【工具证据链】** 中可见主 Agent 在无任何预置 SubAgent 的情况下，动态构造 `roleName`、`systemInstruction`、`taskPrompt` 与 `enableRag`，现场裂变出 2~4 个瞬态专家角色并行研究；
+   - **【时延瀑布图】** 展示对应的 `瞬态专家 [角色名] 分析` 并行 Span；
+   - 若主 Agent 绑定了知识库且检索命中，**【知识库引用】** 页签下对应分片的文档名会带有 `[瞬态专家: 角色名]` 前缀。
 
 ---
 
-### 2.4 四维全景验收指标对照表
+### 2.4 模式 C：混合双开与运行时路由纠偏（dispatch_subagents）
+1. 修改 `架构总控调度员`：
+   - **关联 SubAgent**：重新选上 `SQL性能专家` 与 `代码安全审计专家`；
+   - **自主任务拆解** 开关：同时保持 **开启**。
+2. 保存后在公开对话页新建对话，先后测试两类提示：
+   - **混合补位测试**：发送既含已知专长又含空白新领域的问题：
+     ```text
+     请针对前面那段 Java 订单查询代码，综合评估：① SQL 索引性能隐患；② SQL 注入安全漏洞；③ 高并发下千万级订单表的冷热分离归档与前端埋点监控方案。
+     ```
+     - **预期结果**：工具胶囊显示 **`SUBAGENT` `dispatch_subagents`**；在单次 `tasks` 调用中同时混编了填写 `agentId` 的预置专家任务，以及填写 `roleName` + `systemInstruction` 的空白领域瞬态专家任务。
+   - **路由纠偏验证（可选）**：当大模型误将属于已有专家的职责（例如未填 `agentId` 而是动态起名 `roleName: "SQL优化顾问"`）下发给 `dispatch_subagents` 时，观察 **【实时日志流】** 页签 `subagent` 阶段会出现 `WARN` 日志：
+     `[路由纠偏] 动态角色 [SQL优化顾问] 与预置专家 [SQL性能专家 (ID=...)] 职责重叠，已自动重定向至预置专家以启用其专属知识库与工具`。
+3. **级联终止验证**：发起复杂协作后在 `正在调用` 期间点击输入框右侧 **【终止】**，确认后续子任务停止推进且不残留悬挂运行态。
+
+---
+
+### 2.5 四维全景验收指标对照表
 
 | 维度 | 验收环节 | 预期现象与指标 |
 |---|---|---|
-| **1. 实时状态胶囊** | 对话生成中 | 界面上方/思考过程中依次弹出工具调用状态胶囊：<br>① `[SUBAGENT] subagent_{id1} -> 运行中 / 完成`<br>② `[SUBAGENT] subagent_{id2} -> 运行中 / 完成`<br>表明大模型已正确拆解并下发了函数调用给两个子智能体。 |
-| **2. 结果综合汇总** | 最终流式输出 | 主 Agent 在正文中将两个子智能体的输出融合为统一格式：<br>• **性能维度**：明确指出 `SELECT *` 缺陷、`ORDER BY` 导致 `filesort`，建议建立 `(user_id, create_time)` 联合索引；<br>• **安全维度**：严重警告 `+ userId +` 存在 SQL 注入，给出带有 `?` 占位符的参数化重构代码；<br>• **总结建议**：输出整改优先级。 |
-| **3. 工具证据链 Trace** | 打开 Trace 抽屉 $\to$ **工具证据链** | • 列出所有 `SUBAGENT` 类型的调用卡片；<br>• 点击卡片展开查看 `arguments`，显示子任务描述：`{"task": "..."}`；<br>• `resultSummary` 记录了各个子智能体返回的截断摘要文本；<br>• 显示每个子 Agent 调用的精确毫秒耗时。 |
-| **4. 全链路 Token 统计** | 打开 Trace 抽屉 $\to$ **Token 消耗** | 顶部 `tokenUsage`（Prompt Tokens、Completion Tokens）**已自动将所有子智能体运行所消耗的 Token 累加计入**主会话消耗中。 |
+| **1. 实时状态胶囊** | 对话生成中 | 助手气泡顶部依次出现单一协同门面胶囊：<br>• 模式 A：`SUBAGENT` `delegate_specialist`<br>• 模式 B：`SUBAGENT` `decompose_and_spawn`<br>• 模式 C：`SUBAGENT` `dispatch_subagents`<br>• 若子专家调用了自身/继承 MCP，还会同步弹出 `SUBAGENT_MCP` 子工具胶囊 |
+| **2. 结果综合汇总** | 最终流式输出 | 主 Agent 将并行分支结论交叉提炼后统一输出，避免生硬拼接原始分段报告（如性能建议 + 安全整改 + 新视角方案形成统一行动项） |
+| **3. 全链路 Trace 透视** | 气泡底部 **【全链路追踪】** | • **时延瀑布图**：包含主上下文、大模型推理及并行子 Span（`子智能体 [名称] 执行` / `瞬态专家 [名称] 分析`）<br>• **工具证据链**：`arguments` 展示批处理 `tasks` JSON、`resultSummary` 记录汇总报告、记录真实毫秒耗时<br>• **知识库引用**（若启用）：子专家命中分片文档名自动打标 `[子智能体: 角色名]` 或 `[瞬态专家: 角色名]`<br>• **实时日志流**：完整记录 `subagent` 阶段调度日志与（如有触发）`[路由纠偏]` 告警 |
+| **4. 全链路 Token 统计** | Trace 顶部 **Token 消耗** | 顶部 `Token 消耗`（含输入/输出明细）已线程安全汇总主 Agent 多轮推理与全部子智能体消耗；若上游模型接口未回传 `usage` 则附带 `预估` 标签 |
 
 ---
 
 ## 三、 常见排错与避坑指南
 
-1. **页面报 `Unknown column 'sub_agent_ids' in 'field list'` 错误？**
-   - **原因**：本地 MySQL 尚未执行第零步的 DDL 补丁。
-   - **排查**：执行 [patch_20261110_p3_agent_subagent.sql](file:///home/antigravity/Qinstudy/xxl-ai/doc/db/patch_20261110_p3_agent_subagent.sql) 后重启后端即可。
+1. **页面报 `Unknown column 'sub_agent_ids'` 或 `Unknown column 'auto_decompose_status'` 错误？**
+   - **原因**：存量数据库未按顺序补齐 DDL 补丁。
+   - **排查**：依次执行 [patch_20261110_p2_agent_options.sql](../doc/db/patch_20261110_p2_agent_options.sql)、[patch_20261110_p3_agent_subagent.sql](../doc/db/patch_20261110_p3_agent_subagent.sql)、[patch_20261110_p4_auto_decompose.sql](../doc/db/patch_20261110_p4_auto_decompose.sql) 后重启后端。
 
 2. **主 Agent 没有委派子 Agent，而是自己直接回答了？**
-   - **原因 1（未发布）**：子 Agent 没有点击【发布】。系统设计为只挂载 `publish_status=1` 的子 Agent，未发布的子 Agent 在组装时会被安全过滤掉。
-   - **原因 2（跨空间）**：主 Agent 与子 Agent 必须归属于同一个工作空间。
-   - **原因 3（大模型理解偏差）**：部分小型模型或缺乏 Function Calling 训练的模型对隐式工具调用不敏感。可在主 Agent 的系统提示词中**强化引导**（例如：*“遇到数据库性能分析请必须委派给 SQL性能专家”*）。
+   - **原因 1（子 Agent 未发布）**：未将子 Agent 列表行的 **【发布状态】** 开关拨为开启。系统装配时强制过滤 `publish_status != 1` 的关联子 Agent；若全部未发布且未开启 `自主任务拆解`，主 Agent 将不会挂载任何协同门面工具。
+   - **原因 2（跨空间）**：主 Agent 与子 Agent 必须归属于同一个业务空间。
+   - **原因 3（模型工具调用能力弱）**：部分极小参数模型对复合 JSON Schema 参数生成不稳定，建议为主 Agent 选用主流支持 Tool Calling 的模型并在系统指令明确要求先调用协同工具。
 
-3. **子 Agent 出现 `[SubAgent 委派失败]` 提示？**
-   - **原因**：检查子 Agent 所绑定的模型供应商 API Key 是否有效、网络是否通畅、或者绑定的模型是否为非对话类型。Trace 抽屉的日志中会明确打印出具体的异常信息。
+3. **子 Agent 返回 `[委派失败]` 或 `[子智能体处理失败]`？**
+   - **原因**：检查子 Agent 所绑定的模型供应商 API Key 是否有效、网络是否通畅、或者绑定的模型是否为对话模型（`type=0`）。Trace 抽屉的 **【实时日志流】** 会打印具体异常。
 
-4. **设置了推理超参数（Temperature/Top P/Max Tokens）后，请求国产大模型（如智谱 GLM、DeepSeek 等）报 `400: 模型不存在，请检查模型代码`？**
-   - **故障现场与表象**：在 Agent 编辑弹窗中，一旦配置了【采样温度】、【核采样】或【单次最大 Token】中任意一个参数，发起对话就会报 `400: 模型不存在，请检查模型代码`（如 `com.openai.errors.BadRequestException`）；而一旦清空这三个参数（置空保存），对话立刻恢复正常。
-   - **底层因果排雷（Spring AI 2.x 隐式覆写陷阱）**：
-     - Spring AI 的 `OpenAiChatOptions.builder()` 内部存在默认行为：如果仅设置了 `temperature`、`topP`、`maxTokens` 而**未显式调用 `.model(...)`**，其构造函数会默认回退为 `DEFAULT_CHAT_MODEL = ChatModel.GPT_5_MINI.asString()`（即 OpenAI 的 `"gpt-5-mini"`）。
-     - 随后在 `LlmChatTool` 执行 `spec.options(chatOptions.mutate())` 时，Prompt 级别的 Options 拥有最高优先级，**直接将 `LlmModelFactory` 底层绑定的真实模型（如 `glm-4.7`、`glm-4-flash`）强制覆盖为了 `"gpt-5-mini"`**。
-     - 请求发送至智谱 GLM、DeepSeek 等兼容 OpenAI 协议的第三方 API 网关时，网关识别到模型代码为不存在的 `"gpt-5-mini"`，直接拒绝并返回 HTTP 400。
-   - **闭环防坑解法（双重防御）**：
-     1. **构建处显式绑定**：在 `ChatStreamTool.buildChatOptions(agent, runtime.getModelName(), traceCollector)` 及 `SubAgentTool` 构建超参数时，显式将当前运行时的真实 `modelName` 写入 Builder，阻止 Spring AI 回退默认值。
-     2. **调用层强校验兜底**：在 `LlmChatTool.chat(...)` 执行 Prompt 注入前，若检测到 `OpenAiChatOptions`，强制重新设置 `.model(runtime.getModelName())`，建立不可穿透的底线防御。
+4. **【历史已修复缺陷回归说明】配置超参数后报 `400: 模型不存在 / gpt-5-mini`？**
+   - **背景**：早期版本因 Spring AI `OpenAiChatOptions.builder()` 未显式设置 `.model(...)` 会默认回退 `"gpt-5-mini"`，导致请求第三方网关报错 400。
+   - **当前状态**：已在 [`ChatStreamTool.buildChatOptions`](../xxl-ai-api/src/main/java/com/xxl/ai/api/business/harness/chat/ChatStreamTool.java#L955-L988) 与 `SubAgentTool` 中显式绑定真实 `modelName`。正常情况下第 [1.2 节](#12-对话与-trace-注入日志验证) 验证时不应再复现该报错；若自测中仍见 `"gpt-5-mini"` 报错，请立即核查后端编译产物是否为最新提交版本。
