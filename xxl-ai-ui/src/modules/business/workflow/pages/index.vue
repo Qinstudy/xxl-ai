@@ -16,19 +16,19 @@
                 :placeholder="t('common.inputPlaceholder', [t('business.workflow.name')])"
                 clearable
                 style="width: 200px"
-                @keyup.enter="getWfList"
+                @keyup.enter="handleWfQuery"
               />
             </el-form-item>
             <el-form-item :label="t('business.workflow.status')" prop="status">
               <el-select v-model="wfQuery.status" :placeholder="t('common.selectPlaceholder')" clearable style="width: 130px">
-                <el-option :label="t('common.all')" :value="undefined" />
+                <el-option :label="t('common.all')" :value="-1" />
                 <el-option :label="t('business.workflow.statusDraft')" :value="0" />
                 <el-option :label="t('business.workflow.statusPublished')" :value="1" />
                 <el-option :label="t('business.workflow.statusDisabled')" :value="2" />
               </el-select>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" icon="Search" @click="getWfList">{{ t('common.search') }}</el-button>
+              <el-button type="primary" icon="Search" @click="handleWfQuery">{{ t('common.search') }}</el-button>
               <el-button icon="Refresh" @click="resetWfQuery">{{ t('common.reset') }}</el-button>
             </el-form-item>
           </el-form>
@@ -49,7 +49,7 @@
             <el-table-column :label="t('business.workflow.description')" align="center" prop="description" min-width="180" :show-overflow-tooltip="true" />
             <el-table-column :label="t('business.workflow.nodeCount')" align="center" width="100">
               <template #default="scope">
-                <el-tag type="info">{{ scope.row.nodeCount ?? 0 }} 个节点</el-tag>
+                <el-tag type="info">{{ t('business.workflow.nodesUnit', [scope.row.nodeCount ?? 0]) }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column :label="t('business.workflow.status')" align="center" width="100">
@@ -61,7 +61,7 @@
             </el-table-column>
             <el-table-column :label="t('common.updateTime')" align="center" prop="updateTime" width="160" />
 
-            <el-table-column :label="t('common.action')" align="center" width="280" class-name="small-padding fixed-width">
+            <el-table-column :label="t('common.operation')" align="center" width="280" class-name="small-padding fixed-width">
               <template #default="scope">
                 <el-button
                   link
@@ -79,7 +79,7 @@
                   @click="handleEditWorkflow(scope.row)"
                   v-hasPermi="['workflow:default']"
                 >
-                  {{ t('common.edit') }}
+                  {{ t('common.modify') }}
                 </el-button>
                 <el-button
                   link
@@ -103,7 +103,7 @@
             </el-table-column>
           </el-table>
 
-          <pagination
+          <Pagination
             v-show="wfTotal > 0"
             :total="wfTotal"
             v-model:page="wfQuery.pageNum"
@@ -119,14 +119,17 @@
             <el-form-item :label="t('business.workflow.filterWfId')" prop="workflowId">
               <el-input-number
                 v-model="execQuery.workflowId"
+                :min="1"
+                :controls="false"
+                :value-on-clear="undefined"
                 :placeholder="t('business.workflow.filterWfId')"
-                clearable
                 style="width: 160px"
+                @keyup.enter="handleExecQuery"
               />
             </el-form-item>
             <el-form-item :label="t('business.workflow.execStatus')" prop="status">
               <el-select v-model="execQuery.status" :placeholder="t('common.selectPlaceholder')" clearable style="width: 130px">
-                <el-option :label="t('common.all')" :value="undefined" />
+                <el-option :label="t('common.all')" :value="-1" />
                 <el-option :label="t('business.workflow.statusRunning')" :value="0" />
                 <el-option :label="t('business.workflow.statusSuccess')" :value="1" />
                 <el-option :label="t('business.workflow.statusFailed')" :value="2" />
@@ -134,7 +137,7 @@
               </el-select>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" icon="Search" @click="getExecList">{{ t('common.search') }}</el-button>
+              <el-button type="primary" icon="Search" @click="handleExecQuery">{{ t('common.search') }}</el-button>
               <el-button icon="Refresh" @click="resetExecQuery">{{ t('common.reset') }}</el-button>
             </el-form-item>
           </el-form>
@@ -164,7 +167,7 @@
             <el-table-column :label="t('business.workflow.tokens')" align="center" prop="totalTokens" width="110" />
             <el-table-column :label="t('common.addTime')" align="center" prop="addTime" width="160" />
 
-            <el-table-column :label="t('common.action')" align="center" width="180">
+            <el-table-column :label="t('common.operation')" align="center" width="180">
               <template #default="scope">
                 <el-button
                   link
@@ -188,7 +191,7 @@
             </el-table-column>
           </el-table>
 
-          <pagination
+          <Pagination
             v-show="execTotal > 0"
             :total="execTotal"
             v-model:page="execQuery.pageNum"
@@ -216,9 +219,9 @@
           <el-col :span="10">
             <el-form-item :label="t('business.workflow.status')" prop="status">
               <el-radio-group v-model="wfForm.status">
-                <el-radio :label="0">{{ t('business.workflow.statusDraft') }}</el-radio>
-                <el-radio :label="1">{{ t('business.workflow.statusPublished') }}</el-radio>
-                <el-radio :label="2">{{ t('business.workflow.statusDisabled') }}</el-radio>
+                <el-radio :value="0">{{ t('business.workflow.statusDraft') }}</el-radio>
+                <el-radio :value="1">{{ t('business.workflow.statusPublished') }}</el-radio>
+                <el-radio :value="2">{{ t('business.workflow.statusDisabled') }}</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-col>
@@ -254,8 +257,8 @@
 
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="wfDialogVisible = false">{{ t('common.cancel') }}</el-button>
-          <el-button type="primary" :loading="wfSubmitting" @click="submitWfForm">{{ t('common.confirm') }}</el-button>
+          <el-button @click="wfDialogVisible = false">{{ t('modal.cancelButton') }}</el-button>
+          <el-button type="primary" :loading="wfSubmitting" @click="submitWfForm">{{ t('modal.confirmButton') }}</el-button>
         </span>
       </template>
     </el-dialog>
@@ -266,7 +269,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+defineOptions({ name: 'Workflow' })
+import { ref, nextTick } from 'vue'
 import {
   listWorkflow,
   loadWorkflow,
@@ -277,36 +281,38 @@ import {
   delWorkflowExecution
 } from '../api'
 import WorkflowDebugDrawer from '../components/WorkflowDebugDrawer.vue'
+import { Pagination } from '@/components'
+import { usePageParams } from '@/composables/usePageParams'
 import modal from '@/utils/modal'
 import { t } from '@/i18n'
-import type { Workflow, WorkflowListQuery, WorkflowExecution, WorkflowExecutionListQuery } from '../types'
+import type { Workflow, WorkflowQuery, WorkflowExecution, WorkflowExecutionQuery } from '../types'
 import type { FormInstance } from 'element-plus'
 
+// --------------------------------- ref data ---------------------------------
 const activeTab = ref('workflows')
 
-// ==================== 1. 工作流列表状态 ====================
+const wfQueryRef = ref<FormInstance>()
 const wfLoading = ref(false)
 const wfList = ref<Workflow[]>([])
 const wfTotal = ref(0)
-const wfQuery = reactive<WorkflowListQuery>({
+const wfQuery = ref<WorkflowQuery>({
   pageNum: 1,
   pageSize: 10,
   name: undefined,
-  status: undefined
+  status: -1
 })
 
-// ==================== 2. 执行历史状态 ====================
+const execQueryRef = ref<FormInstance>()
 const execLoading = ref(false)
 const execList = ref<WorkflowExecution[]>([])
 const execTotal = ref(0)
-const execQuery = reactive<WorkflowExecutionListQuery>({
+const execQuery = ref<WorkflowExecutionQuery>({
   pageNum: 1,
   pageSize: 10,
   workflowId: undefined,
-  status: undefined
+  status: -1
 })
 
-// ==================== 3. 编辑弹窗表单 ====================
 const wfDialogVisible = ref(false)
 const wfDialogTitle = ref('')
 const wfSubmitting = ref(false)
@@ -314,7 +320,7 @@ const wfFormRef = ref<FormInstance>()
 const selectedTemplate = ref('')
 const debugDrawerRef = ref()
 
-const wfForm = reactive<Workflow>({
+const wfForm = ref<Workflow>({
   name: '',
   description: '',
   status: 0,
@@ -326,55 +332,61 @@ const wfRules = {
   graphJson: [{ required: true, message: t('business.workflow.graphRequired'), trigger: 'blur' }]
 }
 
-// 预设拓扑模板
-const TEMPLATES: Record<string, any> = {
-  linear: {
-    nodes: [
-      { id: 'start_1', name: '用户输入', type: 'START', config: { fields: [{ name: 'query', type: 'STRING', required: true }] } },
-      { id: 'llm_1', name: '大模型生成', type: 'LLM', config: { userPrompt: '请回答用户提问：{{start_1.query}}', mockResponse: '已收到您的提问：{{start_1.query}}，处理完成。' } },
-      { id: 'end_1', name: '输出回复', type: 'END', config: { outputs: { answer: '{{llm_1.text}}' } } }
-    ],
-    edges: [
-      { id: 'e1', source: 'start_1', target: 'llm_1' },
-      { id: 'e2', source: 'llm_1', target: 'end_1' }
-    ]
-  },
-  rag: {
-    nodes: [
-      { id: 'start_1', name: '用户问题', type: 'START', config: { fields: [{ name: 'question', type: 'STRING', required: true }] } },
-      { id: 'retrieval_1', name: '知识检索', type: 'RETRIEVAL', config: { kbIds: [], query: '{{start_1.question}}', topK: 3, mockHits: [{ text: '三体知识切片参考' }] } },
-      { id: 'llm_1', name: '总结回答', type: 'LLM', config: { systemPrompt: '背景资料：\n{{retrieval_1.context}}', userPrompt: '{{start_1.question}}', mockResponse: '根据三体知识库，相关事实确证。' } },
-      { id: 'end_1', name: '输出答案', type: 'END', config: { outputs: { answer: '{{llm_1.text}}', refCount: '{{retrieval_1.count}}' } } }
-    ],
-    edges: [
-      { id: 'e1', source: 'start_1', target: 'retrieval_1' },
-      { id: 'e2', source: 'retrieval_1', target: 'llm_1' },
-      { id: 'e3', source: 'llm_1', target: 'end_1' }
-    ]
-  },
-  condition: {
-    nodes: [
-      { id: 'start_1', name: '开始', type: 'START', config: { fields: [{ name: 'type', type: 'STRING', required: true }] } },
-      { id: 'cond_1', name: '分类判断', type: 'CONDITION', config: { conditions: [{ left: '{{start_1.type}}', operator: 'EQUALS', right: 'VIP', targetHandle: 'vip_branch' }], defaultHandle: 'normal_branch' } },
-      { id: 'llm_vip', name: 'VIP通道', type: 'LLM', config: { userPrompt: 'VIP请求', mockResponse: '尊敬的VIP，优先响应' } },
-      { id: 'llm_normal', name: '普通通道', type: 'LLM', config: { userPrompt: '普通请求', mockResponse: '普通排队中' } },
-      { id: 'end_1', name: '输出', type: 'END', config: { outputs: { reply: '{{llm_vip.text}}{{llm_normal.text}}' } } }
-    ],
-    edges: [
-      { id: 'e1', source: 'start_1', target: 'cond_1' },
-      { id: 'e2', source: 'cond_1', target: 'llm_vip', sourceHandle: 'vip_branch' },
-      { id: 'e3', source: 'cond_1', target: 'llm_normal', sourceHandle: 'normal_branch' },
-      { id: 'e4', source: 'llm_vip', target: 'end_1' },
-      { id: 'e5', source: 'llm_normal', target: 'end_1' }
-    ]
+// --------------------------------- fun ---------------------------------
+function buildPresetTemplate(key: string) {
+  if (key === 'linear') {
+    return {
+      nodes: [
+        { id: 'start_1', name: t('business.workflow.tplNodeStart'), type: 'START', config: { fields: [{ name: 'query', type: 'STRING', required: true }] } },
+        { id: 'llm_1', name: t('business.workflow.tplNodeLlm'), type: 'LLM', config: { userPrompt: t('business.workflow.tplLinearPrompt'), mockResponse: t('business.workflow.tplLinearMock') } },
+        { id: 'end_1', name: t('business.workflow.tplNodeEnd'), type: 'END', config: { outputs: { answer: '{{llm_1.text}}' } } }
+      ],
+      edges: [
+        { id: 'e1', source: 'start_1', target: 'llm_1' },
+        { id: 'e2', source: 'llm_1', target: 'end_1' }
+      ]
+    }
   }
+  if (key === 'rag') {
+    return {
+      nodes: [
+        { id: 'start_1', name: t('business.workflow.tplNodeQuestion'), type: 'START', config: { fields: [{ name: 'question', type: 'STRING', required: true }] } },
+        { id: 'retrieval_1', name: t('business.workflow.tplNodeRetrieval'), type: 'RETRIEVAL', config: { kbIds: [], query: '{{start_1.question}}', topK: 3, mockHits: [{ text: t('business.workflow.tplRagHit') }] } },
+        { id: 'llm_1', name: t('business.workflow.tplNodeSummary'), type: 'LLM', config: { systemPrompt: t('business.workflow.tplRagSysPrompt'), userPrompt: '{{start_1.question}}', mockResponse: t('business.workflow.tplRagMock') } },
+        { id: 'end_1', name: t('business.workflow.tplNodeAnswer'), type: 'END', config: { outputs: { answer: '{{llm_1.text}}', refCount: '{{retrieval_1.count}}' } } }
+      ],
+      edges: [
+        { id: 'e1', source: 'start_1', target: 'retrieval_1' },
+        { id: 'e2', source: 'retrieval_1', target: 'llm_1' },
+        { id: 'e3', source: 'llm_1', target: 'end_1' }
+      ]
+    }
+  }
+  if (key === 'condition') {
+    return {
+      nodes: [
+        { id: 'start_1', name: t('business.workflow.tplNodeStartSimple'), type: 'START', config: { fields: [{ name: 'type', type: 'STRING', required: true }] } },
+        { id: 'cond_1', name: t('business.workflow.tplNodeCondition'), type: 'CONDITION', config: { conditions: [{ left: '{{start_1.type}}', operator: 'EQUALS', right: 'VIP', targetHandle: 'vip_branch' }], defaultHandle: 'normal_branch' } },
+        { id: 'llm_vip', name: t('business.workflow.tplNodeVip'), type: 'LLM', config: { userPrompt: t('business.workflow.tplVipPrompt'), mockResponse: t('business.workflow.tplVipMock') } },
+        { id: 'llm_normal', name: t('business.workflow.tplNodeNormal'), type: 'LLM', config: { userPrompt: t('business.workflow.tplNormalPrompt'), mockResponse: t('business.workflow.tplNormalMock') } },
+        { id: 'end_1', name: t('business.workflow.tplNodeEnd'), type: 'END', config: { outputs: { reply: '{{llm_vip.text}}{{llm_normal.text}}' } } }
+      ],
+      edges: [
+        { id: 'e1', source: 'start_1', target: 'cond_1' },
+        { id: 'e2', source: 'cond_1', target: 'llm_vip', sourceHandle: 'vip_branch' },
+        { id: 'e3', source: 'cond_1', target: 'llm_normal', sourceHandle: 'normal_branch' },
+        { id: 'e4', source: 'llm_vip', target: 'end_1' },
+        { id: 'e5', source: 'llm_normal', target: 'end_1' }
+      ]
+    }
+  }
+  return null
 }
-
-// --------------------------------- Workflow Methods ---------------------------------
 
 function getWfList() {
   wfLoading.value = true
-  listWorkflow(wfQuery)
+  const params = usePageParams(wfQuery)()
+  listWorkflow(params)
     .then((res) => {
       wfList.value = res.data.data
       wfTotal.value = res.data.total
@@ -384,40 +396,50 @@ function getWfList() {
     })
 }
 
+function handleWfQuery() {
+  wfQuery.value.pageNum = 1
+  getWfList()
+}
+
 function resetWfQuery() {
-  wfQuery.name = undefined
-  wfQuery.status = undefined
-  wfQuery.pageNum = 1
+  wfQuery.value = { pageNum: 1, pageSize: 10, name: undefined, status: -1 }
   getWfList()
 }
 
 function handleAddWorkflow() {
-  wfForm.id = undefined
-  wfForm.name = ''
-  wfForm.description = ''
-  wfForm.status = 0
-  wfForm.graphJson = JSON.stringify(TEMPLATES.linear, null, 2)
+  const tpl = buildPresetTemplate('linear')
+  wfForm.value = {
+    id: undefined,
+    name: '',
+    description: '',
+    status: 0,
+    graphJson: tpl ? JSON.stringify(tpl, null, 2) : ''
+  }
   selectedTemplate.value = 'linear'
   wfDialogTitle.value = t('business.workflow.addTitle')
   wfDialogVisible.value = true
+  nextTick(() => wfFormRef.value?.clearValidate())
 }
 
 function handleEditWorkflow(row: Workflow) {
   loadWorkflow(row.id!).then((res) => {
-    Object.assign(wfForm, res.data)
+    wfForm.value = { ...res.data }
+    selectedTemplate.value = ''
     try {
-      wfForm.graphJson = JSON.stringify(JSON.parse(res.data.graphJson), null, 2)
+      wfForm.value.graphJson = JSON.stringify(JSON.parse(res.data.graphJson), null, 2)
     } catch {
-      wfForm.graphJson = res.data.graphJson
+      wfForm.value.graphJson = res.data.graphJson
     }
     wfDialogTitle.value = t('business.workflow.editTitle')
     wfDialogVisible.value = true
+    nextTick(() => wfFormRef.value?.clearValidate())
   })
 }
 
 function applyTemplate(key: string) {
-  if (TEMPLATES[key]) {
-    wfForm.graphJson = JSON.stringify(TEMPLATES[key], null, 2)
+  const tpl = buildPresetTemplate(key)
+  if (tpl) {
+    wfForm.value.graphJson = JSON.stringify(tpl, null, 2)
   }
 }
 
@@ -425,14 +447,14 @@ function submitWfForm() {
   wfFormRef.value?.validate((valid) => {
     if (!valid) return
     try {
-      JSON.parse(wfForm.graphJson)
+      JSON.parse(wfForm.value.graphJson)
     } catch {
       modal.msgError(t('business.workflow.graphJsonInvalid'))
       return
     }
 
     wfSubmitting.value = true
-    const action = wfForm.id ? updateWorkflow(wfForm) : addWorkflow(wfForm)
+    const action = wfForm.value.id ? updateWorkflow(wfForm.value) : addWorkflow(wfForm.value)
     action
       .then(() => {
         modal.msgSuccess(t('common.saveSuccess'))
@@ -446,12 +468,13 @@ function submitWfForm() {
 }
 
 function handleDeleteWorkflow(row: Workflow) {
-  modal.confirm(t('common.confirmDelete', [row.name])).then(() => {
-    delWorkflow(row.id!).then(() => {
+  modal.confirm(t('business.workflow.confirmDeleteWorkflow', [row.name]))
+    .then(() => delWorkflow(row.id!))
+    .then(() => {
       modal.msgSuccess(t('common.deleteSuccess'))
       getWfList()
     })
-  })
+    .catch(() => {})
 }
 
 function handleDebug(row: Workflow) {
@@ -459,16 +482,16 @@ function handleDebug(row: Workflow) {
 }
 
 function handleViewExecutions(row: Workflow) {
-  execQuery.workflowId = row.id
+  execQuery.value.workflowId = row.id
+  execQuery.value.pageNum = 1
   activeTab.value = 'executions'
   getExecList()
 }
 
-// --------------------------------- Execution History Methods ---------------------------------
-
 function getExecList() {
   execLoading.value = true
-  listWorkflowExecution(execQuery)
+  const params = usePageParams(execQuery)()
+  listWorkflowExecution(params)
     .then((res) => {
       execList.value = res.data.data
       execTotal.value = res.data.total
@@ -478,27 +501,34 @@ function getExecList() {
     })
 }
 
+function handleExecQuery() {
+  execQuery.value.pageNum = 1
+  getExecList()
+}
+
 function resetExecQuery() {
-  execQuery.workflowId = undefined
-  execQuery.status = undefined
-  execQuery.pageNum = 1
+  execQuery.value = { pageNum: 1, pageSize: 10, workflowId: undefined, status: -1 }
   getExecList()
 }
 
 function handleViewExecutionDetail(row: WorkflowExecution) {
-  debugDrawerRef.value?.open({ id: row.workflowId, name: '工作流 #' + row.workflowId } as Workflow, row.id)
+  debugDrawerRef.value?.open(
+    { id: row.workflowId, name: t('business.workflow.workflowItemName', [row.workflowId]) } as Workflow,
+    row.id
+  )
 }
 
 function handleDeleteExecution(row: WorkflowExecution) {
-  modal.confirm(t('common.confirmDelete', ['#' + row.id])).then(() => {
-    delWorkflowExecution(row.id!).then(() => {
+  modal.confirm(t('business.workflow.confirmDeleteExecution', [row.id]))
+    .then(() => delWorkflowExecution(row.id!))
+    .then(() => {
       modal.msgSuccess(t('common.deleteSuccess'))
       getExecList()
     })
-  })
+    .catch(() => {})
 }
 
-// 初始化
+// --------------------------------- page init ---------------------------------
 getWfList()
 getExecList()
 </script>

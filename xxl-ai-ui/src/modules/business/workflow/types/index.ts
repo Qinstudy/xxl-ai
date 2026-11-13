@@ -1,4 +1,4 @@
-import type { PageQuery } from '@/types'
+import type { ListQuery } from '@/types'
 
 /** 工作流定义 */
 export interface Workflow {
@@ -14,11 +14,16 @@ export interface Workflow {
   updateTime?: string
 }
 
-/** 工作流查询参数 */
-export interface WorkflowListQuery extends PageQuery {
+/** 工作流搜索表单参数 */
+export type WorkflowQuery = {
+  pageNum: number
+  pageSize: number
   name?: string
   status?: number
 }
+
+/** 工作流列表请求参数 */
+export type WorkflowListQuery = ListQuery<WorkflowQuery>
 
 /** 工作流节点定义 */
 export interface WorkflowNode {
@@ -74,8 +79,13 @@ export interface WorkflowExecution {
   updateTime?: string
 }
 
-/** 执行记录查询参数 */
-export interface WorkflowExecutionListQuery extends PageQuery {
+/** 执行记录搜索表单参数 */
+export type WorkflowExecutionQuery = {
+  pageNum: number
+  pageSize: number
   workflowId?: number
   status?: number
 }
+
+/** 执行记录列表请求参数 */
+export type WorkflowExecutionListQuery = ListQuery<WorkflowExecutionQuery>

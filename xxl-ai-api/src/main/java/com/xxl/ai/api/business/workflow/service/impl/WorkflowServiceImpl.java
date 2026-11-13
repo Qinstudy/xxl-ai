@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
 
@@ -44,6 +45,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     private static final Logger logger = LoggerFactory.getLogger(WorkflowServiceImpl.class);
 
     private static final int ERROR_MSG_MAX_LEN = 500;
+    private static final int INPUT_JSON_MAX_BYTES = 65000;
 
     @Resource
     private WorkflowMapper workflowMapper;
@@ -104,6 +106,10 @@ public class WorkflowServiceImpl implements WorkflowService {
             return Response.ofFail("工作流图定义 (graphJson) 不能为空");
         }
 
+        if (dto.getStatus() != null && (dto.getStatus() < 0 || dto.getStatus() > 2)) {
+            return Response.ofFail("工作流状态参数非法");
+        }
+
         // 校验 DAG 图合法性
         try {
             WorkflowGraph graph = GsonTool.fromJson(dto.getGraphJson(), WorkflowGraph.class);
@@ -145,6 +151,9 @@ public class WorkflowServiceImpl implements WorkflowService {
         if (StringTool.isBlank(dto.getName())) {
             return Response.ofFail("工作流名称不能为空");
         }
+        if (dto.getStatus() != null && (dto.getStatus() < 0 || dto.getStatus() > 2)) {
+            return Response.ofFail("工作流状态参数非法");
+        }
         Workflow existing = workflowMapper.load(dto.getId());
         if (existing == null || existing.getSpaceId() != spaceId) {
             return Response.ofFail("工作流不存在或无权访问");
@@ -176,6 +185,9 @@ public class WorkflowServiceImpl implements WorkflowService {
 
     @Override
     public Response<String> updateStatus(long spaceId, long id, int status) {
+        if (status < 0 || status > 2) {
+            return Response.ofFail("工作流状态参数非法");
+        }
         Workflow existing = workflowMapper.load(id);
         if (existing == null || existing.getSpaceId() != spaceId) {
             return Response.ofFail("工作流不存在或无权访问");
@@ -202,13 +214,18 @@ public class WorkflowServiceImpl implements WorkflowService {
             return Response.ofFail("工作流图定义非法: " + e.getMessage());
         }
 
+        String inputJson = GsonTool.toJson(inputs != null ? inputs : Collections.emptyMap());
+        if (inputJson != null && inputJson.getBytes(StandardCharsets.UTF_8).length > INPUT_JSON_MAX_BYTES) {
+            return Response.ofFail("调试入参 JSON 过大，请精简后再试");
+        }
+
         // 1、创建执行实例记录
         WorkflowExecution execution = new WorkflowExecution();
         execution.setSpaceId(spaceId);
         execution.setWorkflowId(id);
         execution.setTriggerType("DEBUG");
         execution.setStatus(0); // 运行中
-        execution.setInputJson(GsonTool.toJson(inputs != null ? inputs : Collections.emptyMap()));
+        execution.setInputJson(inputJson);
         workflowExecutionMapper.insert(execution);
 
         long executionId = execution.getId();
@@ -269,15 +286,17 @@ public class WorkflowServiceImpl implements WorkflowService {
             logger.error("Workflow debug execution failed, id={}", id, e);
 
             // 回写失败/超时状态，并保留已产生的 Token 与节点轨迹
-            execution.setStatus(e instanceof TimeoutException ? 3 : 2);
+            boolean isTimeout = (e instanceof TimeoutException) || (e.getCause() instanceof TimeoutException);
+            String rawMsg = StringTool.isNotBlank(e.getMessage()) ? e.getMessage() : e.getClass().getSimpleName();
+            execution.setStatus(isTimeout ? 3 : 2);
             execution.setTotalTokens(ctx.getTotalTokens());
             execution.setDurationMs(ctx.getDurationMs());
-            execution.setErrorMsg(truncateErrorMsg(e.getMessage()));
+            execution.setErrorMsg(truncateErrorMsg(rawMsg));
             execution.setExecutionJson(GsonTool.toJson(ctx.getTraces()));
             workflowExecutionMapper.updateFinish(execution);
 
-            WorkflowExecutionDTO dto = WorkflowAdaptor.adapt2dto(execution);
-            return new Response<>(500, "工作流执行失败: " + e.getMessage(), dto);
+            // 返回 code=200 + 含失败/超时状态与节点轨迹的 ExecutionDTO，确保前端调试抽屉可回显错误与节点 Trace
+            return Response.ofSuccess(WorkflowAdaptor.adapt2dto(execution));
         }
     }
 

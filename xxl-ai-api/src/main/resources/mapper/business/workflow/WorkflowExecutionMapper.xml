@@ -42,7 +42,7 @@
 		) VALUES (
 			#{spaceId}, #{workflowId}, #{triggerType}, #{status}, #{totalTokens}, #{durationMs},
 			#{inputJson}, #{outputJson}, #{executionJson}, #{errorMsg}, NOW(), NOW()
-		);
+		)
 	</insert>
 
 	<delete id="delete">

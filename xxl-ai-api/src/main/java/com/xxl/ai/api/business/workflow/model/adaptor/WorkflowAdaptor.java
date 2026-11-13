@@ -60,8 +60,8 @@ public class WorkflowAdaptor {
         }
         dto.setNodeCount(count);
 
-        dto.setAddTime(DateTool.formatDateTime(entity.getAddTime()));
-        dto.setUpdateTime(DateTool.formatDateTime(entity.getUpdateTime()));
+        dto.setAddTime(entity.getAddTime() != null ? DateTool.formatDateTime(entity.getAddTime()) : null);
+        dto.setUpdateTime(entity.getUpdateTime() != null ? DateTool.formatDateTime(entity.getUpdateTime()) : null);
         return dto;
     }
 
@@ -106,8 +106,8 @@ public class WorkflowAdaptor {
         dto.setOutputJson(entity.getOutputJson());
         dto.setExecutionJson(entity.getExecutionJson());
         dto.setErrorMsg(entity.getErrorMsg());
-        dto.setAddTime(DateTool.formatDateTime(entity.getAddTime()));
-        dto.setUpdateTime(DateTool.formatDateTime(entity.getUpdateTime()));
+        dto.setAddTime(entity.getAddTime() != null ? DateTool.formatDateTime(entity.getAddTime()) : null);
+        dto.setUpdateTime(entity.getUpdateTime() != null ? DateTool.formatDateTime(entity.getUpdateTime()) : null);
         return dto;
     }
 }

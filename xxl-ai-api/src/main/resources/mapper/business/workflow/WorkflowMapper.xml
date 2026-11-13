@@ -32,7 +32,7 @@
 			space_id, name, description, status, graph_json, ext_json, add_time, update_time
 		) VALUES (
 			#{spaceId}, #{name}, #{description}, #{status}, #{graphJson}, #{extJson}, NOW(), NOW()
-		);
+		)
 	</insert>
 
 	<delete id="delete">

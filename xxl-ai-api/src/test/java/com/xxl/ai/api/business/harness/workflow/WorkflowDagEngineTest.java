@@ -379,4 +379,35 @@ public class WorkflowDagEngineTest {
         strictCtx.setAllowMock(false);
         assertThrows(IllegalStateException.class, () -> engine.execute(mockGraph, Collections.emptyMap(), strictCtx));
     }
+
+    @Test
+    @DisplayName("测试 10：空节点类型与未支持节点类型静态校验拦截")
+    public void testInvalidAndBlankNodeTypeRejection() {
+        WorkflowNode start = new WorkflowNode("start_1", "开始", "START", Collections.emptyMap());
+        WorkflowNode end = new WorkflowNode("end_1", "结束", "END", Collections.emptyMap());
+
+        // 1、空节点类型应被拦截
+        WorkflowNode blankNode = new WorkflowNode("node_blank", "空类型", "  ", Collections.emptyMap());
+        WorkflowGraph blankGraph = new WorkflowGraph(
+                List.of(start, blankNode, end),
+                List.of(
+                        new WorkflowEdge("e1", "start_1", "node_blank"),
+                        new WorkflowEdge("e2", "node_blank", "end_1")
+                )
+        );
+        IllegalArgumentException blankEx = assertThrows(IllegalArgumentException.class, () -> engine.validateGraph(blankGraph));
+        assertTrue(blankEx.getMessage().contains("类型不能为空"));
+
+        // 2、不支持的节点类型应被拦截
+        WorkflowNode unknownNode = new WorkflowNode("node_unknown", "未知节点", "HTTP_REQUEST", Collections.emptyMap());
+        WorkflowGraph unknownGraph = new WorkflowGraph(
+                List.of(start, unknownNode, end),
+                List.of(
+                        new WorkflowEdge("e1", "start_1", "node_unknown"),
+                        new WorkflowEdge("e2", "node_unknown", "end_1")
+                )
+        );
+        IllegalArgumentException unknownEx = assertThrows(IllegalArgumentException.class, () -> engine.validateGraph(unknownGraph));
+        assertTrue(unknownEx.getMessage().contains("不支持的类型"));
+    }
 }

@@ -31,6 +31,11 @@ public class WorkflowDagEngine {
     /** 单次工作流全局执行超时时间（180 秒） */
     public static final long MAX_TIMEOUT_MS = 180_000L;
 
+    /** 阶段一引擎支持的内置节点类型 */
+    private static final Set<String> SUPPORTED_NODE_TYPES = Set.of(
+            "START", "END", "LLM", "RETRIEVAL", "CONDITION", "TOOL"
+    );
+
     @Resource
     private List<WorkflowNodeHandler> handlerList;
 
@@ -77,9 +82,17 @@ public class WorkflowDagEngine {
             if (nodeMap.containsKey(node.getId())) {
                 throw new IllegalArgumentException("工作流存在重复节点 ID: " + node.getId());
             }
+            if (StringTool.isBlank(node.getType())) {
+                throw new IllegalArgumentException("工作流节点 [" + node.getId() + "] 的类型不能为空");
+            }
+
+            String type = node.getType().trim().toUpperCase(Locale.ROOT);
+            if (!SUPPORTED_NODE_TYPES.contains(type) && !handlerMap.containsKey(type)) {
+                throw new IllegalArgumentException("工作流节点 [" + node.getId() + "] 存在不支持的类型: " + node.getType());
+            }
+
             nodeMap.put(node.getId(), node);
 
-            String type = node.getType() != null ? node.getType().toUpperCase(Locale.ROOT) : "";
             if ("START".equals(type)) {
                 startCount++;
                 startNodeId = node.getId();
@@ -114,7 +127,8 @@ public class WorkflowDagEngine {
                 throw new IllegalArgumentException("节点禁止直接自环连接: " + edge.getSource());
             }
             WorkflowNode sourceNode = nodeMap.get(edge.getSource());
-            if (sourceNode != null && "CONDITION".equalsIgnoreCase(sourceNode.getType())
+            if (sourceNode != null && sourceNode.getType() != null
+                    && "CONDITION".equals(sourceNode.getType().trim().toUpperCase(Locale.ROOT))
                     && StringTool.isBlank(edge.getSourceHandle())) {
                 throw new IllegalArgumentException("条件节点 [" + sourceNode.getId() + "] 的出边 [" + edge.getId() + "] 必须指定分支标识 (sourceHandle)");
             }
@@ -198,7 +212,8 @@ public class WorkflowDagEngine {
         WorkflowNode startNode = null;
         for (WorkflowNode node : graph.getNodes()) {
             nodeMap.put(node.getId(), node);
-            if ("START".equalsIgnoreCase(node.getType())) {
+            String nodeType = node.getType() != null ? node.getType().trim().toUpperCase(Locale.ROOT) : "";
+            if ("START".equals(nodeType)) {
                 startNode = node;
             }
         }
@@ -287,12 +302,13 @@ public class WorkflowDagEngine {
 
             // 5、执行当前节点
             long nodeStart = System.currentTimeMillis();
-            WorkflowNodeHandler handler = handlerMap.get(node.getType().toUpperCase(Locale.ROOT));
+            String normalizedType = node.getType() != null ? node.getType().trim().toUpperCase(Locale.ROOT) : "";
+            WorkflowNodeHandler handler = handlerMap.get(normalizedType);
             if (handler == null) {
                 throw new UnsupportedOperationException("未找到节点类型 [" + node.getType() + "] 对应的执行处理器");
             }
 
-            WorkflowExecutionTrace trace = new WorkflowExecutionTrace(node.getId(), node.getName(), node.getType(), "RUNNING");
+            WorkflowExecutionTrace trace = new WorkflowExecutionTrace(node.getId(), node.getName(), normalizedType, "RUNNING");
             trace.setInputSnapshot(node.getConfig() != null ? new LinkedHashMap<>(node.getConfig()) : Collections.emptyMap());
 
             try {
@@ -309,7 +325,7 @@ public class WorkflowDagEngine {
                 executedNodes.add(nodeId);
 
                 // 6、激活下游边
-                if ("CONDITION".equalsIgnoreCase(node.getType())) {
+                if ("CONDITION".equals(normalizedType)) {
                     String selectedHandle = ctx.getBranchSelection(node.getId());
                     for (WorkflowEdge outEdge : outgoingEdges.get(nodeId)) {
                         boolean match = StringTool.isNotBlank(selectedHandle)
@@ -326,7 +342,7 @@ public class WorkflowDagEngine {
                 }
 
                 // 7、若遇到 END 节点且无后续执行分支，可提前结束
-                if ("END".equalsIgnoreCase(node.getType()) && ctx.isTerminated()) {
+                if ("END".equals(normalizedType) && ctx.isTerminated()) {
                     if (readyQueue.isEmpty()) {
                         break;
                     }

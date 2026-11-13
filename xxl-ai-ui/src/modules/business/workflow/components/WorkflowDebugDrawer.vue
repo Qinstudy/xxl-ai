@@ -5,15 +5,13 @@ import modal from '@/utils/modal'
 import { t } from '@/i18n'
 import type { Workflow, WorkflowExecution, WorkflowExecutionTrace } from '../types'
 
+// --------------------------------- ref data ---------------------------------
 const visible = ref(false)
 const running = ref(false)
 const currentWorkflow = ref<Workflow | null>(null)
 const executionResult = ref<WorkflowExecution | null>(null)
+const inputJsonStr = ref('')
 
-// 试跑入参 JSON
-const inputJsonStr = ref('{\n  "query": "叶文洁在红岸基地做了什么？"\n}')
-
-// 节点执行链路列表
 const traceList = computed<WorkflowExecutionTrace[]>(() => {
   if (!executionResult.value?.executionJson) return []
   try {
@@ -23,7 +21,6 @@ const traceList = computed<WorkflowExecutionTrace[]>(() => {
   }
 })
 
-// 最终输出 JSON
 const outputFormatted = computed(() => {
   if (!executionResult.value?.outputJson) return ''
   try {
@@ -34,9 +31,15 @@ const outputFormatted = computed(() => {
   }
 })
 
+// --------------------------------- fun ---------------------------------
+function buildDefaultInputJson() {
+  return JSON.stringify({ query: t('business.workflow.sampleInputQuery') }, null, 2)
+}
+
 function open(workflow: Workflow, executionId?: number) {
   currentWorkflow.value = workflow
   executionResult.value = null
+  inputJsonStr.value = buildDefaultInputJson()
   visible.value = true
 
   if (executionId) {
@@ -55,7 +58,7 @@ function tryDefaultInputs(workflow: Workflow) {
     if (startNode?.config?.fields) {
       const sample: Record<string, any> = {}
       for (const f of startNode.config.fields) {
-        sample[f.name] = f.default ?? (f.type === 'NUMBER' ? 1 : '测试内容')
+        sample[f.name] = f.default ?? (f.type === 'NUMBER' ? 1 : t('business.workflow.sampleInputText'))
       }
       inputJsonStr.value = JSON.stringify(sample, null, 2)
     }
@@ -78,7 +81,7 @@ async function loadExecution(id: number) {
       }
     }
   } catch (err: any) {
-    modal.msgError(err.message || '加载执行记录失败')
+    modal.msgError(err.message || t('business.workflow.loadExecutionFailed'))
   }
 }
 
@@ -101,7 +104,13 @@ async function handleRun() {
     const res = await runWorkflow(currentWorkflow.value.id, inputs)
     if (res.code === 200 && res.data) {
       executionResult.value = res.data
-      modal.msgSuccess(t('business.workflow.runSuccess'))
+      if (res.data.status === 1) {
+        modal.msgSuccess(t('business.workflow.runSuccess'))
+      } else if (res.data.status === 3) {
+        modal.msgError(res.data.errorMsg || t('business.workflow.statusTimeout'))
+      } else {
+        modal.msgError(res.data.errorMsg || t('business.workflow.runFailed'))
+      }
     } else {
       modal.msgError(res.msg || t('business.workflow.runFailed'))
       if (res.data) {
