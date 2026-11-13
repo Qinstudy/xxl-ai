@@ -60,16 +60,16 @@
             <el-table-column :label="t('common.updateTime')" align="center" prop="updateTime" width="160" />
             <el-table-column :label="t('common.operation')" align="center" width="260" class-name="small-padding fixed-width">
               <template #default="scope">
-                <el-button link type="primary" icon="VideoPlay" @click="handleRunExperiment(scope.row)" v-hasPermi="['eval:default']">
+                <el-button link type="primary" icon="VideoPlay" @click="handleRunExperiment(scope.row as EvalDataset)" v-hasPermi="['eval:default']">
                   {{ t('business.eval.runExperiment') }}
                 </el-button>
-                <el-button link type="primary" icon="Upload" @click="handleOpenImport(scope.row)" v-hasPermi="['eval:default']">
+                <el-button link type="primary" icon="Upload" @click="handleOpenImport(scope.row as EvalDataset)" v-hasPermi="['eval:default']">
                   {{ t('business.eval.importSamples') }}
                 </el-button>
-                <el-button link type="primary" icon="Edit" @click="handleEditDataset(scope.row)" v-hasPermi="['eval:default']">
+                <el-button link type="primary" icon="Edit" @click="handleEditDataset(scope.row as EvalDataset)" v-hasPermi="['eval:default']">
                   {{ t('common.modify') }}
                 </el-button>
-                <el-button link type="danger" icon="Delete" @click="handleDeleteDataset(scope.row)" v-hasPermi="['eval:default']">
+                <el-button link type="danger" icon="Delete" @click="handleDeleteDataset(scope.row as EvalDataset)" v-hasPermi="['eval:default']">
                   {{ t('common.delete') }}
                 </el-button>
               </template>
@@ -160,13 +160,13 @@
             <el-table-column :label="t('common.createTime')" align="center" prop="addTime" width="160" />
             <el-table-column :label="t('common.operation')" align="center" width="180" class-name="small-padding fixed-width">
               <template #default="scope">
-                <el-button link type="primary" icon="View" @click="handleOpenDetail(scope.row.id)" v-hasPermi="['eval:default']">
+                <el-button link type="primary" icon="View" @click="handleOpenDetail((scope.row as EvalExperiment).id)" v-hasPermi="['eval:default']">
                   {{ t('business.eval.viewReport') }}
                 </el-button>
-                <el-button link type="warning" icon="CircleClose" v-if="scope.row.status === 1" @click="handleCancelExp(scope.row)" v-hasPermi="['eval:default']">
+                <el-button link type="warning" icon="CircleClose" v-if="scope.row.status === 1" @click="handleCancelExp(scope.row as EvalExperiment)" v-hasPermi="['eval:default']">
                   {{ t('modal.cancelButton') }}
                 </el-button>
-                <el-button link type="danger" icon="Delete" @click="handleDeleteExp(scope.row)" v-hasPermi="['eval:default']">
+                <el-button link type="danger" icon="Delete" @click="handleDeleteExp(scope.row as EvalExperiment)" v-hasPermi="['eval:default']">
                   {{ t('common.delete') }}
                 </el-button>
               </template>
@@ -288,7 +288,7 @@ import {
   delEvalExperiment
 } from '../api'
 import { listKnowledgeBaseBySpace } from '@/modules/business/knowledge/base/api'
-import { listAgentBySpace } from '@/modules/business/agent/api'
+import { listAllAgent } from '@/modules/business/agent/api'
 import { listSupplierBySpace, listModelBySupplier } from '@/modules/business/supplier/api'
 import ExperimentDetailDrawer from '../components/ExperimentDetailDrawer.vue'
 
@@ -387,11 +387,15 @@ function loadTargetOptions(type: 'RAG' | 'AGENT') {
   targetOptions.value = []
   if (type === 'RAG') {
     listKnowledgeBaseBySpace().then((res) => {
-      targetOptions.value = (res.data || []).map((item) => ({ id: item.id as number, name: item.name }))
+      targetOptions.value = (res.data || [])
+        .filter((item) => item.id != null)
+        .map((item) => ({ id: item.id as number, name: item.name ?? String(item.id) }))
     })
   } else {
-    listAgentBySpace().then((res) => {
-      targetOptions.value = (res.data || []).map((item) => ({ id: item.id as number, name: item.name }))
+    listAllAgent().then((res) => {
+      targetOptions.value = (res.data || [])
+        .filter((item) => item.id != null)
+        .map((item) => ({ id: item.id as number, name: item.name ?? String(item.id) }))
     })
   }
 }
@@ -404,7 +408,8 @@ function handleAddDataset() {
 }
 
 function handleEditDataset(row: EvalDataset) {
-  loadEvalDataset(row.id as number).then((res) => {
+  if (row.id == null) return
+  loadEvalDataset(row.id).then((res) => {
     datasetForm.value = { ...res.data }
     datasetDialog.value = { visible: true, title: t('business.eval.editDataset') }
     loadTargetOptions(res.data.evalType)
@@ -434,8 +439,10 @@ function submitDatasetForm() {
 }
 
 function handleDeleteDataset(row: EvalDataset) {
-  modal.confirm(t('business.eval.confirmDeleteDataset', [row.id]))
-    .then(() => delEvalDataset(row.id as number))
+  const id = row.id
+  if (id == null) return
+  modal.confirm(t('business.eval.confirmDeleteDataset', [id]))
+    .then(() => delEvalDataset(id))
     .then(() => {
       modal.msgSuccess(t('common.deleteSuccess'))
       getDatasetList()
@@ -557,8 +564,10 @@ function submitRunExperiment() {
 }
 
 function handleCancelExp(row: EvalExperiment) {
+  const id = row.id
+  if (id == null) return
   modal.confirm(t('business.eval.confirmCancel'))
-    .then(() => cancelEvalExperiment(row.id as number))
+    .then(() => cancelEvalExperiment(id))
     .then(() => {
       modal.msgSuccess(t('common.saveSuccess'))
       getExpList()
@@ -567,8 +576,10 @@ function handleCancelExp(row: EvalExperiment) {
 }
 
 function handleDeleteExp(row: EvalExperiment) {
-  modal.confirm(t('business.eval.confirmDeleteExperiment', [row.id]))
-    .then(() => delEvalExperiment(row.id as number))
+  const id = row.id
+  if (id == null) return
+  modal.confirm(t('business.eval.confirmDeleteExperiment', [id]))
+    .then(() => delEvalExperiment(id))
     .then(() => {
       modal.msgSuccess(t('common.deleteSuccess'))
       getExpList()
@@ -576,7 +587,8 @@ function handleDeleteExp(row: EvalExperiment) {
     .catch(() => {})
 }
 
-function handleOpenDetail(id: number) {
+function handleOpenDetail(id?: number) {
+  if (id == null) return
   detailDrawerRef.value?.open(id)
 }
 

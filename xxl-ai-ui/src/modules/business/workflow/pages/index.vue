@@ -67,7 +67,7 @@
                   link
                   type="success"
                   icon="CaretRight"
-                  @click="handleDebug(scope.row)"
+                  @click="handleDebug(scope.row as Workflow)"
                   v-hasPermi="['workflow:default']"
                 >
                   {{ t('business.workflow.runDebug') }}
@@ -76,7 +76,7 @@
                   link
                   type="primary"
                   icon="Edit"
-                  @click="handleEditWorkflow(scope.row)"
+                  @click="handleEditWorkflow(scope.row as Workflow)"
                   v-hasPermi="['workflow:default']"
                 >
                   {{ t('common.modify') }}
@@ -85,7 +85,7 @@
                   link
                   type="info"
                   icon="Tickets"
-                  @click="handleViewExecutions(scope.row)"
+                  @click="handleViewExecutions(scope.row as Workflow)"
                   v-hasPermi="['workflow:default']"
                 >
                   {{ t('business.workflow.tabExecutions') }}
@@ -94,7 +94,7 @@
                   link
                   type="danger"
                   icon="Delete"
-                  @click="handleDeleteWorkflow(scope.row)"
+                  @click="handleDeleteWorkflow(scope.row as Workflow)"
                   v-hasPermi="['workflow:default']"
                 >
                   {{ t('common.delete') }}
@@ -173,7 +173,7 @@
                   link
                   type="primary"
                   icon="View"
-                  @click="handleViewExecutionDetail(scope.row)"
+                  @click="handleViewExecutionDetail(scope.row as WorkflowExecution)"
                   v-hasPermi="['workflow:default']"
                 >
                   {{ t('business.workflow.viewTraces') }}
@@ -182,7 +182,7 @@
                   link
                   type="danger"
                   icon="Delete"
-                  @click="handleDeleteExecution(scope.row)"
+                  @click="handleDeleteExecution(scope.row as WorkflowExecution)"
                   v-hasPermi="['workflow:default']"
                 >
                   {{ t('common.delete') }}
@@ -519,8 +519,10 @@ function handleViewExecutionDetail(row: WorkflowExecution) {
 }
 
 function handleDeleteExecution(row: WorkflowExecution) {
-  modal.confirm(t('business.workflow.confirmDeleteExecution', [row.id]))
-    .then(() => delWorkflowExecution(row.id!))
+  const id = row.id
+  if (id == null) return
+  modal.confirm(t('business.workflow.confirmDeleteExecution', [id]))
+    .then(() => delWorkflowExecution(id))
     .then(() => {
       modal.msgSuccess(t('common.deleteSuccess'))
       getExecList()
