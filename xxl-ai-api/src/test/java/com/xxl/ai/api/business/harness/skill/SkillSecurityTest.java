@@ -52,12 +52,35 @@ public class SkillSecurityTest {
     private SkillToolFactory skillToolFactory;
 
     @Test
-    @DisplayName("1. [SEC-002] 验证子进程环境变量脱敏净化（屏蔽敏感凭证）")
+    @DisplayName("1. [SEC-002] 验证子进程环境变量最小权限白名单净化（全面阻断非白名单宿主凭据）")
     void testSafeEnvironmentSanitization() {
+        Map<String, String> simulatedHostEnv = Map.of(
+                "PATH", "/usr/local/bin:/usr/bin",
+                "HOME", "/home/app",
+                "LANG", "en_US.UTF-8",
+                "PYTHONUNBUFFERED", "1",
+                "DATABASE_URL", "jdbc:mysql://prod:3306/xxl_ai",
+                "SPRING_DATASOURCE_URL", "jdbc:mysql://10.0.0.1/db",
+                "AWS_SECRET_ACCESS_KEY", "wJalrXUtnFEMI/K7MDENG",
+                "REDIS_HOST", "10.0.0.2",
+                "OPENAI_API_KEY", "sk-live-xxx",
+                "CUSTOM_WEBHOOK_URL", "https://internal.hook/abc"
+        );
+        Map<String, String> filtered = SkillToolFactory.filterSafeEnvironment(simulatedHostEnv);
+        assertEquals(4, filtered.size());
+        assertTrue(filtered.containsKey("PATH"));
+        assertTrue(filtered.containsKey("HOME"));
+        assertTrue(filtered.containsKey("LANG"));
+        assertTrue(filtered.containsKey("PYTHONUNBUFFERED"));
+        assertFalse(filtered.containsKey("DATABASE_URL"));
+        assertFalse(filtered.containsKey("SPRING_DATASOURCE_URL"));
+        assertFalse(filtered.containsKey("AWS_SECRET_ACCESS_KEY"));
+        assertFalse(filtered.containsKey("REDIS_HOST"));
+        assertFalse(filtered.containsKey("OPENAI_API_KEY"));
+        assertFalse(filtered.containsKey("CUSTOM_WEBHOOK_URL"));
+
         Map<String, String> safeEnv = SkillToolFactory.buildSafeEnvironment();
         assertNotNull(safeEnv);
-
-        // 验证常见敏感关键词均被严格过滤
         for (String key : safeEnv.keySet()) {
             String upper = key.toUpperCase();
             assertFalse(upper.contains("PASS"), "不应包含 PASS: " + key);
@@ -143,13 +166,13 @@ public class SkillSecurityTest {
     }
 
     @Test
-    @DisplayName("4. [SEC-002] 验证物化路径防目录穿越 (Zip Slip 防护)")
-    void testMaterializeSkillPathTraversalProtection(@TempDir Path tempDir) {
+    @DisplayName("4. [SEC-002] 验证物化路径防目录穿越与合法双点号文件名保留")
+    void testMaterializeSkillPathTraversalProtection(@TempDir Path tempDir) throws IOException {
         ReflectionTestUtils.setField(skillToolFactory, "skillRoot", tempDir.toString());
 
         Path skillDir = tempDir.resolve("agent_1").resolve("malicious-skill");
 
-        // 构造带有非法越界路径的 SkillFile 记录
+        // 构造带有非法越界路径、独立 ".." 以及合法包含双点号的普通文件
         SkillFile evilFile = new SkillFile();
         evilFile.setId(999L);
         evilFile.setSkillId(99L);
@@ -158,14 +181,29 @@ public class SkillSecurityTest {
         evilFile.setParentId(0L);
         evilFile.setContent("root:x:0:0:root:/root:/bin/bash");
 
-        when(skillFileMapper.listBySkill(99L)).thenReturn(List.of(evilFile));
+        SkillFile dotdotDir = new SkillFile();
+        dotdotDir.setId(998L);
+        dotdotDir.setSkillId(99L);
+        dotdotDir.setName("..");
+        dotdotDir.setType(0);
+        dotdotDir.setParentId(0L);
 
-        // 触发物化：必须被 sanitize/normalize + startsWith 安全检查捕获
-        // sanitize 会将 ../ 替换为 __，若未逃逸则正常写入，若以任何形式逃逸必被 SecurityException 拦截
+        SkillFile validDoubleDot = new SkillFile();
+        validDoubleDot.setId(997L);
+        validDoubleDot.setSkillId(99L);
+        validDoubleDot.setName("report..v2.md");
+        validDoubleDot.setType(1);
+        validDoubleDot.setParentId(0L);
+        validDoubleDot.setContent("# Safe");
+
+        when(skillFileMapper.listBySkill(99L)).thenReturn(List.of(evilFile, dotdotDir, validDoubleDot));
+
+        // 触发物化：穿越片段被净化到技能目录内，合法双点号文件名不误伤
         try {
             boolean hasMain = (boolean) ReflectionTestUtils.invokeMethod(skillToolFactory, "materializeSkill", skillDir, 99L);
             assertFalse(hasMain);
-            // 确保没有写到技能目录外部
+            assertTrue(Files.exists(skillDir.resolve("report..v2.md")), "含双点号的正规文件名应保留原名");
+            assertFalse(Files.exists(tempDir.resolve("agent_1").resolve("report..v2.md")));
             Path evilPath = Path.of("/etc/passwd");
             assertNotEquals("root:x:0:0:root:/root:/bin/bash", Files.exists(evilPath) ? Files.readString(evilPath) : "");
         } catch (Exception e) {

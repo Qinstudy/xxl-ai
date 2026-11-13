@@ -35,7 +35,7 @@ public class ChatSessionController {
     private VisitorSecurityTool visitorSecurityTool;
 
     /**
-     * 创建对话（公开，自动签发/刷新 VisitorToken）
+     * 创建对话（公开，强校验 VisitorToken 并滚动刷新签名）
      */
     @RequestMapping("/create")
     @XxlSso(login = false)
@@ -52,7 +52,7 @@ public class ChatSessionController {
     }
 
     /**
-     * 对话列表（公开，按访客隔离，自动签发/刷新 VisitorToken）
+     * 对话列表（公开，按访客隔离，强校验 VisitorToken 并滚动刷新签名）
      */
     @RequestMapping("/list")
     @XxlSso(login = false)

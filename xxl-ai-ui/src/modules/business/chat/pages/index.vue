@@ -497,24 +497,22 @@ const traceDrawer = ref<{
 // --------------------------------- init ---------------------------------
 
 /**
- * 生成访客标识（浏览器维度，localStorage 持久化）
+ * 读取本地缓存的访客标识（最终权威标识由 /chat/load 服务端握手通过 X-Visitor-Id 确认或重新签发）
  */
 function ensureVisitorId() {
-  let id = localStorage.getItem('xxl-ai-agent-visitor')
-  if (!id) {
-    id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
-    localStorage.setItem('xxl-ai-agent-visitor', id)
-  }
-  visitorId.value = id
+  const cachedId = localStorage.getItem('xxl-ai-agent-visitor') || ''
+  visitorId.value = cachedId
 }
 
-/** 初始化：加载 Agent 元信息 + 对话列表；带对话参数则定位单个对话，否则默认展示新建对话内容 */
+/** 初始化：先经 /chat/load 握手获取/校准服务端签名访客身份，再加载对话列表 */
 async function init() {
   ensureVisitorId()
   try {
-    const res = await loadAgentInfo(uuid.value, visitorId.value)
+    const res = await loadAgentInfo(uuid.value, visitorId.value || undefined)
     agent.value = res.data
     document.title = agent.value?.name || 'Agent'
+    // 响应拦截器已将服务端下发/校验后的 X-Visitor-Id 同步至 localStorage
+    visitorId.value = localStorage.getItem('xxl-ai-agent-visitor') || visitorId.value
   } catch (e) {
     agent.value = undefined
     return

@@ -84,17 +84,18 @@ public class VisitorSecurityToolTest {
         String visitorId = "visitor-req-1";
         MockHttpServletRequest request = new MockHttpServletRequest();
 
-        // 1. 无 token 首次请求（平滑迁移兼容）
+        // 1. 无 token 请求必须拒绝（彻底封堵空 Token 绕过漏洞）
         Response<String> res1 = visitorSecurityTool.validateVisitor(request, visitorId);
-        assertTrue(res1.isSuccess());
+        assertFalse(res1.isSuccess());
+        assertEquals("访客凭证无效或已过期", res1.getMsg());
 
-        // 2. 带有效 token 请求头
+        // 2. 带有效 token 请求头放行
         String token = visitorSecurityTool.sign(visitorId);
         request.addHeader(VisitorSecurityTool.HEADER_VISITOR_TOKEN, token);
         Response<String> res2 = visitorSecurityTool.validateVisitor(request, visitorId);
         assertTrue(res2.isSuccess());
 
-        // 3. 携带伪造篡改的 token 请求头
+        // 3. 携带伪造篡改的 token 请求头拒绝
         request.removeHeader(VisitorSecurityTool.HEADER_VISITOR_TOKEN);
         request.addHeader(VisitorSecurityTool.HEADER_VISITOR_TOKEN, "fake-malicious-token");
         Response<String> res3 = visitorSecurityTool.validateVisitor(request, visitorId);
@@ -103,18 +104,62 @@ public class VisitorSecurityToolTest {
     }
 
     @Test
-    void testValidateAndRefreshToken() {
+    void testValidateAndRefreshTokenStrict() {
         String visitorId = "visitor-refresh-1";
         MockHttpServletRequest request = new MockHttpServletRequest();
         MockHttpServletResponse response = new MockHttpServletResponse();
 
+        // 无 token 时 validateAndRefreshToken 必须拒绝且不得下发凭证
+        Response<String> rejected = visitorSecurityTool.validateAndRefreshToken(request, response, visitorId);
+        assertFalse(rejected.isSuccess());
+        assertNull(response.getHeader(VisitorSecurityTool.HEADER_VISITOR_TOKEN));
+
+        // 携带合法 token 时校验通过并滚动刷新签名
+        String token = visitorSecurityTool.sign(visitorId);
+        request.addHeader(VisitorSecurityTool.HEADER_VISITOR_TOKEN, token);
         Response<String> result = visitorSecurityTool.validateAndRefreshToken(request, response, visitorId);
         assertTrue(result.isSuccess());
 
-        // 检查 response header 是否签发了 X-Visitor-Token
         String issuedToken = response.getHeader(VisitorSecurityTool.HEADER_VISITOR_TOKEN);
         assertNotNull(issuedToken);
         assertTrue(visitorSecurityTool.verify(visitorId, issuedToken));
+    }
+
+    @Test
+    void testIssueOrRefreshIdentityPreventsHijacking() {
+        // 1. 攻击者尝试传受害者 visitorId 但未带匹配 Token：必须忽略并重发全新随机 ID + Token
+        String victimId = "victim-user-007";
+        MockHttpServletRequest hijackReq = new MockHttpServletRequest();
+        MockHttpServletResponse hijackResp = new MockHttpServletResponse();
+
+        String mintedId = visitorSecurityTool.issueOrRefreshIdentity(hijackReq, hijackResp, victimId);
+        assertNotNull(mintedId);
+        assertNotEquals(victimId, mintedId);
+        assertEquals(mintedId, hijackResp.getHeader(VisitorSecurityTool.HEADER_VISITOR_ID));
+
+        String mintedToken = hijackResp.getHeader(VisitorSecurityTool.HEADER_VISITOR_TOKEN);
+        assertNotNull(mintedToken);
+        assertTrue(visitorSecurityTool.verify(mintedId, mintedToken));
+        assertFalse(visitorSecurityTool.verify(victimId, mintedToken));
+
+        // 2. 合法用户携带匹配的 visitorId 与 Token：沿用原 visitorId 并刷新 Token
+        MockHttpServletRequest legitimateReq = new MockHttpServletRequest();
+        legitimateReq.addHeader(VisitorSecurityTool.HEADER_VISITOR_TOKEN, mintedToken);
+        MockHttpServletResponse legitimateResp = new MockHttpServletResponse();
+
+        String confirmedId = visitorSecurityTool.issueOrRefreshIdentity(legitimateReq, legitimateResp, mintedId);
+        assertEquals(mintedId, confirmedId);
+        assertEquals(mintedId, legitimateResp.getHeader(VisitorSecurityTool.HEADER_VISITOR_ID));
+        assertTrue(visitorSecurityTool.verify(mintedId, legitimateResp.getHeader(VisitorSecurityTool.HEADER_VISITOR_TOKEN)));
+    }
+
+    @Test
+    void testRandomStartupSecretDiffersAcrossInstances() {
+        VisitorSecurityTool another = new VisitorSecurityTool();
+        another.init();
+        String tokenFromFirst = visitorSecurityTool.sign("visitor-x");
+        // 未配置共享 secret 时，两实例启动各自随机生成密钥，互相无法伪造验签
+        assertFalse(another.verify("visitor-x", tokenFromFirst));
     }
 
     @Test

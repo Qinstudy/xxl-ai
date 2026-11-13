@@ -94,7 +94,8 @@ public class SessionServiceImpl implements SessionService {
         if (session == null) {
             return Response.ofFail("对话不存在");
         }
-        if (session.getVisitorId() != null && (StringTool.isBlank(visitorId) || !session.getVisitorId().equals(visitorId.trim()))) {
+        if (StringTool.isBlank(visitorId) || StringTool.isBlank(session.getVisitorId())
+                || !session.getVisitorId().equals(visitorId.trim())) {
             return Response.ofFail("无权操作该对话");
         }
         sessionMapper.updateTitle(sessionId, title.trim());
@@ -110,7 +111,8 @@ public class SessionServiceImpl implements SessionService {
         if (session == null) {
             return Response.ofFail("对话不存在");
         }
-        if (session.getVisitorId() != null && (StringTool.isBlank(visitorId) || !session.getVisitorId().equals(visitorId.trim()))) {
+        if (StringTool.isBlank(visitorId) || StringTool.isBlank(session.getVisitorId())
+                || !session.getVisitorId().equals(visitorId.trim())) {
             return Response.ofFail("无权操作该对话");
         }
         sessionMsgMapper.deleteBySessionId(sessionId);
@@ -128,7 +130,8 @@ public class SessionServiceImpl implements SessionService {
         if (session == null) {
             return Response.ofFail("对话不存在");
         }
-        if (session.getVisitorId() != null && (StringTool.isBlank(visitorId) || !session.getVisitorId().equals(visitorId.trim()))) {
+        if (StringTool.isBlank(visitorId) || StringTool.isBlank(session.getVisitorId())
+                || !session.getVisitorId().equals(visitorId.trim())) {
             return Response.ofFail("无权访问该对话");
         }
         return Response.ofSuccess(sessionMsgMapper.listBySessionId(sessionId));

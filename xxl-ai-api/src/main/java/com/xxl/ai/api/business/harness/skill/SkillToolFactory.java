@@ -31,6 +31,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -171,20 +172,34 @@ public class SkillToolFactory {
         return new SkillShellTracker(backend);
     }
 
+    /** 允许透传给 Skill 子进程的最小环境变量白名单 */
+    private static final Set<String> SAFE_ENV_ALLOWLIST = Set.of(
+            "PATH", "HOME", "USER", "LOGNAME", "SHELL",
+            "LANG", "LC_ALL", "LC_CTYPE",
+            "TZ", "TMPDIR", "TEMP", "TMP", "TERM",
+            "PYTHONIOENCODING", "PYTHONUNBUFFERED", "VIRTUAL_ENV", "CONDA_PREFIX", "NODE_ENV"
+    );
+
     /**
-     * 构建脱敏后的安全环境变量（排除包含 PASSWORD/SECRET/KEY/TOKEN/AUTH/CREDENTIAL 的敏感变量）
+     * 构建安全子进程环境变量（最小权限白名单模式，阻断宿主机数据库、Redis、云凭证等隐式泄露）
      */
     public static Map<String, String> buildSafeEnvironment() {
-        Map<String, String> safeEnv = new HashMap<>(System.getenv());
-        safeEnv.keySet().removeIf(key -> {
-            String upper = key.toUpperCase();
-            return upper.contains("PASS")
-                    || upper.contains("SECRET")
-                    || upper.contains("KEY")
-                    || upper.contains("TOKEN")
-                    || upper.contains("AUTH")
-                    || upper.contains("CREDENTIAL");
-        });
+        return filterSafeEnvironment(System.getenv());
+    }
+
+    /**
+     * 基于白名单过滤给定环境变量映射
+     */
+    public static Map<String, String> filterSafeEnvironment(Map<String, String> sourceEnv) {
+        Map<String, String> safeEnv = new HashMap<>();
+        if (sourceEnv == null || sourceEnv.isEmpty()) {
+            return safeEnv;
+        }
+        for (Map.Entry<String, String> entry : sourceEnv.entrySet()) {
+            if (entry.getKey() != null && SAFE_ENV_ALLOWLIST.contains(entry.getKey().toUpperCase())) {
+                safeEnv.put(entry.getKey(), entry.getValue());
+            }
+        }
         return safeEnv;
     }
 
@@ -279,12 +294,16 @@ public class SkillToolFactory {
         }
         // 组件节点路径：根级节点名即路径，子节点逐级拼接父目录
         Map<Long, String> pathCache = new HashMap<>();
+        Path normalizedRoot = skillDir.toAbsolutePath().normalize();
         boolean hasMain = false;
         for (SkillFile file : fileList) {
             String relPath = resolvePath(file, fileMap, pathCache);
-            Path target = skillDir.resolve(relPath).normalize();
-            if (!target.startsWith(skillDir)) {
+            Path target = normalizedRoot.resolve(relPath).normalize();
+            if (!target.startsWith(normalizedRoot)) {
                 throw new SecurityException("非法 Skill 文件路径穿越，拒绝物化: " + file.getName());
+            }
+            if (Files.isSymbolicLink(target)) {
+                throw new SecurityException("检测到软链接目标文件，拒绝物化: " + file.getName());
             }
             if (file.getType() == 1) {
                 if (SKILL_FILE_NAME.equals(file.getName())) {
@@ -380,14 +399,21 @@ public class SkillToolFactory {
     }
 
     /**
-     * 路径净化：屏蔽路径分隔符与穿越片段
+     * 路径净化：屏蔽路径分隔符、NUL 字符与独立 "." / ".." 穿越片段（保留合法文件名内双点号）
      */
     private String sanitize(String name) {
         if (StringTool.isBlank(name)) {
             return "_";
         }
-        String cleaned = name.replace('\\', '_').replace('/', '_').replace("..", "_");
-        return cleaned.isEmpty() ? "_" : cleaned;
+        String trimmed = name.trim();
+        if (".".equals(trimmed) || "..".equals(trimmed)) {
+            return "_";
+        }
+        String cleaned = trimmed.replace('\\', '_').replace('/', '_').replace('\0', '_');
+        if (".".equals(cleaned) || "..".equals(cleaned) || cleaned.isEmpty()) {
+            return "_";
+        }
+        return cleaned;
     }
 
     /**

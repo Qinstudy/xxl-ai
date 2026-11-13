@@ -127,52 +127,46 @@ public class ChatServiceImpl implements ChatService {
      }
 
     /**
-     * 断线/刷新续传：从既有结果流的 {@code lastEventId} 之后继续转发，不重新生成
+     * 断线/刷新续传：校验访客归属，从既有结果流的 {@code lastEventId} 之后继续转发，不重新生成
      */
-    @Override
-    public SseEmitter resume(long msgId, String lastEventId) {
-        return resume(msgId, null, lastEventId);
-    }
-
     @Override
     public SseEmitter resume(long msgId, String visitorId, String lastEventId) {
         if (msgId <= 0) {
             return chatStreamTool.error("无效的会话流标识");
         }
-        if (StringTool.isNotBlank(visitorId)) {
-            SessionMsg msg = sessionMsgMapper.load(msgId);
-            if (msg == null) {
-                return chatStreamTool.error("会话消息不存在");
-            }
-            Session session = sessionMapper.load(msg.getSessionId());
-            if (session == null || session.getVisitorId() == null || !visitorId.trim().equals(session.getVisitorId())) {
-                return chatStreamTool.error("无权访问该会话流");
-            }
+        if (StringTool.isBlank(visitorId)) {
+            return chatStreamTool.error("访客标识不能为空");
+        }
+        SessionMsg msg = sessionMsgMapper.load(msgId);
+        if (msg == null) {
+            return chatStreamTool.error("会话消息不存在");
+        }
+        Session session = sessionMapper.load(msg.getSessionId());
+        if (session == null || StringTool.isBlank(session.getVisitorId())
+                || !visitorId.trim().equals(session.getVisitorId())) {
+            return chatStreamTool.error("无权访问该会话流");
         }
         return chatStreamTool.open(msgId, lastEventId);
     }
 
     /**
-     * 主动终止本节点会话进行中的生成：标记终止 → 中断生成 → 回收工具调用进程（幂等，无进行中生成亦成功）
+     * 主动终止本节点会话进行中的生成：校验访客归属 → 标记终止 → 中断生成 → 回收工具调用进程
      */
-    @Override
-    public Response<String> stop(long sessionId) {
-        return stop(sessionId, null);
-    }
-
     @Override
     public Response<String> stop(long sessionId, String visitorId) {
         if (sessionId <= 0) {
             return Response.ofFail("无效的会话标识");
         }
-        if (StringTool.isNotBlank(visitorId)) {
-            Session session = sessionMapper.load(sessionId);
-            if (session == null) {
-                return Response.ofFail("会话不存在");
-            }
-            if (session.getVisitorId() == null || !visitorId.trim().equals(session.getVisitorId())) {
-                return Response.ofFail("无权操作该会话");
-            }
+        if (StringTool.isBlank(visitorId)) {
+            return Response.ofFail("访客标识不能为空");
+        }
+        Session session = sessionMapper.load(sessionId);
+        if (session == null) {
+            return Response.ofFail("会话不存在");
+        }
+        if (StringTool.isBlank(session.getVisitorId())
+                || !visitorId.trim().equals(session.getVisitorId())) {
+            return Response.ofFail("无权操作该会话");
         }
         chatStreamTool.cancel(sessionId);
         return Response.ofSuccess();

@@ -116,4 +116,17 @@ public class SessionServiceSecurityTest {
                 sessionService.requireVisitorSession(100L, null)
         );
     }
+
+    @Test
+    void testSessionWithNullVisitorIdBlockedFailClosed() {
+        Session orphanSession = new Session();
+        orphanSession.setId(200L);
+        orphanSession.setVisitorId(null);
+        when(sessionMapper.load(200L)).thenReturn(orphanSession);
+
+        assertFalse(sessionService.rename(200L, "any-visitor", "新标题").isSuccess());
+        assertFalse(sessionService.delete(200L, "any-visitor").isSuccess());
+        assertFalse(sessionService.msgList(200L, "any-visitor").isSuccess());
+        verify(sessionMapper, never()).delete(200L);
+    }
 }

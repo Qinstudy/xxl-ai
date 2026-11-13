@@ -14,7 +14,9 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.UUID;
 
 /**
  * 访客端身份令牌（VisitorToken）HMAC 签名与验签工具（[SEC-001] IDOR 防护）
@@ -26,6 +28,7 @@ public class VisitorSecurityTool {
 
     private static final Logger logger = LoggerFactory.getLogger(VisitorSecurityTool.class);
 
+    public static final String HEADER_VISITOR_ID = "X-Visitor-Id";
     public static final String HEADER_VISITOR_TOKEN = "X-Visitor-Token";
     public static final String PARAM_VISITOR_TOKEN = "visitorToken";
 
@@ -42,8 +45,11 @@ public class VisitorSecurityTool {
         if (StringTool.isNotBlank(configuredSecret)) {
             this.secretKeyBytes = configuredSecret.trim().getBytes(StandardCharsets.UTF_8);
         } else {
-            // 缺省安全盐（确保开箱即用状态下依然拥有安全防御能力）
-            this.secretKeyBytes = "xxl-ai-visitor-security-token-secret-salt-2026".getBytes(StandardCharsets.UTF_8);
+            // 未显式配置密钥时生成启动级随机 32 字节密钥（杜绝源码硬编码密钥被公网离线伪造）
+            byte[] randomBytes = new byte[32];
+            new SecureRandom().nextBytes(randomBytes);
+            this.secretKeyBytes = randomBytes;
+            logger.warn("未配置 xxl-ai.chat.visitor.secret，已启用单节点随机访客签名密钥；多实例部署或需重启后保持访客会话，请显式配置一致密钥");
         }
     }
 
@@ -100,23 +106,21 @@ public class VisitorSecurityTool {
     }
 
     /**
-     * 校验 HTTP 请求中的访客身份与令牌
+     * 严格校验 HTTP 请求中的访客身份与签名令牌（禁止无 Token 绕过）
      */
     public Response<String> validateVisitor(HttpServletRequest request, String visitorId) {
         if (StringTool.isBlank(visitorId)) {
             return Response.ofFail("访客标识不能为空");
         }
         String token = resolveToken(request);
-        if (StringTool.isNotBlank(token)) {
-            if (!verify(visitorId, token)) {
-                return Response.ofFail("访客凭证无效或已过期");
-            }
+        if (StringTool.isBlank(token) || !verify(visitorId, token)) {
+            return Response.ofFail("访客凭证无效或已过期");
         }
         return Response.ofSuccess();
     }
 
     /**
-     * 校验并在必要时在响应头刷新签发 Token
+     * 严格验签并在响应头滚动刷新 Token（仅放行已持有合法 Token 的请求）
      */
     public Response<String> validateAndRefreshToken(HttpServletRequest request, HttpServletResponse response, String visitorId) {
         Response<String> check = validateVisitor(request, visitorId);
@@ -124,10 +128,30 @@ public class VisitorSecurityTool {
             return check;
         }
         if (response != null && StringTool.isNotBlank(visitorId)) {
-            String freshToken = sign(visitorId);
+            String freshToken = sign(visitorId.trim());
             response.setHeader(HEADER_VISITOR_TOKEN, freshToken);
         }
         return Response.ofSuccess();
+    }
+
+    /**
+     * 仅用于 /chat/load 公开握手初始化：
+     * 已持有匹配且有效 Token 时沿用原 visitorId 并刷新签名；
+     * 未携带或验签失败时，忽略客户端传入的不可信 visitorId，由服务端重新签发全新 UUID 与对应签名（阻断冒用他人 visitorId 骗签）
+     */
+    public String issueOrRefreshIdentity(HttpServletRequest request, HttpServletResponse response, String clientVisitorId) {
+        String token = resolveToken(request);
+        String effectiveVisitorId;
+        if (StringTool.isNotBlank(clientVisitorId) && StringTool.isNotBlank(token) && verify(clientVisitorId, token)) {
+            effectiveVisitorId = clientVisitorId.trim();
+        } else {
+            effectiveVisitorId = "v_" + UUID.randomUUID().toString().replace("-", "");
+        }
+        if (response != null) {
+            response.setHeader(HEADER_VISITOR_ID, effectiveVisitorId);
+            response.setHeader(HEADER_VISITOR_TOKEN, sign(effectiveVisitorId));
+        }
+        return effectiveVisitorId;
     }
 
     /**

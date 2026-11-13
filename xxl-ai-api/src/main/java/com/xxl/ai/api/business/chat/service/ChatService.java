@@ -52,11 +52,6 @@ public interface ChatService {
      */
     SseEmitter resume(long msgId, String visitorId, String lastEventId);
 
-    @Deprecated
-    default SseEmitter resume(long msgId, String lastEventId) {
-        return resume(msgId, null, lastEventId);
-    }
-
     /**
      * 主动终止本节点会话进行中的生成（校验访客归属）：标记终止 → 中断生成线程 → 回收工具调用进程
      *
@@ -64,11 +59,6 @@ public interface ChatService {
      * 其他节点上的在途生成不受影响（无进行中生成时亦返回成功）。
      */
     Response<String> stop(long sessionId, String visitorId);
-
-    @Deprecated
-    default Response<String> stop(long sessionId) {
-        return stop(sessionId, null);
-    }
 
     /**
      * 在线预览对话交付物内容（C端公开校验：Agent 就绪 + 会话归属访客 + 消息所属会话）

@@ -7,7 +7,6 @@ import com.xxl.ai.api.business.session.model.dto.ArtifactDownloadDTO;
 import com.xxl.ai.api.business.session.model.dto.ArtifactPreviewDTO;
 import com.xxl.ai.api.framework.util.VisitorSecurityTool;
 import com.xxl.sso.core.annotation.XxlSso;
-import com.xxl.tool.core.StringTool;
 import com.xxl.tool.json.GsonTool;
 import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
@@ -42,7 +41,7 @@ public class ChatController {
     private VisitorSecurityTool visitorSecurityTool;
 
     /**
-     * Load Agent 基础信息（公开，可选携带 visitorId 自动初始化/刷新签名令牌）
+     * Load Agent 基础信息（公开握手入口：已携带有效 Token 时刷新；否则忽略不可信 visitorId 并由服务端签发全新标识与签名）
      */
     @RequestMapping("/load")
     @XxlSso(login = false)
@@ -50,10 +49,11 @@ public class ChatController {
                                 HttpServletResponse response,
                                 @RequestParam("uuid") String uuid,
                                 @RequestParam(value = "visitorId", required = false) String visitorId) {
-        if (StringTool.isNotBlank(visitorId)) {
-            visitorSecurityTool.validateAndRefreshToken(request, response, visitorId);
+        Response<Agent> resp = chatService.load(uuid);
+        if (resp.isSuccess()) {
+            visitorSecurityTool.issueOrRefreshIdentity(request, response, visitorId);
         }
-        return chatService.load(uuid);
+        return resp;
     }
 
     /**
@@ -62,15 +62,16 @@ public class ChatController {
     @RequestMapping("/send")
     @XxlSso(login = false)
     public SseEmitter send(HttpServletRequest request, @RequestBody ChatSendDTO dto) {
-        Response<String> check = visitorSecurityTool.validateVisitor(request, dto.getVisitorId());
+        String visitorId = dto == null ? null : dto.getVisitorId();
+        Response<String> check = visitorSecurityTool.validateVisitor(request, visitorId);
         if (!check.isSuccess()) {
             throw new IllegalArgumentException(check.getMsg());
         }
-        return chatService.send(dto.getUuid(), dto.getVisitorId(), dto.getSessionId(), dto.getContent(), dto.getVariables());
+        return chatService.send(dto.getUuid(), visitorId, dto.getSessionId(), dto.getContent(), dto.getVariables());
     }
 
     /**
-     * 对话断线续传（公开，SSE 流式返回，校验访客归属）
+     * 对话断线续传（公开，SSE 流式返回，强校验访客令牌与会话归属）
      *
      * 从结果流的 lastEventId 之后继续转发，不重新生成；msgId 为助手消息ID（即结果流标识）
      */
@@ -80,28 +81,24 @@ public class ChatController {
                              @RequestParam("msgId") long msgId,
                              @RequestParam(value = "visitorId", required = false) String visitorId,
                              @RequestParam(value = "lastEventId", required = false) String lastEventId) {
-        if (StringTool.isNotBlank(visitorId)) {
-            Response<String> check = visitorSecurityTool.validateVisitor(request, visitorId);
-            if (!check.isSuccess()) {
-                throw new IllegalArgumentException(check.getMsg());
-            }
+        Response<String> check = visitorSecurityTool.validateVisitor(request, visitorId);
+        if (!check.isSuccess()) {
+            throw new IllegalArgumentException(check.getMsg());
         }
         return chatService.resume(msgId, visitorId, lastEventId);
     }
 
     /**
-     * 主动终止会话（公开，校验访客与会话归属）：中断进行中的生成，并清理工具调用进程
+     * 主动终止会话（公开，强校验访客令牌与会话归属）：中断进行中的生成，并清理工具调用进程
      */
     @RequestMapping("/stop")
     @XxlSso(login = false)
     public Response<String> stop(HttpServletRequest request,
                                  @RequestParam("sessionId") long sessionId,
                                  @RequestParam(value = "visitorId", required = false) String visitorId) {
-        if (StringTool.isNotBlank(visitorId)) {
-            Response<String> check = visitorSecurityTool.validateVisitor(request, visitorId);
-            if (!check.isSuccess()) {
-                return check;
-            }
+        Response<String> check = visitorSecurityTool.validateVisitor(request, visitorId);
+        if (!check.isSuccess()) {
+            return check;
         }
         return chatService.stop(sessionId, visitorId);
     }

@@ -238,3 +238,18 @@ flowchart TD
   - `xxl_ai_agent` 表增加 `sub_agent_ids VARCHAR(500)`；
   - 在 `ChatStreamTool#buildObservableTools` 中为每个子 Agent 构建一个 `FunctionToolCallback`，工具名称为 `agent__{subAgentId}`，描述为子 Agent 简介，函数体委托 `llmChatTool.chat` 执行单轮生成；
   - 零侵入复用现有 ToolCalling 架构，实现真正的父子智能体委派协作。
+
+---
+
+## 八、 待决策事项与架构权衡记录（Uncertain / Open Items）
+
+> 记录近期代码审查与缺陷修复过程中识别出的架构分叉与产品取舍事项；以下各项涉及策略选择或跨阶段演进，暂保持现状并在本表沉淀结论后按排期推进。
+
+| 编号 | 关联能力/缺陷 | 待定事项描述 | 当前暂定策略与已落实兜底 | 可选演进路线（利弊权衡） |
+|---|---|---|---|---|
+| **OPEN-001** | `[FEAT-014]` Eval 评测 | **Eval Agent 模式是否挂载真实 MCP / Skill / RAG 工具链** | 当前 `EvalEngineTool#runAgentCase` 仅装配 `systemPrompt` + 单轮 `LLM` 生成（传入空工具数组），只验证基础指令遵循与直接问答能力。 | **路线 A（保持轻量）**：零工具执行风险，并发压测成本低；缺陷是无法真实衡量 Skill / MCP / RAG / SubAgent 工具调用链指标。<br>**路线 B（完整引擎接入）**：从 `ChatStreamTool#buildObservableTools` 抽离公共装配器，但必须同步配套只读工具白名单、逐 Case 临时沙箱清理与步骤/超时上限，防止批量异步评测打爆线程池或触发宿主机危险操作。 |
+| **OPEN-002** | `[FEAT-014]` Eval 评测 | **平台级“空间默认模型”概念缺失 vs 裁判模型必填取舍** | `xxl_ai_supplier_model` 表与模型管理暂无 `is_default` 或空间默认模型配置；当前创建实验前先校验前端指定 `judgeModelId`（强制归属当前空间）或自动回退至同空间首个可用聊天模型（并结合 Agent 目标自带模型），无任何可用模型时快速失败提示。 | **路线 A（显式选择 + 启用兜底）**：零表结构改动，行为可预期。<br>**路线 B（引入空间默认模型）**：在 `xxl_ai_space` / `xxl_ai_supplier_model` 新增默认 Chat / Embedding 模型配置，可同时简化 Eval 裁判模型、Workflow LLM 节点与检索测试台选择交互。 |
+| **OPEN-003** | `[SEC-001]` 访客鉴权 | **存量旧浏览器无 Token 兼容取舍 & 多实例分布式签名密钥一致性** | 修复“无 Token 时免验签放行”与“硬编码缺省密钥”高危漏洞：`/chat/load` 作为唯一握手入口，当客户端未携带有效签名 `X-Visitor-Token` 时**忽略不可信的客户端 `visitorId`** 并由服务端重发全新 UUID 与签名；未配置 `xxl-ai.chat.visitor.secret` 时改为启动生成 `SecureRandom` 32 字节密钥并输出 `WARN` 日志。 | **权衡影响**：<br>1. 升级前仅缓存了旧 `visitorId` 且无 Token 的存量浏览器首次打开会生成全新访客身份（无法在 C 端继承升级前无凭证的历史会话，管理后台仍可审计保留）；<br>2. 多实例/集群或重启需保持访客会话连续性时，运维**必须**显式在各节点统一配置 `xxl-ai.chat.visitor.secret`，或后续升级为 Redis 集中存储访客令牌。 |
+| **OPEN-004** | `[SEC-002]` Skill 安全 | **Skill 环境变量严格白名单对三方脚本运行时变量的扩展诉求** | `SkillToolFactory#buildSafeEnvironment` 由黑名单模式（仅屏蔽 `PASS/SECRET/...`）收紧为最小权限白名单模式（仅保留 `PATH/HOME/USER/LOGNAME/SHELL/LANG/LC_ALL/LC_CTYPE/TZ/TMPDIR/TEMP/TMP/TERM/PYTHONIOENCODING/PYTHONUNBUFFERED/VIRTUAL_ENV/CONDA_PREFIX/NODE_ENV`），阻断 `DATABASE_URL`、`AWS_*`、`REDIS_*` 等任意命名凭据泄露。 | **权衡影响**：第三方自定义 Skill 脚本若依赖特定环境变量（如 `HTTP_PROXY`、`JAVA_HOME`、自定义 `PYTHONPATH`）将无法直接读取；后续可按需增加配置项 `xxl-ai.skill.env.allowlist` 或在技能元数据中声明允许透传的变量白名单。 |
+| **OPEN-005** | `[FEAT-009]` Workflow | **阶段二发布态 Mock 开关收敛、人工节点及权限边界** | 阶段一调试试跑（`WorkflowServiceImpl#run`）默认启用 `allowMock=true`，方便未接入全部外部依赖时验证拓扑编排与变量传递逻辑。 | **阶段二强制收敛**：面向公网 API / 定时触发 / 已发布态执行必须强制关闭 `allowMock=false`；同时需补齐节点输入 Schema 校验、外部工具/HTTP SSRF 防护、单节点/全图超时与 Token 预算控制，以及分类器/代码沙箱/嵌套子流/人工审批挂起恢复能力。 |
+

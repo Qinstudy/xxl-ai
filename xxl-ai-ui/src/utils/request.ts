@@ -162,7 +162,11 @@ service.interceptors.response.use(
     const data = res.data as Response
     const code = data.code || 200
 
-    // 捕获并存储服务端下发/刷新的 X-Visitor-Token（[SEC-001] IDOR 防护）
+    // 捕获并存储服务端下发/刷新的 X-Visitor-Id 与 X-Visitor-Token（[SEC-001] IDOR 防护）
+    const vId = res.headers ? (res.headers['x-visitor-id'] || res.headers['X-Visitor-Id']) : null
+    if (vId && typeof vId === 'string') {
+      localStorage.setItem('xxl-ai-agent-visitor', vId)
+    }
     const vToken = res.headers ? (res.headers['x-visitor-token'] || res.headers['X-Visitor-Token']) : null
     if (vToken && typeof vToken === 'string') {
       localStorage.setItem('xxl-ai-visitor-token', vToken)
