@@ -54,6 +54,9 @@ public class WorkflowContext implements Serializable {
     /* 是否已被标记终止 */
     private volatile boolean terminated = false;
 
+    /* 是否允许节点使用 Mock 配置兜底（仅 DEBUG 调试或单元测试允许，且优先执行真实绑定的资源） */
+    private boolean allowMock = true;
+
     public WorkflowContext() {
     }
 
@@ -66,24 +69,61 @@ public class WorkflowContext implements Serializable {
     }
 
     /**
-     * 读取指定节点产出的属性值
+     * 读取指定节点产出的属性值（支持顶层键与 a.b.0.c 嵌套点路径）
      */
-    public Object getNodePropertyValue(String nodeId, String propertyKey) {
-        if (nodeId == null || propertyKey == null) {
+    public Object getNodePropertyValue(String nodeId, String propertyPath) {
+        if (nodeId == null || propertyPath == null) {
             return null;
         }
         // 支持全局 start / inputs 别名
         if ("start".equalsIgnoreCase(nodeId) || "inputs".equalsIgnoreCase(nodeId)) {
-            if (inputs.containsKey(propertyKey)) {
-                return inputs.get(propertyKey);
+            Object val = resolvePropertyPath(inputs, propertyPath);
+            if (val != null) {
+                return val;
             }
         }
 
         Map<String, Object> output = nodeOutputs.get(nodeId);
-        if (output != null && output.containsKey(propertyKey)) {
-            return output.get(propertyKey);
+        return resolvePropertyPath(output, propertyPath);
+    }
+
+    /**
+     * 沿点分路径遍历 Map 与 List（纯结构化取值，无脚本执行风险）
+     */
+    private Object resolvePropertyPath(Map<String, Object> rootMap, String propertyPath) {
+        if (rootMap == null || propertyPath == null || propertyPath.isEmpty()) {
+            return null;
         }
-        return null;
+        if (rootMap.containsKey(propertyPath)) {
+            return rootMap.get(propertyPath);
+        }
+        if (!propertyPath.contains(".")) {
+            return null;
+        }
+
+        String[] segments = propertyPath.split("\\.", -1);
+        Object current = rootMap;
+        for (String segment : segments) {
+            if (current == null || segment.isEmpty()) {
+                return null;
+            }
+            if (current instanceof Map<?, ?> subMap) {
+                current = subMap.get(segment);
+            } else if (current instanceof List<?> subList) {
+                try {
+                    int idx = Integer.parseInt(segment);
+                    if (idx < 0 || idx >= subList.size()) {
+                        return null;
+                    }
+                    current = subList.get(idx);
+                } catch (NumberFormatException e) {
+                    return null;
+                }
+            } else {
+                return null;
+            }
+        }
+        return current;
     }
 
     /**
@@ -224,5 +264,13 @@ public class WorkflowContext implements Serializable {
 
     public void setRuntimeProvider(WorkflowRuntimeProvider runtimeProvider) {
         this.runtimeProvider = runtimeProvider;
+    }
+
+    public boolean isAllowMock() {
+        return allowMock;
+    }
+
+    public void setAllowMock(boolean allowMock) {
+        this.allowMock = allowMock;
     }
 }

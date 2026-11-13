@@ -1,6 +1,6 @@
 package com.xxl.ai.api.business.harness.workflow;
 
-import com.xxl.ai.api.business.knowledge.model.KnowledgeBase;
+import com.xxl.ai.api.business.knowledge.model.entity.KnowledgeBase;
 import com.xxl.ai.api.business.supplier.model.SupplierRuntime;
 
 import java.util.Map;
@@ -26,4 +26,11 @@ public interface WorkflowRuntimeProvider {
      * 执行指定工具（MCP / SKILL）
      */
     String executeTool(String toolType, String toolName, Map<String, Object> params);
+
+    /**
+     * 执行指定工具（带可选服务目标ID，如 mcpId）
+     */
+    default String executeTool(String toolType, Long targetId, String toolName, Map<String, Object> params) {
+        return executeTool(toolType, toolName, params);
+    }
 }

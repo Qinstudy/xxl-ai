@@ -202,4 +202,181 @@ public class WorkflowDagEngineTest {
 
         assertTrue(ex.getMessage().contains("有向环路 (Cycle Detected)"));
     }
+
+    @Test
+    @DisplayName("测试 5：孤立节点与断链子图拦截（防合流节点死锁与静默假成功）")
+    public void testOrphanNodeRejection() {
+        WorkflowNode start = new WorkflowNode("start_1", "开始", "START", Collections.emptyMap());
+        WorkflowNode orphan = new WorkflowNode("orphan_1", "孤立节点", "LLM", Map.of("userPrompt", "hi"));
+        WorkflowNode end = new WorkflowNode("end_1", "结束", "END", Collections.emptyMap());
+
+        WorkflowGraph orphanGraph = new WorkflowGraph(
+                List.of(start, orphan, end),
+                List.of(
+                        new WorkflowEdge("e1", "start_1", "end_1"),
+                        new WorkflowEdge("e2", "orphan_1", "end_1")
+                )
+        );
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> {
+            engine.validateGraph(orphanGraph);
+        });
+
+        assertTrue(ex.getMessage().contains("孤立节点"));
+    }
+
+    @Test
+    @DisplayName("测试 6：CONDITION 出边缺失 sourceHandle 静态拦截")
+    public void testConditionMissingSourceHandleRejection() {
+        WorkflowNode start = new WorkflowNode("start_1", "开始", "START", Collections.emptyMap());
+        WorkflowNode cond = new WorkflowNode("cond_1", "分支判断", "CONDITION", Map.of("defaultHandle", "b1"));
+        WorkflowNode end = new WorkflowNode("end_1", "结束", "END", Collections.emptyMap());
+
+        WorkflowGraph invalidCondGraph = new WorkflowGraph(
+                List.of(start, cond, end),
+                List.of(
+                        new WorkflowEdge("e1", "start_1", "cond_1"),
+                        new WorkflowEdge("e2", "cond_1", "end_1")
+                )
+        );
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> {
+            engine.validateGraph(invalidCondGraph);
+        });
+
+        assertTrue(ex.getMessage().contains("sourceHandle"));
+    }
+
+    @Test
+    @DisplayName("测试 7：条件未命中任何有效下游边导致 END 未到达时强制失败")
+    public void testUnreachedEndFailsInsteadOfFakeSuccess() {
+        WorkflowNode start = new WorkflowNode("start_1", "开始", "START", Collections.emptyMap());
+        WorkflowNode cond = new WorkflowNode("cond_1", "分支判断", "CONDITION", Map.of(
+                "conditions", Collections.emptyList(),
+                "defaultHandle", "non_existent_handle"
+        ));
+        WorkflowNode end = new WorkflowNode("end_1", "结束", "END", Collections.emptyMap());
+
+        WorkflowGraph graph = new WorkflowGraph(
+                List.of(start, cond, end),
+                List.of(
+                        new WorkflowEdge("e1", "start_1", "cond_1"),
+                        new WorkflowEdge("e2", "cond_1", "end_1", "branch_a")
+                )
+        );
+
+        IllegalStateException ex = assertThrows(IllegalStateException.class, () -> {
+            engine.execute(graph, Collections.emptyMap(), new WorkflowContext());
+        });
+
+        assertTrue(ex.getMessage().contains("END"));
+    }
+
+    @Test
+    @DisplayName("测试 8：带连字符节点ID、嵌套点路径解析及 Trace Token 透传")
+    public void testHyphenIdNestedPathAndTraceTokens() throws Exception {
+        WorkflowNode start = new WorkflowNode("start-node", "开始", "START", Collections.emptyMap());
+        WorkflowNode retrieval = new WorkflowNode("retrieval-1", "检索", "RETRIEVAL", Map.of(
+                "query", "{{start.user.question}}",
+                "mockHits", List.of(
+                        Map.of("text", "第一条切片文本", "score", 0.92)
+                )
+        ));
+        WorkflowNode llm = new WorkflowNode("llm-1", "模型", "LLM", Map.of(
+                "userPrompt", "用户={{start.user.name}}, 命中={{retrieval-1.references.0.text}}",
+                "mockResponse", "处理完成:{{retrieval-1.references.0.text}}"
+        ));
+        WorkflowNode end = new WorkflowNode("end-1", "结束", "END", Map.of(
+                "outputs", Map.of(
+                        "answer", "{{llm-1.text}}",
+                        "firstChunk", "{{retrieval-1.references.0.text}}"
+                )
+        ));
+
+        WorkflowGraph graph = new WorkflowGraph(
+                List.of(start, retrieval, llm, end),
+                List.of(
+                        new WorkflowEdge("e1", "start-node", "retrieval-1"),
+                        new WorkflowEdge("e2", "retrieval-1", "llm-1"),
+                        new WorkflowEdge("e3", "llm-1", "end-1")
+                )
+        );
+
+        Map<String, Object> inputs = Map.of("user", Map.of("name", "罗辑", "question", "什么是黑暗森林"));
+        WorkflowContext result = engine.execute(graph, inputs, new WorkflowContext());
+
+        assertEquals("第一条切片文本", result.getFinalOutput().get("firstChunk"));
+        assertEquals("处理完成:第一条切片文本", result.getFinalOutput().get("answer"));
+        WorkflowExecutionTrace llmTrace = result.getTraces().stream()
+                .filter(t -> "llm-1".equals(t.getNodeId()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(llmTrace.getTokens() > 0, "Trace 应回填节点真实 Token 数");
+    }
+
+    @Test
+    @DisplayName("测试 9：TOOL 节点绑定 mcpId 优先走真实执行器与禁 Mock 拦截")
+    public void testToolRuntimePrecedenceAndAllowMockGuard() throws Exception {
+        WorkflowNode start = new WorkflowNode("start_1", "开始", "START", Collections.emptyMap());
+        WorkflowNode tool = new WorkflowNode("tool_1", "天气工具", "TOOL", Map.of(
+                "toolType", "MCP",
+                "mcpId", 10L,
+                "toolName", "getWeather",
+                "params", Map.of("city", "{{start_1.city}}"),
+                "mockResult", "不应命中mock"
+        ));
+        WorkflowNode end = new WorkflowNode("end_1", "结束", "END", Map.of(
+                "outputs", Map.of("weather", "{{tool_1.result}}")
+        ));
+
+        WorkflowGraph graph = new WorkflowGraph(
+                List.of(start, tool, end),
+                List.of(
+                        new WorkflowEdge("e1", "start_1", "tool_1"),
+                        new WorkflowEdge("e2", "tool_1", "end_1")
+                )
+        );
+
+        WorkflowContext ctx = new WorkflowContext();
+        ctx.setRuntimeProvider(new WorkflowRuntimeProvider() {
+            @Override
+            public com.xxl.ai.api.business.supplier.model.SupplierRuntime getSupplierRuntime(Long supplierId, Long modelId) {
+                return null;
+            }
+
+            @Override
+            public com.xxl.ai.api.business.knowledge.model.entity.KnowledgeBase getKnowledgeBase(Long kbId) {
+                return null;
+            }
+
+            @Override
+            public String executeTool(String toolType, String toolName, Map<String, Object> params) {
+                return "unexpected";
+            }
+
+            @Override
+            public String executeTool(String toolType, Long targetId, String toolName, Map<String, Object> params) {
+                return "REAL:" + targetId + ":" + toolName + ":" + params.get("city");
+            }
+        });
+
+        WorkflowContext result = engine.execute(graph, Map.of("city", "Shanghai"), ctx);
+        assertEquals("REAL:10:getWeather:Shanghai", result.getFinalOutput().get("weather"));
+
+        // 禁用 Mock 时，仅含 mockResponse 的 LLM 节点必须阻断
+        WorkflowNode mockOnlyLlm = new WorkflowNode("llm_1", "仅Mock", "LLM", Map.of(
+                "userPrompt", "hello",
+                "mockResponse", "fake"
+        ));
+        WorkflowGraph mockGraph = new WorkflowGraph(
+                List.of(start, mockOnlyLlm, new WorkflowNode("end_2", "结束", "END", Collections.emptyMap())),
+                List.of(
+                        new WorkflowEdge("e1", "start_1", "llm_1"),
+                        new WorkflowEdge("e2", "llm_1", "end_2")
+                )
+        );
+        WorkflowContext strictCtx = new WorkflowContext();
+        strictCtx.setAllowMock(false);
+        assertThrows(IllegalStateException.class, () -> engine.execute(mockGraph, Collections.emptyMap(), strictCtx));
+    }
 }

@@ -236,7 +236,7 @@ mysql --default-character-set=utf8mb4 -h127.0.0.1 -P3306 -uroot -p123456 xxl_ai 
 1. **新增 RAG 拓扑**：
    - 点击 **【新增】** 按钮，名称输入 `三体知识问答流`；
    - 预设模板选择 `知识检索问答 (Start -> Retrieval -> LLM -> End)`；
-   - 观察 `graphJson`：`retrieval_1` 节点配置了 `query: "{{start_1.question}}"`，`llm_1` 节点的 Prompt 配置了 `{{retrieval_1.context}}` 变量插值；点击 **【确定】** 保存；
+   - 观察 `graphJson`：`retrieval_1` 节点配置了 `query: "{{start_1.question}}"`，默认 `kbIds: []` + `mockHits` 方便零依赖快速试跑；如需联调真实知识库与大模型，只需在 `kbIds` 中填入**当前空间内已启用且已向量化的知识库 ID**（或在 `llm_1` 中填入真实的 `supplierId`、`modelId`）即可，引擎将优先执行真实检索与模型推理（忽略残留 Mock 字段），同时支持 `{{retrieval_1.references.0.text}}` 嵌套点路径取值；点击 **【确定】** 保存；
 2. **试跑与变量穿透验证**：
    - 点击操作列 **【调试试跑】**；
    - 抽屉自动识别并填入该工作流的入参字段：
@@ -285,7 +285,7 @@ mysql --default-character-set=utf8mb4 -h127.0.0.1 -P3306 -uroot -p123456 xxl_ai 
 
 ---
 
-### 5.5 测试场景四：安全防线与 Kahn 算法环路拦截（反向破坏测试）
+### 5.5 测试场景四：安全防线、孤立节点与 Kahn 算法环路拦截（反向破坏测试）
 1. **测试非法 JSON 格式拦截**：
    - 点击 **【新增】**，在 `graphJson` 中输入缺损的 `{ "nodes": [ ...` 故意漏写括号；
    - 点击 **【确定】**，页面弹出错误提示：`工作流图结构非有效 JSON`，阻止提交；
@@ -295,6 +295,9 @@ mysql --default-character-set=utf8mb4 -h127.0.0.1 -P3306 -uroot -p123456 xxl_ai 
    - **预期拦截表现**：后端 `WorkflowDagEngine.validateGraph` 触发 Kahn 算法有向环检测，接口返回失败并提示：
      `工作流拓扑结构校验失败: 工作流拓扑结构存在有向环路 (Cycle Detected)，无法执行！`
      彻底阻断恶意配置入库。
+3. **测试孤立节点与缺失条件句柄拦截**：
+   - 若在 `nodes` 中放入未从 `START` 连出的孤立节点，或为 `CONDITION` 出边遗漏 `sourceHandle`，保存时直接拦截；
+   - 若在 `RETRIEVAL` 节点中填入其他空间的知识库 ID，执行时直接按无权访问阻断，防止跨租户 IDOR 数据泄露。
 
 ---
 

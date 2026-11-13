@@ -93,14 +93,14 @@ public class McpToolFactory {
     /**
      * 构造工具全名：mcp 名称净化 + 原始工具名，避免多服务同名冲突
      */
-    private String buildToolName(String mcpName, String toolName) {
+    public static String buildToolName(String mcpName, String toolName) {
         return slugify(mcpName) + NAME_SEPARATOR + toolName;
     }
 
     /**
      * 名称净化：仅保留 ASCII 字母数字下划线（工具名须匹配 ^[a-zA-Z0-9_-]+$）
      */
-    private String slugify(String name) {
+    public static String slugify(String name) {
         if (name == null) {
             return "mcp";
         }

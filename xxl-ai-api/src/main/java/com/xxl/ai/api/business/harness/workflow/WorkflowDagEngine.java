@@ -68,6 +68,7 @@ public class WorkflowDagEngine {
         Map<String, WorkflowNode> nodeMap = new HashMap<>();
         int startCount = 0;
         int endCount = 0;
+        String startNodeId = null;
 
         for (WorkflowNode node : nodes) {
             if (StringTool.isBlank(node.getId())) {
@@ -81,6 +82,7 @@ public class WorkflowDagEngine {
             String type = node.getType() != null ? node.getType().toUpperCase(Locale.ROOT) : "";
             if ("START".equals(type)) {
                 startCount++;
+                startNodeId = node.getId();
             } else if ("END".equals(type)) {
                 endCount++;
             }
@@ -111,9 +113,21 @@ public class WorkflowDagEngine {
             if (edge.getSource().equals(edge.getTarget())) {
                 throw new IllegalArgumentException("节点禁止直接自环连接: " + edge.getSource());
             }
+            WorkflowNode sourceNode = nodeMap.get(edge.getSource());
+            if (sourceNode != null && "CONDITION".equalsIgnoreCase(sourceNode.getType())
+                    && StringTool.isBlank(edge.getSourceHandle())) {
+                throw new IllegalArgumentException("条件节点 [" + sourceNode.getId() + "] 的出边 [" + edge.getId() + "] 必须指定分支标识 (sourceHandle)");
+            }
 
             inDegreeMap.put(edge.getTarget(), inDegreeMap.get(edge.getTarget()) + 1);
             adjList.get(edge.getSource()).add(edge.getTarget());
+        }
+
+        // 孤立节点检测：除 START 节点外，所有节点入度必须 >= 1，避免合流节点死锁静默跳过
+        for (Map.Entry<String, Integer> entry : inDegreeMap.entrySet()) {
+            if (!entry.getKey().equals(startNodeId) && entry.getValue() == 0) {
+                throw new IllegalArgumentException("工作流存在孤立节点（无前置连线），无法执行: " + entry.getKey());
+            }
         }
 
         // Kahn 算法检测是否存在有向环
@@ -139,6 +153,23 @@ public class WorkflowDagEngine {
 
         if (visitedCount < nodes.size()) {
             throw new IllegalArgumentException("工作流拓扑结构存在有向环路 (Cycle Detected)，无法执行！");
+        }
+
+        // 连通性校验：从 START 节点出发应可到达全部节点（拦截断链子图）
+        Set<String> reachable = new HashSet<>();
+        Queue<String> bfs = new LinkedList<>();
+        bfs.offer(startNodeId);
+        reachable.add(startNodeId);
+        while (!bfs.isEmpty()) {
+            String curr = bfs.poll();
+            for (String neighbor : adjList.get(curr)) {
+                if (reachable.add(neighbor)) {
+                    bfs.offer(neighbor);
+                }
+            }
+        }
+        if (reachable.size() < nodes.size()) {
+            throw new IllegalArgumentException("工作流存在从 START 节点不可达的孤立子图，请检查连线完整性");
         }
     }
 
@@ -269,7 +300,11 @@ public class WorkflowDagEngine {
                 int duration = (int) (System.currentTimeMillis() - nodeStart);
                 trace.setStatus("SUCCESS");
                 trace.setDurationMs(duration);
-                trace.setOutputSnapshot(ctx.getNodeOutput(node.getId()));
+                Map<String, Object> nodeOutput = ctx.getNodeOutput(node.getId());
+                trace.setOutputSnapshot(nodeOutput);
+                if (nodeOutput != null && nodeOutput.get("tokens") instanceof Number numTokens) {
+                    trace.setTokens(numTokens.intValue());
+                }
                 ctx.addTrace(trace);
                 executedNodes.add(nodeId);
 
@@ -277,8 +312,9 @@ public class WorkflowDagEngine {
                 if ("CONDITION".equalsIgnoreCase(node.getType())) {
                     String selectedHandle = ctx.getBranchSelection(node.getId());
                     for (WorkflowEdge outEdge : outgoingEdges.get(nodeId)) {
-                        boolean match = StringTool.isBlank(outEdge.getSourceHandle())
-                                || outEdge.getSourceHandle().equalsIgnoreCase(selectedHandle);
+                        boolean match = StringTool.isNotBlank(selectedHandle)
+                                && StringTool.isNotBlank(outEdge.getSourceHandle())
+                                && outEdge.getSourceHandle().trim().equalsIgnoreCase(selectedHandle.trim());
                         edgeActiveState.put(outEdge.getId(), match);
                         checkAndEnqueue(outEdge.getTarget(), incomingEdges, edgeActiveState, readyQueue, executedNodes, skippedNodes);
                     }
@@ -309,6 +345,11 @@ public class WorkflowDagEngine {
         }
 
         ctx.setDurationMs((int) (System.currentTimeMillis() - startTime));
+        if (!ctx.isTerminated()) {
+            String msg = "工作流未到达任何 END 结束节点（请检查条件分支 targetHandle 与连线 sourceHandle 是否匹配）";
+            logger.error(msg);
+            throw new IllegalStateException(msg);
+        }
         return ctx;
     }
 

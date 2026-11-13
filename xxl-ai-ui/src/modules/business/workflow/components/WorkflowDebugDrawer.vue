@@ -188,7 +188,7 @@ defineExpose({ open })
 
       <!-- 异常提示 -->
       <el-alert
-        v-if="executionResult && executionResult.status === 2 && executionResult.errorMsg"
+        v-if="executionResult && (executionResult.status === 2 || executionResult.status === 3) && executionResult.errorMsg"
         type="error"
         :title="t('business.workflow.errorAlert')"
         :description="executionResult.errorMsg"

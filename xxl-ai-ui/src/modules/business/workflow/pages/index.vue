@@ -342,7 +342,7 @@ const TEMPLATES: Record<string, any> = {
   rag: {
     nodes: [
       { id: 'start_1', name: '用户问题', type: 'START', config: { fields: [{ name: 'question', type: 'STRING', required: true }] } },
-      { id: 'retrieval_1', name: '知识检索', type: 'RETRIEVAL', config: { kbIds: [1], query: '{{start_1.question}}', topK: 3, mockHits: [{ text: '三体知识切片参考' }] } },
+      { id: 'retrieval_1', name: '知识检索', type: 'RETRIEVAL', config: { kbIds: [], query: '{{start_1.question}}', topK: 3, mockHits: [{ text: '三体知识切片参考' }] } },
       { id: 'llm_1', name: '总结回答', type: 'LLM', config: { systemPrompt: '背景资料：\n{{retrieval_1.context}}', userPrompt: '{{start_1.question}}', mockResponse: '根据三体知识库，相关事实确证。' } },
       { id: 'end_1', name: '输出答案', type: 'END', config: { outputs: { answer: '{{llm_1.text}}', refCount: '{{retrieval_1.count}}' } } }
     ],

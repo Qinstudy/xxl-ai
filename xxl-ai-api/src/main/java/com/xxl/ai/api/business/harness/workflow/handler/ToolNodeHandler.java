@@ -4,12 +4,13 @@ import com.xxl.ai.api.business.harness.workflow.WorkflowContext;
 import com.xxl.ai.api.business.harness.workflow.WorkflowNodeHandler;
 import com.xxl.ai.api.business.harness.workflow.WorkflowVariableResolver;
 import com.xxl.ai.api.business.harness.workflow.model.WorkflowNode;
+import com.xxl.tool.core.StringTool;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 
 /**
- * TOOL 工具执行节点处理器：负责 MCP 或 Skill 外部工具调用与结果沉淀
+ * TOOL 工具执行节点处理器：负责 MCP 外部工具真实调用与结果沉淀
  *
  * @author xuxueli 2026-11-12
  */
@@ -26,15 +27,20 @@ public class ToolNodeHandler implements WorkflowNodeHandler {
     public void execute(WorkflowNode node, WorkflowContext ctx) throws Exception {
         Map<String, Object> config = node.getConfig() != null ? node.getConfig() : Collections.emptyMap();
 
-        String toolType = (String) config.getOrDefault("toolType", "MCP");
-        String toolName = (String) config.getOrDefault("toolName", "");
+        String toolType = config.get("toolType") != null ? String.valueOf(config.get("toolType")) : "MCP";
+        String toolName = config.get("toolName") != null ? String.valueOf(config.get("toolName")) : "";
+        Long mcpId = parseLong(config.get("mcpId"));
 
         // 1、解析入参字典模板
-        Map<String, Object> rawParams = (Map<String, Object>) config.getOrDefault("params", Collections.emptyMap());
+        Object rawParamsObj = config.get("params");
+        Map<String, Object> rawParams = rawParamsObj instanceof Map<?, ?> m
+                ? (Map<String, Object>) m
+                : Collections.emptyMap();
         Map<String, Object> resolvedParams = (Map<String, Object>) WorkflowVariableResolver.resolveObject(rawParams, ctx);
 
-        // 2、测试或 Mock 模式支持
-        if (config.containsKey("mockResult")) {
+        // 2、若显式绑定了真实 mcpId，强制执行真实工具；仅在未绑定服务ID且允许 Mock 时使用 mockResult
+        boolean hasExplicitTarget = mcpId != null && mcpId > 0;
+        if (!hasExplicitTarget && ctx.isAllowMock() && config.containsKey("mockResult") && config.get("mockResult") != null) {
             String mockResult = String.valueOf(config.get("mockResult"));
             mockResult = WorkflowVariableResolver.resolveString(mockResult, ctx);
             Map<String, Object> out = new LinkedHashMap<>();
@@ -44,18 +50,31 @@ public class ToolNodeHandler implements WorkflowNodeHandler {
             return;
         }
 
-        // 3、通过运行时提供者执行工具
-        String result = "";
-        if (ctx.getRuntimeProvider() != null) {
-            result = ctx.getRuntimeProvider().executeTool(toolType, toolName, resolvedParams);
-        } else {
-            result = "未提供工具执行器，模拟完成: " + toolName;
+        if (StringTool.isBlank(toolName)) {
+            throw new IllegalArgumentException("TOOL 节点工具名称 (toolName) 不能为空, nodeId=" + node.getId());
+        }
+        if (ctx.getRuntimeProvider() == null) {
+            throw new IllegalStateException("TOOL 节点未提供运行时工具执行器 (runtimeProvider), toolName=" + toolName);
         }
 
+        // 3、通过运行时提供者执行真实工具
+        String result = ctx.getRuntimeProvider().executeTool(toolType, mcpId, toolName.trim(), resolvedParams);
+
         Map<String, Object> output = new LinkedHashMap<>();
-        output.put("result", result);
+        output.put("result", result != null ? result : "");
         output.put("success", true);
 
         ctx.setNodeOutput(node.getId(), output);
+    }
+
+    private Long parseLong(Object obj) {
+        if (obj == null) return null;
+        if (obj instanceof Number n) return n.longValue();
+        try {
+            String s = String.valueOf(obj).trim();
+            return s.isEmpty() ? null : Long.parseLong(s);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

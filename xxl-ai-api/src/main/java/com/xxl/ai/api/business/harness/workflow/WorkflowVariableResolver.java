@@ -11,7 +11,7 @@ import java.util.regex.Pattern;
  */
 public class WorkflowVariableResolver {
 
-    private static final Pattern VAR_PATTERN = Pattern.compile("\\{\\{([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\}\\}");
+    private static final Pattern VAR_PATTERN = Pattern.compile("\\{\\{([a-zA-Z0-9_-]+)\\.([a-zA-Z0-9_.-]+)\\}\\}");
 
     /**
      * 解析字符串模板中的变量插值
