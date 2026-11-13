@@ -70,6 +70,16 @@
           </el-col>
         </el-row>
 
+        <!-- 失败/取消原因提示 -->
+        <el-alert
+          v-if="experiment?.errorMsg"
+          type="error"
+          :title="experiment.errorMsg"
+          :closable="false"
+          show-icon
+          class="mt16"
+        />
+
         <!-- 目标基线快照折叠提示 -->
         <div v-if="summary?.targetSnapshot" class="target-snapshot-alert mt16">
           <el-alert type="info" :closable="false" show-icon>
@@ -91,9 +101,9 @@
         <div class="cases-header">
           <span class="cases-title">{{ t('business.eval.casesTitle') }} ({{ casesList.length }})</span>
           <el-radio-group v-model="filterType" size="small">
-            <el-radio-button label="ALL">{{ t('common.all') }}</el-radio-button>
-            <el-radio-button label="HIT" v-if="experiment?.evalType === 'RAG'">{{ t('business.eval.hitOnly') }}</el-radio-button>
-            <el-radio-button label="MISS" v-if="experiment?.evalType === 'RAG'">{{ t('business.eval.missOnly') }}</el-radio-button>
+            <el-radio-button value="ALL">{{ t('common.all') }}</el-radio-button>
+            <el-radio-button value="HIT" v-if="experiment?.evalType === 'RAG'">{{ t('business.eval.hitOnly') }}</el-radio-button>
+            <el-radio-button value="MISS" v-if="experiment?.evalType === 'RAG'">{{ t('business.eval.missOnly') }}</el-radio-button>
           </el-radio-group>
         </div>
 
@@ -137,6 +147,9 @@
                 <div class="detail-label">{{ t('business.eval.groundTruth') }}:</div>
                 <div class="detail-value text-muted">{{ c.groundTruth }}</div>
               </div>
+              <div class="detail-row mt12" v-if="c.error">
+                <el-alert type="error" :title="c.error" :closable="false" show-icon />
+              </div>
 
               <!-- 检索命中的切片 -->
               <div class="detail-row mt12" v-if="c.retrievedChunks && c.retrievedChunks.length">
@@ -144,7 +157,7 @@
                 <div class="detail-value chunks-list">
                   <div v-for="(chunk, cIdx) in c.retrievedChunks" :key="cIdx" class="chunk-card">
                     <div class="chunk-header">
-                      <span class="chunk-doc">《{{ chunk.docName }}》</span>
+                      <span class="chunk-doc">[{{ chunk.docName }}]</span>
                       <el-tag size="small" type="info">Score: {{ chunk.score }}</el-tag>
                     </div>
                     <div class="chunk-content">{{ chunk.content }}</div>
@@ -200,6 +213,9 @@ const summary = ref<ExperimentSummaryReport | null>(null)
 const filterType = ref<'ALL' | 'HIT' | 'MISS'>('ALL')
 
 function open(id: number) {
+  experiment.value = null
+  summary.value = null
+  filterType.value = 'ALL'
   visible.value = true
   loading.value = true
   loadEvalExperiment(id)
@@ -244,7 +260,7 @@ function formatScore(val?: number) {
   return Number(val).toFixed(2)
 }
 
-function statusTagType(status?: number): '' | 'success' | 'warning' | 'danger' | 'info' {
+function statusTagType(status?: number): 'success' | 'warning' | 'danger' | 'info' {
   switch (status) {
     case 1: return 'warning'
     case 2: return 'success'

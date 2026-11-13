@@ -47,8 +47,14 @@ public class EvalExperimentController {
 
     @RequestMapping("/load")
     @XxlSso(permission = "eval:default")
-    public Response<EvalExperimentDTO> load(@RequestParam("id") long id) {
-        return evalExperimentService.load(id);
+    public Response<EvalExperimentDTO> load(HttpServletRequest request,
+                                            @RequestHeader(value = "xxl-space-id", required = false) Integer spaceId,
+                                            @RequestParam("id") long id) {
+        Response<SpaceContext> spaceResp = spaceService.checkSpace(request, spaceId);
+        if (!spaceResp.isSuccess()) {
+            return Response.ofFail(spaceResp.getMsg());
+        }
+        return evalExperimentService.load(spaceResp.getData().getSpaceId(), id);
     }
 
     @PostMapping("/createAndRun")

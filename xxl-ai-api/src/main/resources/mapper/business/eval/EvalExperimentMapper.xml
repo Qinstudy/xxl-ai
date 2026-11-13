@@ -64,7 +64,7 @@
 			#{judgeModelId}, #{status}, #{totalCases}, #{completedCases}, #{avgHitRate},
 			#{avgMrr}, #{avgFaithfulness}, #{avgRelevance}, #{avgGoalCompletion},
 			#{avgLatencyMs}, #{totalTokens}, #{summaryJson}, #{errorMsg}, NOW(), NOW()
-		);
+		)
 	</insert>
 
 	<delete id="delete">
@@ -101,19 +101,50 @@
 
 	<update id="updateProgress" parameterType="com.xxl.ai.api.business.eval.model.entity.EvalExperiment">
 		UPDATE xxl_ai_eval_experiment
-		SET status = #{status},
+		<set>
+			<if test="completedCases != null">completed_cases = #{completedCases},</if>
+			<if test="avgHitRate != null">avg_hit_rate = #{avgHitRate},</if>
+			<if test="avgMrr != null">avg_mrr = #{avgMrr},</if>
+			<if test="avgFaithfulness != null">avg_faithfulness = #{avgFaithfulness},</if>
+			<if test="avgRelevance != null">avg_relevance = #{avgRelevance},</if>
+			<if test="avgGoalCompletion != null">avg_goal_completion = #{avgGoalCompletion},</if>
+			<if test="avgLatencyMs != null">avg_latency_ms = #{avgLatencyMs},</if>
+			<if test="totalTokens != null">total_tokens = #{totalTokens},</if>
+			update_time = NOW()
+		</set>
+		WHERE id = #{id} AND status = 1
+	</update>
+
+	<update id="updateFinish" parameterType="com.xxl.ai.api.business.eval.model.entity.EvalExperiment">
+		UPDATE xxl_ai_eval_experiment
+		SET status = 2,
 			completed_cases = #{completedCases},
-			avg_hit_rate = #{avgHitRate},
-			avg_mrr = #{avgMrr},
-			avg_faithfulness = #{avgFaithfulness},
-			avg_relevance = #{avgRelevance},
-			avg_goal_completion = #{avgGoalCompletion},
+			avg_hit_rate = IFNULL(#{avgHitRate}, avg_hit_rate),
+			avg_mrr = IFNULL(#{avgMrr}, avg_mrr),
+			avg_faithfulness = IFNULL(#{avgFaithfulness}, avg_faithfulness),
+			avg_relevance = IFNULL(#{avgRelevance}, avg_relevance),
+			avg_goal_completion = IFNULL(#{avgGoalCompletion}, avg_goal_completion),
 			avg_latency_ms = #{avgLatencyMs},
 			total_tokens = #{totalTokens},
 			summary_json = #{summaryJson},
+			update_time = NOW()
+		WHERE id = #{id} AND status = 1
+	</update>
+
+	<update id="updateFailure">
+		UPDATE xxl_ai_eval_experiment
+		SET status = 3,
 			error_msg = #{errorMsg},
 			update_time = NOW()
-		WHERE id = #{id}
+		WHERE id = #{id} AND status = 1
+	</update>
+
+	<update id="updateCancel">
+		UPDATE xxl_ai_eval_experiment
+		SET status = 4,
+			error_msg = #{errorMsg},
+			update_time = NOW()
+		WHERE id = #{id} AND status = 1
 	</update>
 
 	<select id="load" resultMap="EvalExperiment">

@@ -44,8 +44,8 @@ public class EvalAdaptor {
         dto.setSampleCount(entity.getSampleCount());
         dto.setContentJson(entity.getContentJson());
         dto.setDescription(entity.getDescription());
-        dto.setAddTime(DateTool.formatDateTime(entity.getAddTime()));
-        dto.setUpdateTime(DateTool.formatDateTime(entity.getUpdateTime()));
+        dto.setAddTime(entity.getAddTime() != null ? DateTool.formatDateTime(entity.getAddTime()) : null);
+        dto.setUpdateTime(entity.getUpdateTime() != null ? DateTool.formatDateTime(entity.getUpdateTime()) : null);
         return dto;
     }
 
@@ -102,8 +102,8 @@ public class EvalAdaptor {
         dto.setTotalTokens(entity.getTotalTokens());
         dto.setSummaryJson(entity.getSummaryJson());
         dto.setErrorMsg(entity.getErrorMsg());
-        dto.setAddTime(DateTool.formatDateTime(entity.getAddTime()));
-        dto.setUpdateTime(DateTool.formatDateTime(entity.getUpdateTime()));
+        dto.setAddTime(entity.getAddTime() != null ? DateTool.formatDateTime(entity.getAddTime()) : null);
+        dto.setUpdateTime(entity.getUpdateTime() != null ? DateTool.formatDateTime(entity.getUpdateTime()) : null);
         return dto;
     }
 }

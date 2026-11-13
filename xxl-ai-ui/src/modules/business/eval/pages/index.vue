@@ -16,7 +16,7 @@
                 :placeholder="t('common.inputPlaceholder', [t('business.eval.datasetName')])"
                 clearable
                 style="width: 200px"
-                @keyup.enter="getDatasetList"
+                @keyup.enter="handleDatasetQuery"
               />
             </el-form-item>
             <el-form-item :label="t('business.eval.evalType')" prop="evalType">
@@ -27,7 +27,7 @@
               </el-select>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" icon="Search" @click="getDatasetList">{{ t('common.search') }}</el-button>
+              <el-button type="primary" icon="Search" @click="handleDatasetQuery">{{ t('common.search') }}</el-button>
               <el-button icon="Refresh" @click="resetDatasetQuery">{{ t('common.reset') }}</el-button>
             </el-form-item>
           </el-form>
@@ -58,7 +58,7 @@
             </el-table-column>
             <el-table-column :label="t('business.eval.description')" align="center" prop="description" min-width="160" :show-overflow-tooltip="true" />
             <el-table-column :label="t('common.updateTime')" align="center" prop="updateTime" width="160" />
-            <el-table-column :label="t('common.operate')" align="center" width="260" class-name="small-padding fixed-width">
+            <el-table-column :label="t('common.operation')" align="center" width="260" class-name="small-padding fixed-width">
               <template #default="scope">
                 <el-button link type="primary" icon="VideoPlay" @click="handleRunExperiment(scope.row)" v-hasPermi="['eval:default']">
                   {{ t('business.eval.runExperiment') }}
@@ -77,7 +77,7 @@
           </el-table>
 
           <!-- 分页 -->
-          <pagination
+          <Pagination
             v-show="datasetTotal > 0"
             :total="datasetTotal"
             v-model:page="datasetQuery.pageNum"
@@ -96,7 +96,7 @@
                 :placeholder="t('common.inputPlaceholder', [t('business.eval.experimentName')])"
                 clearable
                 style="width: 200px"
-                @keyup.enter="getExpList"
+                @keyup.enter="handleExpQuery"
               />
             </el-form-item>
             <el-form-item :label="t('common.status')" prop="status">
@@ -109,7 +109,7 @@
               </el-select>
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" icon="Search" @click="getExpList">{{ t('common.search') }}</el-button>
+              <el-button type="primary" icon="Search" @click="handleExpQuery">{{ t('common.search') }}</el-button>
               <el-button icon="Refresh" @click="resetExpQuery">{{ t('common.reset') }}</el-button>
             </el-form-item>
           </el-form>
@@ -158,13 +158,13 @@
               </template>
             </el-table-column>
             <el-table-column :label="t('common.createTime')" align="center" prop="addTime" width="160" />
-            <el-table-column :label="t('common.operate')" align="center" width="180" class-name="small-padding fixed-width">
+            <el-table-column :label="t('common.operation')" align="center" width="180" class-name="small-padding fixed-width">
               <template #default="scope">
                 <el-button link type="primary" icon="View" @click="handleOpenDetail(scope.row.id)" v-hasPermi="['eval:default']">
                   {{ t('business.eval.viewReport') }}
                 </el-button>
                 <el-button link type="warning" icon="CircleClose" v-if="scope.row.status === 1" @click="handleCancelExp(scope.row)" v-hasPermi="['eval:default']">
-                  {{ t('common.cancel') }}
+                  {{ t('modal.cancelButton') }}
                 </el-button>
                 <el-button link type="danger" icon="Delete" @click="handleDeleteExp(scope.row)" v-hasPermi="['eval:default']">
                   {{ t('common.delete') }}
@@ -174,7 +174,7 @@
           </el-table>
 
           <!-- 分页 -->
-          <pagination
+          <Pagination
             v-show="expTotal > 0"
             :total="expTotal"
             v-model:page="expQuery.pageNum"
@@ -192,8 +192,8 @@
           </el-form-item>
           <el-form-item :label="t('business.eval.evalType')" prop="evalType">
             <el-radio-group v-model="datasetForm.evalType" @change="handleEvalTypeChange">
-              <el-radio label="RAG">RAG 知识库检索生成</el-radio>
-              <el-radio label="AGENT">Agent 目标与工具链</el-radio>
+              <el-radio value="RAG">{{ t('business.eval.evalTypeRag') }}</el-radio>
+              <el-radio value="AGENT">{{ t('business.eval.evalTypeAgent') }}</el-radio>
             </el-radio-group>
           </el-form-item>
           <el-form-item :label="t('business.eval.target')" prop="targetId">
@@ -211,8 +211,8 @@
           </el-form-item>
         </el-form>
         <template #footer>
-          <el-button @click="datasetDialog.visible = false">{{ t('common.cancel') }}</el-button>
-          <el-button type="primary" @click="submitDatasetForm">{{ t('common.confirm') }}</el-button>
+          <el-button @click="datasetDialog.visible = false">{{ t('modal.cancelButton') }}</el-button>
+          <el-button type="primary" @click="submitDatasetForm">{{ t('modal.confirmButton') }}</el-button>
         </template>
       </el-dialog>
 
@@ -229,8 +229,8 @@
           placeholder='[{"id":"case-1","query":"...","groundTruth":"...","expectedDocNames":["..."],"expectedKeywords":["..."]}]'
         />
         <template #footer>
-          <el-button @click="importDialog.visible = false">{{ t('common.cancel') }}</el-button>
-          <el-button type="primary" @click="submitImportJson">{{ t('common.confirm') }}</el-button>
+          <el-button @click="importDialog.visible = false">{{ t('modal.cancelButton') }}</el-button>
+          <el-button type="primary" @click="submitImportJson">{{ t('modal.confirmButton') }}</el-button>
         </template>
       </el-dialog>
 
@@ -255,7 +255,7 @@
           </el-form-item>
         </el-form>
         <template #footer>
-          <el-button @click="runDialog.visible = false">{{ t('common.cancel') }}</el-button>
+          <el-button @click="runDialog.visible = false">{{ t('modal.cancelButton') }}</el-button>
           <el-button type="primary" @click="submitRunExperiment">{{ t('business.eval.startRun') }}</el-button>
         </template>
       </el-dialog>
@@ -267,10 +267,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+defineOptions({ name: 'Eval' })
+import { ref, nextTick } from 'vue'
+import type { FormInstance } from 'element-plus'
+import modal from '@/utils/modal'
 import { t } from '@/i18n'
-import type { EvalDataset, EvalDatasetListQuery, EvalExperiment, EvalExperimentListQuery } from '../types'
+import { Pagination } from '@/components'
+import { usePageParams } from '@/composables/usePageParams'
+import type { EvalDataset, EvalDatasetQuery, EvalExperiment, EvalExperimentQuery } from '../types'
 import {
   listEvalDataset,
   loadEvalDataset,
@@ -288,13 +292,15 @@ import { listAgentBySpace } from '@/modules/business/agent/api'
 import { listSupplierBySpace, listModelBySupplier } from '@/modules/business/supplier/api'
 import ExperimentDetailDrawer from '../components/ExperimentDetailDrawer.vue'
 
+// --------------------------------- ref data ---------------------------------
 const activeTab = ref('datasets')
 
-// ------------------- Tab 1: 评测数据集 -------------------
+const datasetQueryRef = ref<FormInstance>()
+const datasetFormRef = ref<FormInstance>()
 const datasetLoading = ref(false)
 const datasetList = ref<EvalDataset[]>([])
 const datasetTotal = ref(0)
-const datasetQuery = ref<EvalDatasetListQuery>({
+const datasetQuery = ref<EvalDatasetQuery>({
   pageNum: 1,
   pageSize: 10,
   name: undefined,
@@ -309,19 +315,49 @@ const datasetForm = ref<EvalDataset>({
   id: undefined,
   name: '',
   evalType: 'RAG',
-  targetId: 0,
+  targetId: undefined,
   description: ''
 })
 const datasetRules = {
   name: [{ required: true, message: t('common.requiredMsg', [t('business.eval.datasetName')]), trigger: 'blur' }],
   targetId: [{ required: true, message: t('common.requiredMsg', [t('business.eval.target')]), trigger: 'change' }]
 }
-
 const targetOptions = ref<Array<{ id: number; name: string }>>([])
 
+const importDialog = ref({
+  visible: false,
+  datasetId: 0,
+  jsonContent: ''
+})
+
+const expQueryRef = ref<FormInstance>()
+const expLoading = ref(false)
+const expList = ref<EvalExperiment[]>([])
+const expTotal = ref(0)
+const expQuery = ref<EvalExperimentQuery>({
+  pageNum: 1,
+  pageSize: 10,
+  name: undefined,
+  status: -1
+})
+
+const runDialog = ref({
+  visible: false
+})
+const runForm = ref({
+  datasetId: 0,
+  datasetName: '',
+  name: '',
+  judgeModelId: undefined as number | undefined
+})
+const modelOptions = ref<Array<{ id: number; name: string }>>([])
+const detailDrawerRef = ref()
+
+// --------------------------------- fun ---------------------------------
 function getDatasetList() {
   datasetLoading.value = true
-  listEvalDataset(datasetQuery.value)
+  const params = usePageParams(datasetQuery)()
+  listEvalDataset(params)
     .then((res) => {
       datasetList.value = res.data.data
       datasetTotal.value = res.data.total
@@ -331,33 +367,40 @@ function getDatasetList() {
     })
 }
 
+function handleDatasetQuery() {
+  datasetQuery.value.pageNum = 1
+  getDatasetList()
+}
+
 function resetDatasetQuery() {
   datasetQuery.value = { pageNum: 1, pageSize: 10, name: undefined, evalType: undefined }
   getDatasetList()
 }
 
-function handleEvalTypeChange(val: 'RAG' | 'AGENT') {
-  datasetForm.value.targetId = 0
-  loadTargetOptions(val)
+function handleEvalTypeChange(val: string | number | boolean | undefined) {
+  const evalType = val === 'AGENT' ? 'AGENT' : 'RAG'
+  datasetForm.value.targetId = undefined
+  loadTargetOptions(evalType)
 }
 
 function loadTargetOptions(type: 'RAG' | 'AGENT') {
   targetOptions.value = []
   if (type === 'RAG') {
     listKnowledgeBaseBySpace().then((res) => {
-      targetOptions.value = res.data.map((item) => ({ id: item.id as number, name: item.name }))
+      targetOptions.value = (res.data || []).map((item) => ({ id: item.id as number, name: item.name }))
     })
   } else {
     listAgentBySpace().then((res) => {
-      targetOptions.value = res.data.map((item) => ({ id: item.id as number, name: item.name }))
+      targetOptions.value = (res.data || []).map((item) => ({ id: item.id as number, name: item.name }))
     })
   }
 }
 
 function handleAddDataset() {
-  datasetForm.value = { id: undefined, name: '', evalType: 'RAG', targetId: 0, description: '' }
+  datasetForm.value = { id: undefined, name: '', evalType: 'RAG', targetId: undefined, description: '' }
   datasetDialog.value = { visible: true, title: t('business.eval.addDataset') }
   loadTargetOptions('RAG')
+  nextTick(() => datasetFormRef.value?.clearValidate())
 }
 
 function handleEditDataset(row: EvalDataset) {
@@ -365,48 +408,40 @@ function handleEditDataset(row: EvalDataset) {
     datasetForm.value = { ...res.data }
     datasetDialog.value = { visible: true, title: t('business.eval.editDataset') }
     loadTargetOptions(res.data.evalType)
+    nextTick(() => datasetFormRef.value?.clearValidate())
   })
 }
 
 function submitDatasetForm() {
-  if (!datasetForm.value.name) {
-    ElMessage.warning(t('common.requiredMsg', [t('business.eval.datasetName')]))
-    return
-  }
-  if (!datasetForm.value.targetId) {
-    ElMessage.warning(t('common.requiredMsg', [t('business.eval.target')]))
-    return
-  }
-  if (datasetForm.value.id) {
-    updateEvalDataset(datasetForm.value).then(() => {
-      ElMessage.success(t('common.operateSuccess'))
-      datasetDialog.value.visible = false
-      getDatasetList()
-    })
-  } else {
-    addEvalDataset(datasetForm.value).then(() => {
-      ElMessage.success(t('common.operateSuccess'))
-      datasetDialog.value.visible = false
-      getDatasetList()
-    })
-  }
-}
-
-function handleDeleteDataset(row: EvalDataset) {
-  ElMessageBox.confirm(t('common.confirmDelete'), t('common.tip'), { type: 'warning' }).then(() => {
-    delEvalDataset(row.id as number).then(() => {
-      ElMessage.success(t('common.deleteSuccess'))
-      getDatasetList()
-    })
+  datasetFormRef.value?.validate((valid) => {
+    if (!valid) {
+      return
+    }
+    if (datasetForm.value.id) {
+      updateEvalDataset(datasetForm.value).then(() => {
+        modal.msgSuccess(t('common.updateSuccess'))
+        datasetDialog.value.visible = false
+        getDatasetList()
+      })
+    } else {
+      addEvalDataset(datasetForm.value).then(() => {
+        modal.msgSuccess(t('common.addSuccess'))
+        datasetDialog.value.visible = false
+        getDatasetList()
+      })
+    }
   })
 }
 
-// 样本集导入
-const importDialog = ref({
-  visible: false,
-  datasetId: 0,
-  jsonContent: ''
-})
+function handleDeleteDataset(row: EvalDataset) {
+  modal.confirm(t('business.eval.confirmDeleteDataset', [row.id]))
+    .then(() => delEvalDataset(row.id as number))
+    .then(() => {
+      modal.msgSuccess(t('common.deleteSuccess'))
+      getDatasetList()
+    })
+    .catch(() => {})
+}
 
 function handleOpenImport(row: EvalDataset) {
   importDialog.value.datasetId = row.id as number
@@ -419,15 +454,15 @@ function fillSampleTemplate() {
     [
       {
         id: 'sample-001',
-        query: 'XXL-AI 的流式超时时间配置项是什么？',
-        groundTruth: '配置项为 xxl-ai.chat.stream.timeout，默认 180000ms',
+        query: t('business.eval.tplQ1'),
+        groundTruth: t('business.eval.tplA1'),
         expectedDocNames: ['CLOUD_HANDOVER_CONTEXT.md'],
         expectedKeywords: ['streamTimeout', '180000']
       },
       {
         id: 'sample-002',
-        query: '系统多租户隔离基于什么字段？',
-        groundTruth: '核心基于 space_id 空间强隔离',
+        query: t('business.eval.tplQ2'),
+        groundTruth: t('business.eval.tplA2'),
         expectedDocNames: ['CLOUD_HANDOVER_CONTEXT.md'],
         expectedKeywords: ['space_id', 'SpaceContext']
       }
@@ -439,30 +474,20 @@ function fillSampleTemplate() {
 
 function submitImportJson() {
   if (!importDialog.value.jsonContent) {
-    ElMessage.warning(t('business.eval.jsonRequired'))
+    modal.msgWarning(t('business.eval.jsonRequired'))
     return
   }
   importEvalDatasetJson(importDialog.value.datasetId, importDialog.value.jsonContent).then(() => {
-    ElMessage.success(t('common.operateSuccess'))
+    modal.msgSuccess(t('common.saveSuccess'))
     importDialog.value.visible = false
     getDatasetList()
   })
 }
 
-// ------------------- Tab 2: 评测实验中心 -------------------
-const expLoading = ref(false)
-const expList = ref<EvalExperiment[]>([])
-const expTotal = ref(0)
-const expQuery = ref<EvalExperimentListQuery>({
-  pageNum: 1,
-  pageSize: 10,
-  name: undefined,
-  status: -1
-})
-
 function getExpList() {
   expLoading.value = true
-  listEvalExperiment(expQuery.value)
+  const params = usePageParams(expQuery)()
+  listEvalExperiment(params)
     .then((res) => {
       expList.value = res.data.data
       expTotal.value = res.data.total
@@ -472,22 +497,15 @@ function getExpList() {
     })
 }
 
+function handleExpQuery() {
+  expQuery.value.pageNum = 1
+  getExpList()
+}
+
 function resetExpQuery() {
   expQuery.value = { pageNum: 1, pageSize: 10, name: undefined, status: -1 }
   getExpList()
 }
-
-// 触发评测实验
-const runDialog = ref({
-  visible: false
-})
-const runForm = ref({
-  datasetId: 0,
-  datasetName: '',
-  name: '',
-  judgeModelId: undefined as number | undefined
-})
-const modelOptions = ref<Array<{ id: number; name: string }>>([])
 
 function handleRunExperiment(row: EvalDataset) {
   runForm.value = {
@@ -503,25 +521,27 @@ function handleRunExperiment(row: EvalDataset) {
 function loadModelOptions() {
   modelOptions.value = []
   listSupplierBySpace().then((res) => {
-    if (res.data && res.data.length > 0) {
-      res.data.forEach((supplier) => {
-        listModelBySupplier(supplier.id as number).then((mRes) => {
-          if (mRes.data) {
-            mRes.data
-              .filter((m) => m.type === 0 && m.status === 0)
-              .forEach((m) => {
-                modelOptions.value.push({ id: m.id as number, name: `${supplier.name} - ${m.name}` })
-              })
-          }
-        })
-      })
+    const suppliers = (res.data || []).filter((s) => s.status === 0 && s.id != null)
+    if (suppliers.length === 0) {
+      return
     }
+    Promise.all(
+      suppliers.map((supplier) =>
+        listModelBySupplier(supplier.id as number).then((mRes) =>
+          (mRes.data || [])
+            .filter((m) => m.type === 0 && m.status === 0 && m.id != null)
+            .map((m) => ({ id: m.id as number, name: `${supplier.name} - ${m.name}` }))
+        )
+      )
+    ).then((groups) => {
+      modelOptions.value = groups.flat()
+    })
   })
 }
 
 function submitRunExperiment() {
   if (!runForm.value.name) {
-    ElMessage.warning(t('common.requiredMsg', [t('business.eval.experimentName')]))
+    modal.msgWarning(t('common.requiredMsg', [t('business.eval.experimentName')]))
     return
   }
   createAndRunExperiment({
@@ -529,7 +549,7 @@ function submitRunExperiment() {
     name: runForm.value.name,
     judgeModelId: runForm.value.judgeModelId
   }).then(() => {
-    ElMessage.success(t('business.eval.experimentStarted'))
+    modal.msgSuccess(t('business.eval.experimentStarted'))
     runDialog.value.visible = false
     activeTab.value = 'experiments'
     getExpList()
@@ -537,25 +557,25 @@ function submitRunExperiment() {
 }
 
 function handleCancelExp(row: EvalExperiment) {
-  ElMessageBox.confirm(t('business.eval.confirmCancel'), t('common.tip'), { type: 'warning' }).then(() => {
-    cancelEvalExperiment(row.id as number).then(() => {
-      ElMessage.success(t('common.operateSuccess'))
+  modal.confirm(t('business.eval.confirmCancel'))
+    .then(() => cancelEvalExperiment(row.id as number))
+    .then(() => {
+      modal.msgSuccess(t('common.saveSuccess'))
       getExpList()
     })
-  })
+    .catch(() => {})
 }
 
 function handleDeleteExp(row: EvalExperiment) {
-  ElMessageBox.confirm(t('common.confirmDelete'), t('common.tip'), { type: 'warning' }).then(() => {
-    delEvalExperiment(row.id as number).then(() => {
-      ElMessage.success(t('common.deleteSuccess'))
+  modal.confirm(t('business.eval.confirmDeleteExperiment', [row.id]))
+    .then(() => delEvalExperiment(row.id as number))
+    .then(() => {
+      modal.msgSuccess(t('common.deleteSuccess'))
       getExpList()
     })
-  })
+    .catch(() => {})
 }
 
-// 详情抽屉
-const detailDrawerRef = ref()
 function handleOpenDetail(id: number) {
   detailDrawerRef.value?.open(id)
 }
@@ -575,7 +595,7 @@ function formatScore(val?: number) {
   return Number(val).toFixed(2)
 }
 
-function statusTagType(status?: number): '' | 'success' | 'warning' | 'danger' | 'info' {
+function statusTagType(status?: number): 'success' | 'warning' | 'danger' | 'info' {
   switch (status) {
     case 1: return 'warning'
     case 2: return 'success'
@@ -596,10 +616,9 @@ function statusLabel(status?: number): string {
   }
 }
 
-onMounted(() => {
-  getDatasetList()
-  getExpList()
-})
+// --------------------------------- page init ---------------------------------
+getDatasetList()
+getExpList()
 </script>
 
 <style scoped>

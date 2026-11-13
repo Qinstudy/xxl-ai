@@ -47,8 +47,14 @@ public class EvalDatasetController {
 
     @RequestMapping("/load")
     @XxlSso(permission = "eval:default")
-    public Response<EvalDatasetDTO> load(@RequestParam("id") long id) {
-        return evalDatasetService.load(id);
+    public Response<EvalDatasetDTO> load(HttpServletRequest request,
+                                         @RequestHeader(value = "xxl-space-id", required = false) Integer spaceId,
+                                         @RequestParam("id") long id) {
+        Response<SpaceContext> spaceResp = spaceService.checkSpace(request, spaceId);
+        if (!spaceResp.isSuccess()) {
+            return Response.ofFail(spaceResp.getMsg());
+        }
+        return evalDatasetService.load(spaceResp.getData().getSpaceId(), id);
     }
 
     @PostMapping("/insert")
@@ -96,11 +102,17 @@ public class EvalDatasetController {
         if (!spaceResp.isSuccess()) {
             return Response.ofFail(spaceResp.getMsg());
         }
-        long id = 0L;
-        if (params.get("id") != null) {
-            id = Long.parseLong(params.get("id").toString());
+        if (params == null || params.get("id") == null) {
+            return Response.ofFail("ID 参数非法");
         }
-        String jsonContent = (String) params.get("jsonContent");
+        long id;
+        try {
+            id = Long.parseLong(params.get("id").toString());
+        } catch (NumberFormatException e) {
+            return Response.ofFail("ID 参数非法");
+        }
+        Object rawJson = params.get("jsonContent");
+        String jsonContent = rawJson instanceof String ? (String) rawJson : null;
         return evalDatasetService.importJson(spaceResp.getData().getSpaceId(), id, jsonContent);
     }
 }

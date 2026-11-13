@@ -56,10 +56,10 @@ public class EvalDatasetServiceImpl implements EvalDatasetService {
     }
 
     @Override
-    public Response<EvalDatasetDTO> load(long id) {
+    public Response<EvalDatasetDTO> load(long spaceId, long id) {
         EvalDataset dataset = evalDatasetMapper.load(id);
-        if (dataset == null) {
-            return Response.ofFail("评测数据集不存在");
+        if (dataset == null || dataset.getSpaceId() != spaceId) {
+            return Response.ofFail("评测数据集不存在或无权限访问");
         }
         return Response.ofSuccess(EvalAdaptor.adapt2dto(dataset));
     }
@@ -77,8 +77,11 @@ public class EvalDatasetServiceImpl implements EvalDatasetService {
         }
         datasetDTO.setSpaceId(spaceId);
 
-        // 解析并填充目标名称
-        fillTargetName(spaceId, datasetDTO);
+        // 校验目标归属并填充目标名称（防跨空间挂载）
+        Response<String> targetResp = validateAndFillTarget(spaceId, datasetDTO);
+        if (!targetResp.isSuccess()) {
+            return targetResp;
+        }
 
         // 计算样本数量与初值
         int count = countSamples(datasetDTO.getContentJson());
@@ -104,15 +107,23 @@ public class EvalDatasetServiceImpl implements EvalDatasetService {
         if (StringTool.isBlank(datasetDTO.getName())) {
             return Response.ofFail("评测集名称不能为空");
         }
+        if (StringTool.isBlank(datasetDTO.getEvalType())) {
+            datasetDTO.setEvalType(old.getEvalType());
+        }
 
         datasetDTO.setSpaceId(spaceId);
-        fillTargetName(spaceId, datasetDTO);
+        // 校验目标归属并填充目标名称（防跨空间挂载）
+        Response<String> targetResp = validateAndFillTarget(spaceId, datasetDTO);
+        if (!targetResp.isSuccess()) {
+            return targetResp;
+        }
 
-        int count = countSamples(datasetDTO.getContentJson());
-        datasetDTO.setSampleCount(count);
         if (StringTool.isBlank(datasetDTO.getContentJson())) {
             datasetDTO.setContentJson(old.getContentJson());
             datasetDTO.setSampleCount(old.getSampleCount());
+        } else {
+            int count = countSamples(datasetDTO.getContentJson());
+            datasetDTO.setSampleCount(count);
         }
 
         EvalDataset entity = EvalAdaptor.adapt(datasetDTO);
@@ -153,10 +164,14 @@ public class EvalDatasetServiceImpl implements EvalDatasetService {
             if (cases.size() > 50) {
                 return Response.ofFail("单个评测集样本数不能超过 50 条（防止评测超时）");
             }
-            // 自动补齐缺失 ID
+            // 校验必填 query 并自动补齐缺失 ID
             for (int i = 0; i < cases.size(); i++) {
-                if (StringTool.isBlank(cases.get(i).getId())) {
-                    cases.get(i).setId("case-" + (i + 1));
+                EvalEngineTool.EvalCase item = cases.get(i);
+                if (item == null || StringTool.isBlank(item.getQuery())) {
+                    return Response.ofFail("第 " + (i + 1) + " 条样本缺少有效的 query 问题内容");
+                }
+                if (StringTool.isBlank(item.getId())) {
+                    item.setId("case-" + (i + 1));
                 }
             }
             String finalJson = GsonTool.toJson(cases);
@@ -169,18 +184,32 @@ public class EvalDatasetServiceImpl implements EvalDatasetService {
         }
     }
 
-    private void fillTargetName(long spaceId, EvalDatasetDTO dto) {
-        if ("RAG".equalsIgnoreCase(dto.getEvalType()) && dto.getTargetId() > 0) {
-            KnowledgeBase kb = knowledgeBaseMapper.load(dto.getTargetId());
-            if (kb != null) {
-                dto.setTargetName(kb.getName());
-            }
-        } else if ("AGENT".equalsIgnoreCase(dto.getEvalType()) && dto.getTargetId() > 0) {
-            Agent agent = agentMapper.load(dto.getTargetId());
-            if (agent != null) {
-                dto.setTargetName(agent.getName());
-            }
+    /**
+     * 校验评测类型及目标资源归属，填充冗余目标名称
+     */
+    private Response<String> validateAndFillTarget(long spaceId, EvalDatasetDTO dto) {
+        String evalType = StringTool.isBlank(dto.getEvalType()) ? "" : dto.getEvalType().trim().toUpperCase();
+        if (!"RAG".equals(evalType) && !"AGENT".equals(evalType)) {
+            return Response.ofFail("评测类型仅支持 RAG 或 AGENT");
         }
+        dto.setEvalType(evalType);
+        if (dto.getTargetId() <= 0) {
+            return Response.ofFail("请选择评测目标");
+        }
+        if ("RAG".equals(evalType)) {
+            KnowledgeBase kb = knowledgeBaseMapper.load(dto.getTargetId());
+            if (kb == null || kb.getSpaceId() != spaceId) {
+                return Response.ofFail("目标知识库不存在或无权限访问");
+            }
+            dto.setTargetName(StringTool.isNotBlank(kb.getName()) ? kb.getName() : "");
+        } else {
+            Agent agent = agentMapper.load(dto.getTargetId());
+            if (agent == null || agent.getSpaceId() != spaceId) {
+                return Response.ofFail("目标 Agent 不存在或无权限访问");
+            }
+            dto.setTargetName(StringTool.isNotBlank(agent.getName()) ? agent.getName() : "");
+        }
+        return Response.ofSuccess();
     }
 
     private int countSamples(String contentJson) {

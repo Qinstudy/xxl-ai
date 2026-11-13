@@ -126,8 +126,19 @@ public class EvalEngineTool {
      * 判定忠实度（Faithfulness）：模型回答是否完全基于参考内容，是否存在无中生有或捏造事实
      */
     public JudgeResult judgeFaithfulness(String query, String context, String answer, SupplierRuntime judgeRuntime) {
-        if (judgeRuntime == null || StringTool.isBlank(answer)) {
-            return new JudgeResult(1.0, "无裁判模型或回答为空，默认跳过忠实度校验");
+        return judgeFaithfulness(query, context, answer, judgeRuntime, null);
+    }
+
+    /**
+     * 判定忠实度（支持透传 TraceCollector 累加裁判 Token 消耗）
+     */
+    public JudgeResult judgeFaithfulness(String query, String context, String answer,
+                                         SupplierRuntime judgeRuntime, TraceCollector traceCollector) {
+        if (StringTool.isBlank(answer)) {
+            return new JudgeResult(0.0, "模型未返回有效回答，忠实度判为 0 分");
+        }
+        if (judgeRuntime == null) {
+            return new JudgeResult(0.0, "未配置裁判模型，无法评估忠实度");
         }
         String prompt = "你是严谨客观的大模型事实核验专家。请根据以下提供的用户问题、参考上下文（Context）以及实际回答（Answer），" +
                 "评估回答的忠实度（Faithfulness）：回答内容是否完全有参考上下文支持？是否存在脱离参考的捏造或幻觉？\n\n" +
@@ -138,15 +149,26 @@ public class EvalEngineTool {
                 "请严格输出如下 JSON 格式，严禁包含任何前缀或额外文字：\n" +
                 "{\"score\": 1.0, \"reason\": \"理由说明\"}";
 
-        return invokeJudgeModel(prompt, judgeRuntime);
+        return invokeJudgeModel(prompt, judgeRuntime, traceCollector);
     }
 
     /**
      * 判定答案相关性（Answer Relevance）：模型回答是否切题，是否准确响应了用户意图
      */
     public JudgeResult judgeAnswerRelevance(String query, String answer, SupplierRuntime judgeRuntime) {
-        if (judgeRuntime == null || StringTool.isBlank(answer)) {
-            return new JudgeResult(1.0, "无裁判模型或回答为空，默认跳过相关性校验");
+        return judgeAnswerRelevance(query, answer, judgeRuntime, null);
+    }
+
+    /**
+     * 判定答案相关性（支持透传 TraceCollector 累加裁判 Token 消耗）
+     */
+    public JudgeResult judgeAnswerRelevance(String query, String answer,
+                                            SupplierRuntime judgeRuntime, TraceCollector traceCollector) {
+        if (StringTool.isBlank(answer)) {
+            return new JudgeResult(0.0, "模型未返回有效回答，相关性判为 0 分");
+        }
+        if (judgeRuntime == null) {
+            return new JudgeResult(0.0, "未配置裁判模型，无法评估相关性");
         }
         String prompt = "你是严谨的大模型质量评审专家。请根据用户提问（Question）和实际回答（Answer），评估答案相关性（Relevance）：" +
                 "回答是否直接且充分回应了用户核心疑问？是否存在答非所问、冗余废话或拒答？\n\n" +
@@ -156,15 +178,26 @@ public class EvalEngineTool {
                 "请严格输出如下 JSON 格式，严禁包含任何前缀或额外文字：\n" +
                 "{\"score\": 1.0, \"reason\": \"理由说明\"}";
 
-        return invokeJudgeModel(prompt, judgeRuntime);
+        return invokeJudgeModel(prompt, judgeRuntime, traceCollector);
     }
 
     /**
      * 判定任务达成率（Goal Completion）：Agent 最终回答及工具调用是否达成了用户目标
      */
     public JudgeResult judgeGoalCompletion(String query, String answer, SupplierRuntime judgeRuntime) {
-        if (judgeRuntime == null || StringTool.isBlank(answer)) {
-            return new JudgeResult(1.0, "无裁判模型或回答为空，默认跳过目标达成率校验");
+        return judgeGoalCompletion(query, answer, judgeRuntime, null);
+    }
+
+    /**
+     * 判定任务达成率（支持透传 TraceCollector 累加裁判 Token 消耗）
+     */
+    public JudgeResult judgeGoalCompletion(String query, String answer,
+                                           SupplierRuntime judgeRuntime, TraceCollector traceCollector) {
+        if (StringTool.isBlank(answer)) {
+            return new JudgeResult(0.0, "模型未返回有效回答，目标达成率判为 0 分");
+        }
+        if (judgeRuntime == null) {
+            return new JudgeResult(0.0, "未配置裁判模型，无法评估目标达成率");
         }
         String prompt = "你是严谨的智能体（Agent）任务完成度评估专家。请根据用户的任务指令（Instruction）和智能体最终给出的方案/交付结果（Output），" +
                 "评估任务达成率（Goal Completion）：是否完整解决了用户指令所要求的全部任务？\n\n" +
@@ -174,13 +207,13 @@ public class EvalEngineTool {
                 "请严格输出如下 JSON 格式，严禁包含任何前缀或额外文字：\n" +
                 "{\"score\": 1.0, \"reason\": \"理由说明\"}";
 
-        return invokeJudgeModel(prompt, judgeRuntime);
+        return invokeJudgeModel(prompt, judgeRuntime, traceCollector);
     }
 
     /**
      * 统一调用 Judge 模型并解析 JSON 结果（具备正则提取兜底，防止 LLM 输出包裹 markdown 代码块）
      */
-    private JudgeResult invokeJudgeModel(String prompt, SupplierRuntime judgeRuntime) {
+    private JudgeResult invokeJudgeModel(String prompt, SupplierRuntime judgeRuntime, TraceCollector traceCollector) {
         try {
             LlmChatTool.ChatText chatText = llmChatTool.chat(
                     judgeRuntime,
@@ -192,12 +225,14 @@ public class EvalEngineTool {
                     Collections.emptyList(),
                     "eval-judge-" + System.currentTimeMillis(),
                     null,
+                    null,
+                    traceCollector,
                     null
             );
 
             String raw = chatText != null ? chatText.getContent() : null;
             if (StringTool.isBlank(raw)) {
-                return new JudgeResult(0.5, "裁判模型未返回内容");
+                return new JudgeResult(0.0, "裁判模型未返回有效内容");
             }
 
             // 清理 markdown 代码块
@@ -214,14 +249,15 @@ public class EvalEngineTool {
                 // 回退到正则提取
             }
 
-            // 2、正则提取 score 与 reason 兜底
-            double score = 0.5;
-            String reason = "模型返回未格式化文本，回退默认";
+            // 2、正则提取 score 与 reason 兜底（未能解析出分数时不给予虚高分）
+            double score = 0.0;
+            String reason = "模型返回未格式化文本，无法解析有效评分";
             Matcher scoreMatcher = JSON_SCORE_PATTERN.matcher(cleaned);
             if (scoreMatcher.find()) {
                 try {
                     score = Double.parseDouble(scoreMatcher.group(1));
                     score = Math.min(1.0, Math.max(0.0, score));
+                    reason = "从非标准输出中提取评分";
                 } catch (Exception ignore) {}
             }
             Matcher reasonMatcher = JSON_REASON_PATTERN.matcher(cleaned);
@@ -270,7 +306,7 @@ public class EvalEngineTool {
             result.setHitRateAt3(hitRateAt3);
             result.setReciprocalRank(mrr);
 
-            // 3、生成模型推理回答（如果未配置生成模型，则仅评测检索）
+            // 3、生成模型推理回答（若未配置生成模型则留空并在后续判为 0 分）
             StringBuilder contextBuilder = new StringBuilder();
             if (CollectionTool.isNotEmpty(references)) {
                 for (int i = 0; i < references.size(); i++) {
@@ -293,29 +329,36 @@ public class EvalEngineTool {
                         Collections.emptyList(),
                         "eval-rag-" + evalCase.getId(),
                         null,
+                        null,
+                        traceCollector,
                         null
                 );
                 actualAnswer = chatText != null ? chatText.getContent() : "";
             }
             result.setActualAnswer(actualAnswer);
 
-            // 4、裁判模型打分
-            if (judgeRuntime != null && StringTool.isNotBlank(actualAnswer)) {
-                JudgeResult faith = judgeFaithfulness(evalCase.getQuery(), context, actualAnswer, judgeRuntime);
+            // 4、裁判模型打分（无有效回答或无裁判模型一律客观判 0.0）
+            if (StringTool.isBlank(actualAnswer)) {
+                result.setFaithfulnessScore(0.0);
+                result.setFaithfulnessReason("模型未生成有效回答，无法通过评估");
+                result.setRelevanceScore(0.0);
+                result.setRelevanceReason("模型未生成有效回答，无法通过评估");
+            } else if (judgeRuntime == null) {
+                result.setFaithfulnessScore(0.0);
+                result.setFaithfulnessReason("未配置裁判模型，无法评估生成内容");
+                result.setRelevanceScore(0.0);
+                result.setRelevanceReason("未配置裁判模型，无法评估生成内容");
+            } else {
+                JudgeResult faith = judgeFaithfulness(evalCase.getQuery(), context, actualAnswer, judgeRuntime, traceCollector);
                 result.setFaithfulnessScore(faith.getScore());
                 result.setFaithfulnessReason(faith.getReason());
 
-                JudgeResult relev = judgeAnswerRelevance(evalCase.getQuery(), actualAnswer, judgeRuntime);
+                JudgeResult relev = judgeAnswerRelevance(evalCase.getQuery(), actualAnswer, judgeRuntime, traceCollector);
                 result.setRelevanceScore(relev.getScore());
                 result.setRelevanceReason(relev.getReason());
-            } else {
-                result.setFaithfulnessScore(1.0);
-                result.setFaithfulnessReason("未启用裁判模型评估生成内容");
-                result.setRelevanceScore(1.0);
-                result.setRelevanceReason("未启用裁判模型评估生成内容");
             }
 
-            result.setTokens(Math.max(1, actualAnswer.length() / 2));
+            result.setTokens(resolveCaseTokens(traceCollector, actualAnswer));
         } catch (Exception e) {
             logger.error("Run RAG case failed: {}", evalCase.getId(), e);
             result.setError(e.getMessage());
@@ -339,6 +382,8 @@ public class EvalEngineTool {
         result.setGroundTruth(evalCase.getGroundTruth());
 
         long startTime = System.currentTimeMillis();
+        TraceCollector traceCollector = new TraceCollector(
+                0L, 0L, agent != null ? agent.getId() : 0L, "eval-" + evalCase.getId());
         try {
             String actualAnswer = "";
             if (agentRuntime != null && agent != null) {
@@ -353,28 +398,35 @@ public class EvalEngineTool {
                         Collections.emptyList(),
                         "eval-agent-" + evalCase.getId(),
                         null,
+                        null,
+                        traceCollector,
                         null
                 );
                 actualAnswer = chatText != null ? chatText.getContent() : "";
             }
             result.setActualAnswer(actualAnswer);
 
-            // 裁判模型打分：目标达成率与相关性
-            if (judgeRuntime != null && StringTool.isNotBlank(actualAnswer)) {
-                JudgeResult goal = judgeGoalCompletion(evalCase.getQuery(), actualAnswer, judgeRuntime);
+            // 裁判模型打分：目标达成率与相关性（无有效回答或无裁判模型一律客观判 0.0）
+            if (StringTool.isBlank(actualAnswer)) {
+                result.setGoalCompletionScore(0.0);
+                result.setGoalCompletionReason("Agent 未生成有效回答（可能未配置可用对话模型或生成失败）");
+                result.setRelevanceScore(0.0);
+                result.setRelevanceReason("Agent 未生成有效回答（可能未配置可用对话模型或生成失败）");
+            } else if (judgeRuntime == null) {
+                result.setGoalCompletionScore(0.0);
+                result.setGoalCompletionReason("未配置裁判模型，无法评估生成内容");
+                result.setRelevanceScore(0.0);
+                result.setRelevanceReason("未配置裁判模型，无法评估生成内容");
+            } else {
+                JudgeResult goal = judgeGoalCompletion(evalCase.getQuery(), actualAnswer, judgeRuntime, traceCollector);
                 result.setGoalCompletionScore(goal.getScore());
                 result.setGoalCompletionReason(goal.getReason());
 
-                JudgeResult relev = judgeAnswerRelevance(evalCase.getQuery(), actualAnswer, judgeRuntime);
+                JudgeResult relev = judgeAnswerRelevance(evalCase.getQuery(), actualAnswer, judgeRuntime, traceCollector);
                 result.setRelevanceScore(relev.getScore());
                 result.setRelevanceReason(relev.getReason());
-            } else {
-                result.setGoalCompletionScore(1.0);
-                result.setGoalCompletionReason("未启用裁判模型");
-                result.setRelevanceScore(1.0);
-                result.setRelevanceReason("未启用裁判模型");
             }
-            result.setTokens(Math.max(1, actualAnswer.length() / 2));
+            result.setTokens(resolveCaseTokens(traceCollector, actualAnswer));
         } catch (Exception e) {
             logger.error("Run Agent case failed: {}", evalCase.getId(), e);
             result.setError(e.getMessage());
@@ -382,6 +434,19 @@ public class EvalEngineTool {
             result.setLatencyMs(System.currentTimeMillis() - startTime);
         }
         return result;
+    }
+
+    /**
+     * 优先返回 TraceCollector 聚合的真实 Token；模型未回传 usage 时仅当存在有效回答再按字符估算兜底
+     */
+    private int resolveCaseTokens(TraceCollector traceCollector, String actualAnswer) {
+        if (traceCollector != null && traceCollector.getTokenUsage() != null) {
+            int recorded = traceCollector.getTokenUsage().getTotalTokens();
+            if (recorded > 0) {
+                return recorded;
+            }
+        }
+        return StringTool.isNotBlank(actualAnswer) ? Math.max(1, actualAnswer.length() / 2) : 0;
     }
 
     // ==================== 4. 数据结构模型 (POJOs) ====================

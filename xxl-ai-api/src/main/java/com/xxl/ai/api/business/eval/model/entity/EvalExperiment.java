@@ -26,11 +26,11 @@ public class EvalExperiment implements Serializable {
     private int status;                     /* 状态：0-待运行, 1-运行中, 2-已完成, 3-失败, 4-已取消 */
     private int totalCases;                 /* 总用例数 */
     private int completedCases;             /* 已完成用例数 */
-    private BigDecimal avgHitRate;          /* 平均检索命中率 HitRate@3 */
-    private BigDecimal avgMrr;              /* 平均倒数排名 MRR */
-    private BigDecimal avgFaithfulness;     /* 平均忠实度（防幻觉） */
-    private BigDecimal avgRelevance;        /* 平均答案相关性 */
-    private BigDecimal avgGoalCompletion;   /* 平均目标达成率（仅AGENT） */
+    private BigDecimal avgHitRate = BigDecimal.ZERO;          /* 平均检索命中率 HitRate@3 */
+    private BigDecimal avgMrr = BigDecimal.ZERO;              /* 平均倒数排名 MRR */
+    private BigDecimal avgFaithfulness = BigDecimal.ZERO;     /* 平均忠实度（防幻觉） */
+    private BigDecimal avgRelevance = BigDecimal.ZERO;        /* 平均答案相关性 */
+    private BigDecimal avgGoalCompletion = BigDecimal.ZERO;   /* 平均目标达成率（仅AGENT） */
     private int avgLatencyMs;               /* 平均耗时（ms） */
     private int totalTokens;                /* 累计 Token 消耗 */
     private String summaryJson;             /* 详细实验指标汇总及用例结果明细 JSON */

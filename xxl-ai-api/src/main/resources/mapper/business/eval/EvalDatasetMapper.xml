@@ -38,7 +38,7 @@
 		) VALUES (
 			#{spaceId}, #{name}, #{evalType}, #{targetId}, #{targetName},
 			#{sampleCount}, #{contentJson}, #{description}, NOW(), NOW()
-		);
+		)
 	</insert>
 
 	<delete id="delete">

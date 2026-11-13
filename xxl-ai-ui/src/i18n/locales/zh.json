@@ -40,6 +40,7 @@
     "requiredMsg": "{0}不能为空",
     "titleAdd": "新增{0}",
     "titleEdit": "修改{0}",
+    "unknown": "未知",
     "noun": {
       "config": "配置",
       "iconName": "图标名称",
@@ -639,6 +640,14 @@
       "startRun": "立即启动评测",
       "experimentStarted": "实验任务已提交后台异步执行",
       "confirmCancel": "是否确认终止该评测实验？已完成的用例结果将被保留。",
+      "confirmDeleteDataset": "是否确认删除评测集编号为\"{0}\"的数据项？",
+      "confirmDeleteExperiment": "是否确认删除评测实验编号为\"{0}\"的数据项？",
+      "evalTypeRag": "RAG 知识库检索生成",
+      "evalTypeAgent": "Agent 目标与工具链",
+      "tplQ1": "XXL-AI 的流式超时时间配置项是什么？",
+      "tplA1": "配置项为 xxl-ai.chat.stream.timeout，默认 180000ms",
+      "tplQ2": "系统多租户隔离基于什么字段？",
+      "tplA2": "核心基于 space_id 空间强隔离",
       "viewReport": "查看报告",
       "experimentDetailTitle": "评测实验质量报告与明细透视"
     },

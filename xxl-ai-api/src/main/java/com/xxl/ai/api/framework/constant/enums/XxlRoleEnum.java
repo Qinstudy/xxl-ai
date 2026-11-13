@@ -107,7 +107,7 @@ public enum XxlRoleEnum {
         resources.add(resHidden(71, 0, "供应商模型", ResourceTypeEnum.MENU, "supplier:default", "/supplier/model", "", 701));
 
         // 质量评测
-        resources.add(res(75, 0, "质量评测", ResourceTypeEnum.MENU, "eval:default", "/eval", "data-analysis", 750));
+        resources.add(res(75, 0, "质量评测", ResourceTypeEnum.MENU, "eval:default", "/eval", "chart", 750));
 
         // 工作流编排
         resources.add(res(76, 0, "工作流编排", ResourceTypeEnum.MENU, "workflow:default", "/workflow", "tree", 760));

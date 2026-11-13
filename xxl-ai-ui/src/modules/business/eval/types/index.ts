@@ -1,4 +1,4 @@
-import type { PageQuery } from '@/types'
+import type { ListQuery } from '@/types'
 
 /** 评测数据集 */
 export interface EvalDataset {
@@ -6,7 +6,7 @@ export interface EvalDataset {
   spaceId?: number
   name: string
   evalType: 'RAG' | 'AGENT'
-  targetId: number
+  targetId?: number
   targetName?: string
   sampleCount?: number
   contentJson?: string
@@ -15,11 +15,16 @@ export interface EvalDataset {
   updateTime?: string
 }
 
-/** 评测数据集列表查询参数 */
-export interface EvalDatasetListQuery extends PageQuery {
+/** 评测数据集搜索表单参数 */
+export interface EvalDatasetQuery {
+  pageNum: number
+  pageSize: number
   name?: string
   evalType?: string
 }
+
+/** 评测数据集列表请求参数 */
+export type EvalDatasetListQuery = ListQuery<EvalDatasetQuery>
 
 /** 评测实验记录 */
 export interface EvalExperiment {
@@ -48,12 +53,17 @@ export interface EvalExperiment {
   updateTime?: string
 }
 
-/** 评测实验列表查询参数 */
-export interface EvalExperimentListQuery extends PageQuery {
+/** 评测实验搜索表单参数 */
+export interface EvalExperimentQuery {
+  pageNum: number
+  pageSize: number
   name?: string
   datasetId?: number
   status?: number
 }
+
+/** 评测实验列表请求参数 */
+export type EvalExperimentListQuery = ListQuery<EvalExperimentQuery>
 
 /** 单个测试用例定义 */
 export interface EvalCase {

@@ -15,7 +15,7 @@ public interface EvalDatasetService {
 
     PageModel<EvalDatasetDTO> pageList(long spaceId, int offset, int pagesize, String name, String evalType);
 
-    Response<EvalDatasetDTO> load(long id);
+    Response<EvalDatasetDTO> load(long spaceId, long id);
 
     Response<String> insert(long spaceId, EvalDatasetDTO datasetDTO);
 

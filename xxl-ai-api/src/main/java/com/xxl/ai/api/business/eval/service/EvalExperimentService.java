@@ -15,7 +15,7 @@ public interface EvalExperimentService {
 
     PageModel<EvalExperimentDTO> pageList(long spaceId, int offset, int pagesize, String name, Long datasetId, Integer status);
 
-    Response<EvalExperimentDTO> load(long id);
+    Response<EvalExperimentDTO> load(long spaceId, long id);
 
     Response<Long> createAndRun(long spaceId, EvalExperimentDTO experimentDTO);
 

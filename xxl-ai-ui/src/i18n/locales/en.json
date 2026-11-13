@@ -40,6 +40,7 @@
     "requiredMsg": "{0} cannot be empty",
     "titleAdd": "Add {0}",
     "titleEdit": "Edit {0}",
+    "unknown": "Unknown",
     "noun": {
       "config": "Config",
       "iconName": "icon name",
@@ -639,6 +640,14 @@
       "startRun": "Start Evaluation",
       "experimentStarted": "Experiment submitted for background execution",
       "confirmCancel": "Are you sure to cancel this experiment? Completed cases will be preserved.",
+      "confirmDeleteDataset": "Are you sure to delete the dataset with ID \"{0}\"?",
+      "confirmDeleteExperiment": "Are you sure to delete the experiment with ID \"{0}\"?",
+      "evalTypeRag": "RAG Knowledge Retrieval & Generation",
+      "evalTypeAgent": "Agent Goal & Tooling",
+      "tplQ1": "What is the streaming timeout config key in XXL-AI?",
+      "tplA1": "The config key is xxl-ai.chat.stream.timeout, default 180000ms",
+      "tplQ2": "Which field isolates multi-tenant data in XXL-AI?",
+      "tplA2": "Tenant isolation is enforced by space_id",
       "viewReport": "View Report",
       "experimentDetailTitle": "Evaluation Quality Report & Details"
     },

@@ -24,6 +24,12 @@ public interface EvalExperimentMapper {
 
     int updateProgress(EvalExperiment experiment);
 
+    int updateFinish(EvalExperiment experiment);
+
+    int updateFailure(@Param("id") long id, @Param("errorMsg") String errorMsg);
+
+    int updateCancel(@Param("id") long id, @Param("errorMsg") String errorMsg);
+
     EvalExperiment load(@Param("id") long id);
 
     List<EvalExperiment> listByDatasetId(@Param("datasetId") long datasetId);
