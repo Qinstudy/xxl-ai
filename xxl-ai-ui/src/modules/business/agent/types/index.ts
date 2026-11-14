@@ -27,6 +27,12 @@ export interface Agent {
   skillIds?: number[]
   /** 记忆开关：0-关闭、1-开启 */
   memoryStatus?: number
+  /** 模型采样温度：0.0~2.0，空表示默认 */
+  temperature?: number
+  /** 模型核采样：0.0~1.0，空表示默认 */
+  topP?: number
+  /** 单次生成最大Token数，空表示默认 */
+  maxTokens?: number
   /** 发布状态：0-未发布、1-已发布 */
   publishStatus?: number
   /** 访问UUID */

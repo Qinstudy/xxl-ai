@@ -11,6 +11,8 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
@@ -37,19 +39,7 @@ public class LlmChatTool {
     private LlmModelFactory llmModelFactory;
 
     /**
-     * 流式对话：装配消息 → 附加工具/Advisor → 增量输出
-     *
-     * @param runtime      模型运行时配置（需为对话模型）
-     * @param systemPrompt 系统指令（已由调用方解析，可为空）
-     * @param roleList     历史消息角色（user/assistant）
-     * @param contentList  历史消息内容（与 roleList 平行）
-     * @param content      当前用户消息
-     * @param tools        已装配的工具（ToolCallback / @Tool 对象，可为空）
-     * @param advisorObjects  已装配的对话 Advisor（可为空）
-     * @param sessionId    会话标识（Header {session} 占位替换）
-     * @param onThinking   思考过程增量回调（可空）
-     * @param onContent    回复内容增量回调（可空）
-     * @return 完整回复（内容 + 思考过程）
+     * 流式对话（兼容无 ChatOptions 签名）：装配消息 → 附加工具/Advisor → 增量输出
      */
     public ChatText chat(SupplierRuntime runtime,
                          String systemPrompt,
@@ -61,6 +51,37 @@ public class LlmChatTool {
                          String sessionId,
                          Consumer<String> onThinking,
                          Consumer<String> onContent) {
+        return chat(runtime, systemPrompt, roleList, contentList, content,
+                tools, advisorObjects, sessionId, null, onThinking, onContent);
+    }
+
+    /**
+     * 流式对话（带推理超参数 Options）：装配消息 → 注入 Options → 附加工具/Advisor → 增量输出
+     *
+     * @param runtime        模型运行时配置（需为对话模型）
+     * @param systemPrompt   系统指令（已由调用方解析，可为空）
+     * @param roleList       历史消息角色（user/assistant）
+     * @param contentList    历史消息内容（与 roleList 平行）
+     * @param content        当前用户消息
+     * @param tools          已装配的工具（ToolCallback / @Tool 对象，可为空）
+     * @param advisorObjects 已装配的对话 Advisor（可为空）
+     * @param sessionId      会话标识（Header {session} 占位替换）
+     * @param chatOptions    动态推理超参数（[FEAT-006]，温度/核采样/最大Token等，可空）
+     * @param onThinking     思考过程增量回调（可空）
+     * @param onContent      回复内容增量回调（可空）
+     * @return 完整回复（内容 + 思考过程）
+     */
+    public ChatText chat(SupplierRuntime runtime,
+                         String systemPrompt,
+                         List<String> roleList,
+                         List<String> contentList,
+                         String content,
+                         Object[] tools,
+                         List<Object> advisorObjects,
+                         String sessionId,
+                         ChatOptions chatOptions,
+                         Consumer<String> onThinking,
+                         Consumer<String> onContent) {
 
         // 创建 ChatClient（spring-ai）
         ChatClient chatClient = llmModelFactory.chatClient(runtime, sessionId);
@@ -68,6 +89,16 @@ public class LlmChatTool {
         // 消息装配：系统指令 + 历史（角色与内容平行列表）+ 当前用户消息
         ChatClient.ChatClientRequestSpec spec = chatClient.prompt()
                 .messages(buildMessages(systemPrompt, roleList, contentList, content));
+
+        // 动态注入推理超参数（[FEAT-006]）：温度 / 核采样 / 最大Token 等
+        if (chatOptions != null) {
+            if (chatOptions instanceof OpenAiChatOptions openAiChatOptions) {
+                // 确保模型代码与当前运行时供应商模型严格一致，防止被 Spring AI 默认的 gpt-5-mini 篡改
+                spec = spec.options(openAiChatOptions.mutate().model(runtime.getModelName()));
+            } else {
+                spec = spec.options(chatOptions.mutate());
+            }
+        }
 
         // 附加工具（ToolCallback / @Tool 对象）
         if (tools != null && tools.length > 0) {

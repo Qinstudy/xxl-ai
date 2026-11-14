@@ -24,6 +24,7 @@ import com.xxl.tool.response.Response;
 import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.SmartLifecycle;
 import org.springframework.context.annotation.Lazy;
@@ -813,13 +814,49 @@ public class ChatStreamTool implements SmartLifecycle {
             noticeText.append(notice);
         }
 
+        // 2.7、大模型推理超参数动态配置（[FEAT-006]）：从 Agent 读取配置并显式绑定当前真实模型名称
+        OpenAiChatOptions chatOptions = buildChatOptions(agent, runtime.getModelName());
+
         // 3、harness 流式对话：增量回调写思考流与内容流，最终返回完整内容与思考文本
         LlmChatTool.ChatText chatText = llmChatTool.chat(runtime, systemPrompt, roleList, contentList, content, tools, advisors,
-                "xxl-ai-session-" + sessionId, onThinking, onContent);
+                "xxl-ai-session-" + sessionId, chatOptions, onThinking, onContent);
         if (!noticeText.isEmpty()) {
             chatText = new LlmChatTool.ChatText(chatText.getContent(), noticeText + chatText.getThinking());
         }
         return chatText;
+    }
+
+    /**
+     * 构建动态推理超参数（[FEAT-006]）：从 Agent 配置读取 temperature / top_p / max_tokens
+     *
+     * 需显式绑定当前真实模型名称（modelName），防止未设置 model 时 Spring AI 默认回退为 gpt-5-mini
+     * 导致请求第三方或本地大模型时因模型名称不匹配被服务端拒绝。
+     */
+    static OpenAiChatOptions buildChatOptions(Agent agent, String modelName) {
+        if (agent == null) {
+            return null;
+        }
+        Double temperature = agent.getTemperature();
+        Double topP = agent.getTopP();
+        Integer maxTokens = agent.getMaxTokens();
+        if (temperature == null && topP == null && maxTokens == null) {
+            return null;
+        }
+
+        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder();
+        if (StringTool.isNotBlank(modelName)) {
+            builder.model(modelName.trim());
+        }
+        if (temperature != null) {
+            builder.temperature(temperature);
+        }
+        if (topP != null) {
+            builder.topP(topP);
+        }
+        if (maxTokens != null && maxTokens > 0) {
+            builder.maxTokens(maxTokens);
+        }
+        return builder.build();
     }
 
     /**

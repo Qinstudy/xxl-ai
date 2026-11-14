@@ -145,6 +145,69 @@
         <el-form-item :label="t('business.agent.memoryStatus')" prop="memoryStatus">
           <el-switch v-model="formState.form.memoryStatus" :active-value="1" :inactive-value="0" />
         </el-form-item>
+        <el-divider content-position="left">
+          <span style="font-weight: 500; font-size: 13px; color: var(--el-text-color-regular)">
+            {{ t('business.agent.optionsTitle') }}
+          </span>
+        </el-divider>
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item prop="temperature">
+              <template #label>
+                <span>{{ t('business.agent.temperature') }}</span>
+                <el-tooltip :content="t('business.agent.temperatureTip')" placement="top">
+                  <el-icon style="margin-left: 4px; vertical-align: middle; cursor: pointer"><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </template>
+              <el-input-number
+                v-model="formState.form.temperature"
+                :min="0"
+                :max="2"
+                :step="0.1"
+                :precision="1"
+                controls-position="right"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item prop="topP">
+              <template #label>
+                <span>{{ t('business.agent.topP') }}</span>
+                <el-tooltip :content="t('business.agent.topPTip')" placement="top">
+                  <el-icon style="margin-left: 4px; vertical-align: middle; cursor: pointer"><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </template>
+              <el-input-number
+                v-model="formState.form.topP"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                :precision="2"
+                controls-position="right"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item prop="maxTokens">
+              <template #label>
+                <span>{{ t('business.agent.maxTokens') }}</span>
+                <el-tooltip :content="t('business.agent.maxTokensTip')" placement="top">
+                  <el-icon style="margin-left: 4px; vertical-align: middle; cursor: pointer"><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </template>
+              <el-input-number
+                v-model="formState.form.maxTokens"
+                :min="1"
+                :max="131072"
+                :step="128"
+                controls-position="right"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
         <div class="dialog-footer">
@@ -257,6 +320,9 @@ function reset() {
     mcpIds: [],
     skillIds: [],
     memoryStatus: 0,
+    temperature: undefined,
+    topP: undefined,
+    maxTokens: undefined,
     publishStatus: 0,
     uuid: undefined
   }
