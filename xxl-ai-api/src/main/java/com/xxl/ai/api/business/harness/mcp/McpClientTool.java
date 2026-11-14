@@ -16,11 +16,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -238,15 +240,61 @@ public class McpClientTool {
         if (config.command == null || config.command.isEmpty()) {
             return null;
         }
-        ServerParameters.Builder params = ServerParameters.builder(config.command);
-        if (config.args != null && !config.args.isEmpty()) {
-            params.args(config.args);
-        }
-        if (config.env != null && !config.env.isEmpty()) {
-            params.env(config.env);
-        }
+        ServerParameters params = buildStdioParameters(config.command, config.args, config.env, isWindowsOs());
         McpJsonMapper jsonMapper = McpJsonDefaults.getMapper();
-        return new StdioClientTransport(params.build(), jsonMapper);
+        return new StdioClientTransport(params, jsonMapper);
+    }
+
+    /**
+     * 构建本地 stdio 进程启动参数（含 Windows 平台兼容适配）
+     */
+    static ServerParameters buildStdioParameters(String command, List<String> rawArgs, Map<String, String> env, boolean windows) {
+        String resolvedCommand = command;
+        List<String> args = rawArgs != null ? new ArrayList<>(rawArgs) : new ArrayList<>();
+
+        if (windows) {
+            // 1、将类 Unix 常见临时目录 /tmp 自动映射为当前系统临时目录
+            String tmpDir = null;
+            for (int i = 0; i < args.size(); i++) {
+                String arg = args.get(i);
+                if ("/tmp".equals(arg) || "/tmp/".equals(arg)) {
+                    if (tmpDir == null) {
+                        tmpDir = new File(System.getProperty("java.io.tmpdir")).getAbsolutePath();
+                    }
+                    args.set(i, tmpDir);
+                    logger.info("Windows 平台将 MCP 路径 /tmp 自动转换为: {}", tmpDir);
+                }
+            }
+
+            // 2、通过 cmd.exe /c 包装批处理与包管理脚本命令（解决 ProcessBuilder 无法直接拉起 .cmd/.bat 的问题）
+            String lower = resolvedCommand.toLowerCase(Locale.ROOT);
+            boolean isCmdShim = lower.equals("npx") || lower.equals("npm") || lower.equals("pnpm") || lower.equals("yarn")
+                    || lower.endsWith(".cmd") || lower.endsWith(".bat");
+            boolean alreadyCmd = lower.equals("cmd") || lower.equals("cmd.exe")
+                    || lower.endsWith("\\cmd.exe") || lower.endsWith("/cmd.exe");
+            if (isCmdShim && !alreadyCmd) {
+                args.add(0, resolvedCommand);
+                args.add(0, "/c");
+                resolvedCommand = "cmd.exe";
+            }
+        }
+
+        ServerParameters.Builder params = ServerParameters.builder(resolvedCommand);
+        if (!args.isEmpty()) {
+            params.args(args);
+        }
+        if (env != null && !env.isEmpty()) {
+            params.env(env);
+        }
+        return params.build();
+    }
+
+    /**
+     * 判断当前运行环境是否为 Windows
+     */
+    private static boolean isWindowsOs() {
+        String osName = System.getProperty("os.name");
+        return osName != null && osName.toLowerCase(Locale.ROOT).contains("win");
     }
 
     /**
