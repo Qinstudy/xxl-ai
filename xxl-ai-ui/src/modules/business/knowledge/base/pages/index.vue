@@ -136,6 +136,18 @@
               <el-input-number v-model="formState.form.topK" :min="1" :max="20" :step="1" style="width: 100%" />
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item :label="t('business.knowledge.similarityThreshold')" prop="similarityThreshold">
+              <el-input-number
+                v-model="formState.form.similarityThreshold"
+                :min="0"
+                :max="1"
+                :step="0.05"
+                :precision="2"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
         </el-row>
       </el-form>
       <template #footer>
@@ -225,6 +237,7 @@ function reset() {
     chunkSize: 500,
     chunkOverlap: 50,
     topK: 5,
+    similarityThreshold: 0.40,
     status: 0
   }
   embedModelOptions.value = []
@@ -257,6 +270,9 @@ function handleUpdate(row: any) {
   if (!current) return
   loadSupplierOptions()
   formState.value.form = { ...current }
+  if (formState.value.form.similarityThreshold == null) {
+    formState.value.form.similarityThreshold = 0.40
+  }
   // 回显选中供应商的嵌入模型
   if (current.embedSupplierId) {
     listModelBySupplier(current.embedSupplierId).then((response) => {

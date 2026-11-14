@@ -124,6 +124,8 @@ public class ChatStreamTool implements SmartLifecycle {
     private RagTool ragTool;
     @Resource
     private MemoryTool memoryTool;
+    @Resource
+    private ChatContextWindowTool chatContextWindowTool;
 
     /** worker 线程数（单节点并发生成数） */
     @Value("${xxl-ai.chat.worker.count}")
@@ -807,15 +809,19 @@ public class ChatStreamTool implements SmartLifecycle {
         Object[] tools = buildObservableTools(agent, shellTracker, traceCollector,
                 toolJson -> appendResult(msgId, EVENT_TOOL, toolJson));
 
-        // 2.5、显式 RAG 知识库检索与引用卡片下发（[FEAT-003]）：
+        // 2.5、显式 RAG 知识库检索与引用卡片下发（[FEAT-003] / [CTX-002]）：
         List<String> degradeNotices = new ArrayList<>();
         List<TraceCollector.RagReference> references = ragTool.retrieveForChat(
                 agent.getSpaceId(), splitIds(agent.getKbIds()), content, degradeNotices, traceCollector);
         if (!references.isEmpty()) {
             traceCollector.addReferences(references);
-            systemPrompt = ragTool.injectContextPrompt(systemPrompt, references);
             appendResult(msgId, EVENT_REFERENCE, traceCollector.toReferencesJson());
         }
+        // [CTX-002] 遵循「静态前置、动态后置」：systemPrompt 保持稳定（Agent 指令 + 记忆），动态 RAG 切片拼入当前 UserMessage
+        String contextualQuestion = ragTool.buildContextualQuestion(content, references);
+
+        // 2.6、历史上下文 Token 预算评估与滑动窗口裁剪（[CTX-001]）：
+        chatContextWindowTool.pruneHistory(roleList, contentList, systemPrompt, contextualQuestion, traceCollector);
 
         StringBuilder noticeText = new StringBuilder();
         for (String notice : degradeNotices) {
@@ -831,7 +837,7 @@ public class ChatStreamTool implements SmartLifecycle {
                 systemPrompt,
                 roleList,
                 contentList,
-                content,
+                contextualQuestion,
                 tools,
                 Collections.emptyList(),
                 "xxl-ai-session-" + sessionId,

@@ -75,6 +75,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         if (knowledgeBase.getTopK() <= 0) {
             knowledgeBase.setTopK(5);
         }
+        if (knowledgeBase.getSimilarityThreshold() < 0 || knowledgeBase.getSimilarityThreshold() > 1.0) {
+            knowledgeBase.setSimilarityThreshold(0.40);
+        }
         knowledgeBase.setSpaceId(spaceId);
         knowledgeBaseMapper.insert(knowledgeBase);
         return Response.ofSuccess();
@@ -116,6 +119,9 @@ public class KnowledgeBaseServiceImpl implements KnowledgeBaseService {
         }
         if (knowledgeBase.getEmbedSupplierId() == 0 || knowledgeBase.getEmbedModelId() == 0) {
             return Response.ofFail("请配置向量化供应商与模型");
+        }
+        if (knowledgeBase.getSimilarityThreshold() < 0 || knowledgeBase.getSimilarityThreshold() > 1.0) {
+            knowledgeBase.setSimilarityThreshold(0.40);
         }
         KnowledgeBase oldDb = knowledgeBaseMapper.load(knowledgeBase.getId());
         int ret = knowledgeBaseMapper.update(knowledgeBase);

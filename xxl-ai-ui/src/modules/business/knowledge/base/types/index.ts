@@ -21,6 +21,8 @@ export interface KnowledgeBase {
   chunkOverlap?: number
   /** 检索数量 */
   topK?: number
+  /** 相似度阈值 (0.00-1.00，默认 0.40) */
+  similarityThreshold?: number
   /** 状态：0-正常、1-停用 */
   status?: number
   addTime?: string

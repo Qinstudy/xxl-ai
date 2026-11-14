@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS `xxl_ai_knowledge_base` (
     `chunk_size`          INT             NOT NULL DEFAULT 500    COMMENT '分片大小',
     `chunk_overlap`       INT             NOT NULL DEFAULT 50     COMMENT '分片重叠',
     `top_k`               INT             NOT NULL DEFAULT 5      COMMENT '检索数量',
+    `similarity_threshold` DECIMAL(4, 2) NOT NULL DEFAULT 0.40 COMMENT '相似度阈值 (0.00-1.00，默认 0.40)',
     `status`              TINYINT         NOT NULL DEFAULT 0      COMMENT '状态：0-正常、1-停用',
     `add_time`            DATETIME        NOT NULL                COMMENT '新增时间',
     `update_time`         DATETIME        NOT NULL                COMMENT '更新时间',
@@ -339,9 +340,9 @@ VALUES
 
 
 -- 8、预设知识库与知识文档（RAG 测试数据：《三体》主题，嵌入模型使用本地 Ollama qwen3-embedding，开箱即可向量化/检索）
-INSERT INTO `xxl_ai_knowledge_base` (`id`, `space_id`, `name`, `description`, `embed_supplier_id`, `embed_model_id`, `chunk_size`, `chunk_overlap`, `top_k`, `status`, `add_time`, `update_time`)
+INSERT INTO `xxl_ai_knowledge_base` (`id`, `space_id`, `name`, `description`, `embed_supplier_id`, `embed_model_id`, `chunk_size`, `chunk_overlap`, `top_k`, `similarity_threshold`, `status`, `add_time`, `update_time`)
 VALUES
-    (1, 1, '三体知识库', '刘慈欣《三体》系列知识库：主要人物、核心设定、关键情节，作为 RAG 知识问答联调用例', 2, 5, 500, 50, 5, 0, NOW(), NOW());
+    (1, 1, '三体知识库', '刘慈欣《三体》系列知识库：主要人物、核心设定、关键情节，作为 RAG 知识问答联调用例', 2, 5, 500, 50, 5, 0.40, 0, NOW(), NOW());
 
 INSERT INTO `xxl_ai_knowledge_doc` (`id`, `space_id`, `base_id`, `name`, `content`, `chunk_count`, `status`, `add_time`, `update_time`)
 VALUES

@@ -391,6 +391,8 @@
       "chunkSize": "分片大小",
       "chunkOverlap": "分片重叠",
       "topK": "检索数量(topK)",
+      "similarityThreshold": "相似度阈值",
+      "similarityThresholdTip": "检索过滤阈值 (0.00-1.00，默认 0.40；设为 0 表示不过滤)",
       "kb": "知识库",
       "embedSupplier": "向量化供应商",
       "embedModel": "向量化模型",

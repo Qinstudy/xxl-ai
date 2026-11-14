@@ -16,6 +16,7 @@ public class KnowledgeBaseDTO {
     private int chunkSize;          /* 分片大小 */
     private int chunkOverlap;       /* 分片重叠 */
     private int topK;               /* 检索数量 */
+    private Double similarityThreshold; /* 相似度阈值 (0.00-1.00，默认 0.40) */
     private int status;             /* 状态：0-正常、1-停用 */
     private String addTime;         /* 新增时间（格式化字符串） */
     private String updateTime;      /* 更新时间（格式化字符串） */
@@ -90,6 +91,14 @@ public class KnowledgeBaseDTO {
 
     public void setTopK(int topK) {
         this.topK = topK;
+    }
+
+    public Double getSimilarityThreshold() {
+        return similarityThreshold;
+    }
+
+    public void setSimilarityThreshold(Double similarityThreshold) {
+        this.similarityThreshold = similarityThreshold;
     }
 
     public int getStatus() {

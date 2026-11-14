@@ -391,6 +391,8 @@
       "chunkSize": "Chunk Size",
       "chunkOverlap": "Chunk Overlap",
       "topK": "Retrieval topK",
+      "similarityThreshold": "Similarity Threshold",
+      "similarityThresholdTip": "Retrieval filtering threshold (0.00-1.00, default 0.40; 0 means no filter)",
       "kb": "Knowledge Base",
       "embedSupplier": "Embedding Supplier",
       "embedModel": "Embedding Model",
