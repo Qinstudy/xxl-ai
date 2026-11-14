@@ -80,8 +80,8 @@ async function loadExecution(id: number) {
         }
       }
     }
-  } catch (err: any) {
-    modal.msgError(err.message || t('business.workflow.loadExecutionFailed'))
+  } catch {
+    /* 错误提示已由 request.ts 响应拦截器统一弹出，避免重复弹窗 */
   }
 }
 
@@ -117,8 +117,8 @@ async function handleRun() {
         executionResult.value = res.data
       }
     }
-  } catch (err: any) {
-    modal.msgError(err.message || t('business.workflow.runFailed'))
+  } catch {
+    /* 错误提示已由 request.ts 响应拦截器统一弹出，避免重复弹窗 */
   } finally {
     running.value = false
   }

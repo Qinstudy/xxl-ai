@@ -391,6 +391,9 @@ function getWfList() {
       wfList.value = res.data.data
       wfTotal.value = res.data.total
     })
+    .catch(() => {
+      /* 错误提示已由 request.ts 响应拦截器统一弹出 */
+    })
     .finally(() => {
       wfLoading.value = false
     })
@@ -422,18 +425,20 @@ function handleAddWorkflow() {
 }
 
 function handleEditWorkflow(row: Workflow) {
-  loadWorkflow(row.id!).then((res) => {
-    wfForm.value = { ...res.data }
-    selectedTemplate.value = ''
-    try {
-      wfForm.value.graphJson = JSON.stringify(JSON.parse(res.data.graphJson), null, 2)
-    } catch {
-      wfForm.value.graphJson = res.data.graphJson
-    }
-    wfDialogTitle.value = t('business.workflow.editTitle')
-    wfDialogVisible.value = true
-    nextTick(() => wfFormRef.value?.clearValidate())
-  })
+  loadWorkflow(row.id!)
+    .then((res) => {
+      wfForm.value = { ...res.data }
+      selectedTemplate.value = ''
+      try {
+        wfForm.value.graphJson = JSON.stringify(JSON.parse(res.data.graphJson), null, 2)
+      } catch {
+        wfForm.value.graphJson = res.data.graphJson
+      }
+      wfDialogTitle.value = t('business.workflow.editTitle')
+      wfDialogVisible.value = true
+      nextTick(() => wfFormRef.value?.clearValidate())
+    })
+    .catch(() => {})
 }
 
 function applyTemplate(key: string) {
@@ -460,6 +465,9 @@ function submitWfForm() {
         modal.msgSuccess(t('common.saveSuccess'))
         wfDialogVisible.value = false
         getWfList()
+      })
+      .catch(() => {
+        /* 错误提示已由 request.ts 统一弹出，防止未捕获 Promise 异常污染控制台 */
       })
       .finally(() => {
         wfSubmitting.value = false
@@ -496,6 +504,7 @@ function getExecList() {
       execList.value = res.data.data
       execTotal.value = res.data.total
     })
+    .catch(() => {})
     .finally(() => {
       execLoading.value = false
     })
