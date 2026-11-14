@@ -121,7 +121,7 @@
             <div v-for="tool in traceData.toolTraces" :key="tool.callId" class="tool-trace-card">
               <div class="tool-trace-head">
                 <div class="tool-title-group">
-                  <el-tag size="small" :type="tool.toolType === 'SUBAGENT' ? 'warning' : 'info'" effect="plain">{{ tool.toolType }}</el-tag>
+                  <el-tag size="small" :type="toolTypeTagType(tool.toolType)" effect="plain">{{ tool.toolType }}</el-tag>
                   <span class="tool-name">{{ tool.toolName }}</span>
                 </div>
                 <div class="tool-status-group">
@@ -131,14 +131,40 @@
                   </el-tag>
                 </div>
               </div>
+              <!-- [FEAT-013] SubAgent 并发子任务明细标签 -->
+              <div v-if="tool.subTasks && tool.subTasks.length > 0" class="subtask-chips-bar">
+                <span class="subtask-bar-label">{{ t('business.chat.subTaskDispatchLabel') }}</span>
+                <div
+                  v-for="(sub, idx) in tool.subTasks"
+                  :key="idx + '-' + sub.agentId + '-' + sub.roleName"
+                  class="subtask-chip"
+                  :class="'is-' + (sub.status || 'RUNNING').toLowerCase()"
+                  :title="sub.detail || ''"
+                >
+                  <span class="subtask-chip-name">{{ sub.roleName }}</span>
+                  <span v-if="sub.agentId > 0" class="subtask-chip-id">#{{ sub.agentId }}</span>
+                  <span class="subtask-chip-meta">
+                    <template v-if="sub.status === 'RUNNING'">{{ t('business.chat.toolCalling') }}...</template>
+                    <template v-else-if="sub.status === 'CANCELLED'">{{ t('business.chat.subTaskStatusCancelled') }}</template>
+                    <template v-else-if="sub.status === 'ERROR'">
+                      {{ t('business.chat.toolError') }}<template v-if="sub.elapsedMs"> · {{ formatMs(sub.elapsedMs) }}</template>
+                    </template>
+                    <template v-else>{{ formatMs(sub.elapsedMs) || t('business.chat.toolSuccess') }}</template>
+                  </span>
+                </div>
+              </div>
               <div class="tool-io-section">
                 <div class="tool-io-label">{{ t('business.chat.toolInput') }}</div>
                 <pre class="tool-io-code">{{ formatJsonText(tool.arguments) }}</pre>
               </div>
-              <div class="tool-io-section" v-if="tool.resultSummary || tool.errorMsg">
+              <div class="tool-io-section" v-if="tool.errorMsg">
+                <div class="tool-io-label tool-io-label-error">{{ t('business.chat.toolErrorMsg') }}</div>
+                <pre class="tool-io-code code-error">{{ tool.errorMsg }}</pre>
+              </div>
+              <div class="tool-io-section" v-if="tool.resultSummary">
                 <div class="tool-io-label">{{ t('business.chat.toolOutput') }}</div>
-                <pre class="tool-io-code" :class="{ 'code-error': tool.status === 'ERROR' }">{{
-                  tool.errorMsg || tool.resultSummary
+                <pre class="tool-io-code" :class="{ 'code-error': tool.status === 'ERROR' && !tool.errorMsg }">{{
+                  tool.resultSummary
                 }}</pre>
               </div>
             </div>
@@ -236,6 +262,11 @@ function stateTagType(state?: string): 'success' | 'warning' | 'danger' | 'info'
   return 'info'
 }
 
+function toolTypeTagType(toolType?: string): 'warning' | 'info' {
+  if (toolType === 'SUBAGENT' || toolType === 'SUBAGENT_MCP') return 'warning'
+  return 'info'
+}
+
 function toolStatusTagType(status?: string): 'success' | 'warning' | 'danger' | 'info' {
   if (status === 'SUCCESS') return 'success'
   if (status === 'RUNNING') return 'warning'
@@ -247,6 +278,7 @@ function toolStatusLabel(status?: string): string {
   if (status === 'RUNNING') return t('business.chat.toolCalling')
   if (status === 'SUCCESS') return t('business.chat.toolSuccess')
   if (status === 'ERROR') return t('business.chat.toolError')
+  if (status === 'CANCELLED') return t('business.chat.subTaskStatusCancelled')
   return status || '-'
 }
 
@@ -520,6 +552,69 @@ function formatJsonText(raw?: string): string {
   color: var(--el-text-color-secondary);
 }
 
+.subtask-chips-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  background: var(--el-fill-color-light);
+}
+
+.subtask-bar-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--el-text-color-secondary);
+  margin-right: 2px;
+}
+
+.subtask-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  border: 1px solid #d1fae5;
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.subtask-chip.is-running {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.subtask-chip.is-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.subtask-chip.is-cancelled {
+  border-color: var(--el-border-color);
+  background: var(--el-fill-color);
+  color: var(--el-text-color-secondary);
+}
+
+.subtask-chip-name {
+  font-weight: 600;
+}
+
+.subtask-chip-id {
+  font-size: 10.5px;
+  font-family: monospace;
+  opacity: 0.75;
+}
+
+.subtask-chip-meta {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
 .tool-io-section {
   margin-top: 8px;
 }
@@ -529,6 +624,10 @@ function formatJsonText(raw?: string): string {
   font-weight: 600;
   color: var(--el-text-color-secondary);
   margin-bottom: 4px;
+}
+
+.tool-io-label-error {
+  color: #f56c6c;
 }
 
 .tool-io-code {

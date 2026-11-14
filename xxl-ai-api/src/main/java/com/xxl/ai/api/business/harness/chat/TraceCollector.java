@@ -103,12 +103,35 @@ public class TraceCollector {
         if (span == null) {
             return;
         }
-        long end = System.currentTimeMillis();
-        span.setEndTime(end);
-        span.setElapsedMs(Math.max(0L, end - span.getStartTime()));
-        span.setStatus(status);
-        if (StringTool.isNotBlank(detail)) {
-            span.setDetail(truncate(detail, 300));
+        synchronized (span) {
+            long end = System.currentTimeMillis();
+            span.setEndTime(end);
+            span.setElapsedMs(Math.max(0L, end - span.getStartTime()));
+            span.setStatus(status);
+            if (StringTool.isNotBlank(detail)) {
+                span.setDetail(truncate(detail, 300));
+            }
+        }
+    }
+
+    /**
+     * 幂等结束仍在运行中的 Span（用于超时与并发取消场景防悬挂 RUNNING）
+     */
+    public void finishSpanIfRunning(TraceSpan span, String status, String detail) {
+        if (span == null) {
+            return;
+        }
+        synchronized (span) {
+            if (!"RUNNING".equals(span.getStatus())) {
+                return;
+            }
+            long end = System.currentTimeMillis();
+            span.setEndTime(end);
+            span.setElapsedMs(Math.max(0L, end - span.getStartTime()));
+            span.setStatus(status);
+            if (StringTool.isNotBlank(detail)) {
+                span.setDetail(truncate(detail, 300));
+            }
         }
     }
 
@@ -134,12 +157,18 @@ public class TraceCollector {
         if (trace == null) {
             return;
         }
-        long end = System.currentTimeMillis();
-        trace.setEndTime(end);
-        trace.setElapsedMs(Math.max(0L, end - trace.getStartTime()));
-        trace.setStatus(status);
-        trace.setResultSummary(truncate(resultSummary, MAX_SUMMARY_CHARS));
-        trace.setErrorMsg(truncate(errorMsg, 500));
+        synchronized (trace) {
+            // 若 Run 已终止（CANCELLED），禁止后台迟到收尾覆盖已取消态
+            if ("CANCELLED".equals(trace.getStatus())) {
+                return;
+            }
+            long end = System.currentTimeMillis();
+            trace.setEndTime(end);
+            trace.setElapsedMs(Math.max(0L, end - trace.getStartTime()));
+            trace.setStatus(status);
+            trace.setResultSummary(truncate(resultSummary, MAX_SUMMARY_CHARS));
+            trace.setErrorMsg(truncate(errorMsg, 500));
+        }
     }
 
     /**
@@ -246,6 +275,43 @@ public class TraceCollector {
         this.runMeta.setTotalElapsedMs(Math.max(0L, end - this.runMeta.getStartTime()));
         if (StringTool.isNotBlank(errorMsg)) {
             this.runMeta.setErrorMsg(truncate(errorMsg, 500));
+        }
+        // 兜底闭合未完成即终止的异步子 Span，避免瀑布图残留 RUNNING 状态
+        String fallbackSpanStatus = "CANCELLED".equals(finalState) ? "CANCELLED" : "ERROR";
+        String fallbackDetail = "CANCELLED".equals(finalState) ? "会话已终止" : "任务未在结束前完成";
+        synchronized (spans) {
+            for (TraceSpan span : spans) {
+                finishSpanIfRunning(span, fallbackSpanStatus, fallbackDetail);
+            }
+        }
+        // 兜底闭合未完成即终止的工具调用与子任务明细，避免证据链胶囊残留 RUNNING 状态
+        synchronized (toolTraces) {
+            for (ToolTrace toolTrace : toolTraces) {
+                if (toolTrace == null) {
+                    continue;
+                }
+                synchronized (toolTrace) {
+                    if ("RUNNING".equals(toolTrace.getStatus())) {
+                        toolTrace.setEndTime(end);
+                        toolTrace.setElapsedMs(Math.max(0L, end - toolTrace.getStartTime()));
+                        toolTrace.setStatus(fallbackSpanStatus);
+                        if (StringTool.isBlank(toolTrace.getErrorMsg())) {
+                            toolTrace.setErrorMsg(fallbackDetail);
+                        }
+                    }
+                    if (toolTrace.getSubTasks() != null) {
+                        for (SubTaskTrace subTask : toolTrace.getSubTasks()) {
+                            if (subTask != null && "RUNNING".equals(subTask.getStatus())) {
+                                subTask.setStatus(fallbackSpanStatus);
+                                subTask.setElapsedMs(Math.max(0L, end - toolTrace.getStartTime()));
+                                if (StringTool.isBlank(subTask.getDetail())) {
+                                    subTask.setDetail(fallbackDetail);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -647,16 +713,17 @@ public class TraceCollector {
      * 工具调用证据链记录
      */
     public static class ToolTrace {
-        private String callId;          /* 调用唯一标识 */
-        private String toolName;        /* 工具名称 */
-        private String toolType;        /* 工具类型：MCP / SKILL / EXEC */
-        private String arguments;       /* 入参 JSON（截断保护） */
-        private String resultSummary;   /* 返回结果摘要（截断保护） */
-        private String status;          /* 状态：RUNNING / SUCCESS / ERROR */
-        private String errorMsg;        /* 异常信息（可空） */
-        private long startTime;         /* 开始时间戳(ms) */
-        private long endTime;           /* 结束时间戳(ms) */
-        private long elapsedMs;         /* 耗时(ms) */
+        private String callId;                  /* 调用唯一标识 */
+        private String toolName;                /* 工具名称 */
+        private String toolType;                /* 工具类型：MCP / SKILL / EXEC / SUBAGENT / SUBAGENT_MCP */
+        private String arguments;               /* 入参 JSON（截断保护） */
+        private String resultSummary;           /* 返回结果摘要（截断保护） */
+        private String status;                  /* 状态：RUNNING / SUCCESS / ERROR */
+        private String errorMsg;                /* 异常信息（可空） */
+        private long startTime;                 /* 开始时间戳(ms) */
+        private long endTime;                   /* 结束时间戳(ms) */
+        private long elapsedMs;                 /* 耗时(ms) */
+        private List<SubTaskTrace> subTasks;    /* SubAgent 并行子任务明细（可空） */
 
         public String getCallId() {
             return callId;
@@ -736,6 +803,74 @@ public class TraceCollector {
 
         public void setElapsedMs(long elapsedMs) {
             this.elapsedMs = elapsedMs;
+        }
+
+        public List<SubTaskTrace> getSubTasks() {
+            return subTasks;
+        }
+
+        public void setSubTasks(List<SubTaskTrace> subTasks) {
+            this.subTasks = subTasks;
+        }
+    }
+
+    /**
+     * SubAgent 并行委派子任务追踪明细（[FEAT-013]）
+     */
+    public static class SubTaskTrace {
+        private long agentId;           /* 预置子智能体ID（动态专家为0） */
+        private String roleName;        /* 专家角色名称 */
+        private String mode;            /* 模式：SPECIALIST / DECOMPOSE */
+        private String status;          /* 状态：RUNNING / SUCCESS / ERROR / CANCELLED */
+        private long elapsedMs;         /* 耗时(ms) */
+        private String detail;          /* 简要状态说明（可空） */
+
+        public long getAgentId() {
+            return agentId;
+        }
+
+        public void setAgentId(long agentId) {
+            this.agentId = agentId;
+        }
+
+        public String getRoleName() {
+            return roleName;
+        }
+
+        public void setRoleName(String roleName) {
+            this.roleName = roleName;
+        }
+
+        public String getMode() {
+            return mode;
+        }
+
+        public void setMode(String mode) {
+            this.mode = mode;
+        }
+
+        public String getStatus() {
+            return status;
+        }
+
+        public void setStatus(String status) {
+            this.status = status;
+        }
+
+        public long getElapsedMs() {
+            return elapsedMs;
+        }
+
+        public void setElapsedMs(long elapsedMs) {
+            this.elapsedMs = elapsedMs;
+        }
+
+        public String getDetail() {
+            return detail;
+        }
+
+        public void setDetail(String detail) {
+            this.detail = detail;
         }
     }
 

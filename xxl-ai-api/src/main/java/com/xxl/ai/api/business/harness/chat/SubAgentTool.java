@@ -19,13 +19,16 @@ import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.function.FunctionToolCallback;
 import org.springframework.beans.factory.DisposableBean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 
 /**
@@ -54,8 +57,19 @@ public class SubAgentTool implements DisposableBean {
 
     /** 单批次最大并发子任务数 */
     public static final int MAX_PARALLEL_SUBTASKS = 4;
-    /** 单个子任务超时时间（秒） */
-    public static final int SUBTASK_TIMEOUT_SECONDS = 60;
+    /** 单个子任务默认超时时间（秒，对齐流式模型长输出耗时） */
+    public static final int SUBTASK_TIMEOUT_SECONDS = 180;
+
+    /** 单个子任务硬超时时间（秒，支持通过 xxl-ai.subagent.timeout-seconds 配置） */
+    @Value("${xxl-ai.subagent.timeout-seconds:180}")
+    private int subtaskTimeoutSeconds = SUBTASK_TIMEOUT_SECONDS;
+
+    /**
+     * 获取当前生效的子任务超时秒数（非法配置回退默认值）
+     */
+    public int getSubtaskTimeoutSeconds() {
+        return subtaskTimeoutSeconds > 0 ? subtaskTimeoutSeconds : SUBTASK_TIMEOUT_SECONDS;
+    }
 
     /** 预置专家批量委派工具 Schema */
     private static final String DELEGATE_SPECIALIST_SCHEMA = """
@@ -327,42 +341,51 @@ public class SubAgentTool implements DisposableBean {
                     "开始并行执行混合协同任务批次（共 " + boundedTasks.size() + " 项任务）");
         }
 
-        List<CompletableFuture<SubTaskResult>> futures = new ArrayList<>();
+        List<SubTaskSpec> specs = new ArrayList<>();
         for (HybridTaskInput taskInput : boundedTasks) {
-            futures.add(CompletableFuture.supplyAsync(() -> {
-                if (cancelled != null && cancelled.get()) {
-                    return new SubTaskResult(0L, resolveRoleName(taskInput, specialistMap),
-                            "[任务已终止] 用户已终止对话生成。", 0L, false);
+            // 运行时静态专家优先路由仲裁（Specialist-First Arbiter）
+            SpecialistMatch match = matchExistingSpecialist(taskInput, specialistMap);
+            if (match != null) {
+                Agent targetAgent = match.getAgent();
+                if (match.isHijacked() && traceCollector != null) {
+                    traceCollector.addLog("WARN", "subagent",
+                            "[路由纠偏] 动态角色 [" + taskInput.getRoleName() + "] 与预置专家 ["
+                                    + targetAgent.getName() + " (ID=" + targetAgent.getId() + ")] 职责重叠，已自动重定向至预置专家以启用其专属知识库与工具");
                 }
+                specs.add(new SubTaskSpec(
+                        targetAgent.getId(),
+                        targetAgent.getName(),
+                        formatSpecialistTitle(targetAgent, targetAgent.getId()),
+                        "SPECIALIST",
+                        "[子智能体执行异常] ",
+                        (subCancelled, spanRef) -> executeSingleSpecialist(
+                                parentAgent, targetAgent, taskInput.getTask(),
+                                traceCollector, cancelled, subCancelled, spanRef, eventConsumer)
+                ));
+                continue;
+            }
 
-                // 运行时静态专家优先路由仲裁（Specialist-First Arbiter）
-                SpecialistMatch match = matchExistingSpecialist(taskInput, specialistMap);
-                if (match != null) {
-                    Agent targetAgent = match.getAgent();
-                    if (match.isHijacked() && traceCollector != null) {
-                        traceCollector.addLog("WARN", "subagent",
-                                "[路由纠偏] 动态角色 [" + taskInput.getRoleName() + "] 与预置专家 ["
-                                        + targetAgent.getName() + " (ID=" + targetAgent.getId() + ")] 职责重叠，已自动重定向至预置专家以启用其专属知识库与工具");
-                    }
-                    return executeSingleSpecialist(parentAgent, targetAgent, taskInput.getTask(), traceCollector, cancelled, eventConsumer);
-                }
-
-                // 确属空白领域，执行动态瞬态专家
-                DecomposeTaskInput decInput = new DecomposeTaskInput(
-                        taskInput.getRoleName(),
-                        taskInput.getSystemInstruction(),
-                        taskInput.getTask(),
-                        taskInput.getEnableRag()
-                );
-                return executeSingleDecompose(parentAgent, decInput, traceCollector, cancelled, eventConsumer);
-            }, subAgentExecutor).orTimeout(SUBTASK_TIMEOUT_SECONDS, TimeUnit.SECONDS).exceptionally(ex -> {
-                String errorMsg = ex instanceof TimeoutException ? "任务执行超时（" + SUBTASK_TIMEOUT_SECONDS + "s）" : ex.getMessage();
-                return new SubTaskResult(0L, resolveRoleName(taskInput, specialistMap),
-                        "[子智能体执行异常] " + errorMsg, 0L, false);
-            }));
+            // 确属空白领域，执行动态瞬态专家
+            String roleName = StringTool.isNotBlank(taskInput.getRoleName())
+                    ? taskInput.getRoleName().trim() : "动态业务专家";
+            DecomposeTaskInput decInput = new DecomposeTaskInput(
+                    roleName,
+                    taskInput.getSystemInstruction(),
+                    taskInput.getTask(),
+                    taskInput.getEnableRag()
+            );
+            specs.add(new SubTaskSpec(
+                    0L,
+                    roleName,
+                    roleName,
+                    "DECOMPOSE",
+                    "[瞬态专家执行异常] ",
+                    (subCancelled, spanRef) -> executeSingleDecompose(
+                            parentAgent, decInput, traceCollector, cancelled, subCancelled, spanRef, eventConsumer)
+            ));
         }
 
-        return awaitAndFormatResults(futures, traceCollector);
+        return dispatchSubTaskBatch(specs, traceCollector, cancelled, eventConsumer);
     }
 
     /**
@@ -447,15 +470,7 @@ public class SubAgentTool implements DisposableBean {
         return (2.0 * intersection) / (set1.size() + set2.size());
     }
 
-    private static String resolveRoleName(HybridTaskInput input, Map<Long, Agent> specialistMap) {
-        if (input.getAgentId() != null && specialistMap.containsKey(input.getAgentId())) {
-            return specialistMap.get(input.getAgentId()).getName();
-        }
-        if (StringTool.isNotBlank(input.getRoleName())) {
-            return input.getRoleName();
-        }
-        return "协同子任务";
-    }
+
 
     // ==================== 模式 A：预置专家批量委派 ====================
 
@@ -515,27 +530,36 @@ public class SubAgentTool implements DisposableBean {
                     "开始并行委派预置专家任务（共 " + boundedTasks.size() + " 项）");
         }
 
-        List<CompletableFuture<SubTaskResult>> futures = new ArrayList<>();
+        List<SubTaskSpec> specs = new ArrayList<>();
         for (SpecialistTaskInput taskInput : boundedTasks) {
-            futures.add(CompletableFuture.supplyAsync(() -> {
-                if (cancelled != null && cancelled.get()) {
-                    return new SubTaskResult(taskInput.getAgentId(), "子智能体 (ID=" + taskInput.getAgentId() + ")",
-                            "[任务已终止] 用户已终止对话生成。", 0L, false);
-                }
-                Agent subAgent = specialistMap.get(taskInput.getAgentId());
-                if (subAgent == null) {
-                    return new SubTaskResult(taskInput.getAgentId(), "未知子智能体",
-                            "[委派失败] 子智能体 (ID=" + taskInput.getAgentId() + ") 未在主 Agent 绑定名录中或未发布。", 0L, false);
-                }
-                return executeSingleSpecialist(parentAgent, subAgent, taskInput.getTask(), traceCollector, cancelled, eventConsumer);
-            }, subAgentExecutor).orTimeout(SUBTASK_TIMEOUT_SECONDS, TimeUnit.SECONDS).exceptionally(ex -> {
-                String errorMsg = ex instanceof TimeoutException ? "任务执行超时（" + SUBTASK_TIMEOUT_SECONDS + "s）" : ex.getMessage();
-                return new SubTaskResult(taskInput.getAgentId(), "子智能体 (ID=" + taskInput.getAgentId() + ")",
-                        "[子智能体执行异常] " + errorMsg, 0L, false);
-            }));
+            Agent subAgent = specialistMap.get(taskInput.getAgentId());
+            if (subAgent == null) {
+                String missingTitle = "未知子智能体 (ID=" + taskInput.getAgentId() + ")";
+                specs.add(new SubTaskSpec(
+                        taskInput.getAgentId(),
+                        missingTitle,
+                        missingTitle,
+                        "SPECIALIST",
+                        "[委派失败] ",
+                        (subCancelled, spanRef) -> new SubTaskResult(taskInput.getAgentId(), missingTitle,
+                                "[委派失败] 子智能体 (ID=" + taskInput.getAgentId() + ") 未在主 Agent 绑定名录中或未发布。",
+                                0L, false)
+                ));
+                continue;
+            }
+            specs.add(new SubTaskSpec(
+                    subAgent.getId(),
+                    subAgent.getName(),
+                    formatSpecialistTitle(subAgent, subAgent.getId()),
+                    "SPECIALIST",
+                    "[子智能体执行异常] ",
+                    (subCancelled, spanRef) -> executeSingleSpecialist(
+                            parentAgent, subAgent, taskInput.getTask(),
+                            traceCollector, cancelled, subCancelled, spanRef, eventConsumer)
+            ));
         }
 
-        return awaitAndFormatResults(futures, traceCollector);
+        return dispatchSubTaskBatch(specs, traceCollector, cancelled, eventConsumer);
     }
 
     /**
@@ -545,14 +569,20 @@ public class SubAgentTool implements DisposableBean {
                                                   Agent subAgent,
                                                   String task,
                                                   TraceCollector traceCollector,
-                                                  AtomicBoolean cancelled,
+                                                  AtomicBoolean parentCancelled,
+                                                  BooleanSupplier subCancelled,
+                                                  AtomicReference<TraceCollector.TraceSpan> spanRef,
                                                   BiConsumer<String, String> eventConsumer) {
         long startTime = System.currentTimeMillis();
         String roleName = subAgent.getName();
+        String displayTitle = formatSpecialistTitle(subAgent, subAgent.getId());
 
         TraceCollector.TraceSpan span = traceCollector != null
                 ? traceCollector.startSpan("subagent", "子智能体 [" + roleName + "] 执行")
                 : null;
+        if (spanRef != null) {
+            spanRef.set(span);
+        }
 
         if (traceCollector != null) {
             traceCollector.addLog("INFO", "subagent",
@@ -560,11 +590,15 @@ public class SubAgentTool implements DisposableBean {
         }
 
         try {
-            if (cancelled != null && cancelled.get()) {
+            if (isSubCancelled(parentCancelled, subCancelled)) {
+                boolean byParent = parentCancelled != null && parentCancelled.get();
                 if (traceCollector != null && span != null) {
-                    traceCollector.finishSpan(span, "CANCELLED", "任务已由用户主动取消");
+                    traceCollector.finishSpanIfRunning(span, byParent ? "CANCELLED" : "ERROR",
+                            byParent ? "任务已由用户主动取消" : "任务已超时中断");
                 }
-                return new SubTaskResult(subAgent.getId(), roleName, "[任务已终止] 用户主动终止生成。", System.currentTimeMillis() - startTime, false);
+                return new SubTaskResult(subAgent.getId(), displayTitle,
+                        byParent ? "[任务已终止] 用户主动终止生成。" : "[子智能体执行异常] 任务已超时中断",
+                        System.currentTimeMillis() - startTime, false, byParent);
             }
 
             // 1、加载子智能体对话模型运行时
@@ -573,9 +607,9 @@ public class SubAgentTool implements DisposableBean {
             if (!runtimeResp.isSuccess() || runtimeResp.getData() == null) {
                 String err = "无法加载子智能体对话模型：" + runtimeResp.getMsg();
                 if (traceCollector != null && span != null) {
-                    traceCollector.finishSpan(span, "ERROR", err);
+                    traceCollector.finishSpanIfRunning(span, "ERROR", err);
                 }
-                return new SubTaskResult(subAgent.getId(), roleName, "[委派失败] " + err, System.currentTimeMillis() - startTime, false);
+                return new SubTaskResult(subAgent.getId(), displayTitle, "[委派失败] " + err, System.currentTimeMillis() - startTime, false);
             }
             SupplierRuntime runtime = runtimeResp.getData();
 
@@ -605,6 +639,16 @@ public class SubAgentTool implements DisposableBean {
                         eventConsumer.accept(ChatStreamTool.EVENT_REFERENCE, traceCollector.toReferencesJson());
                     }
                 }
+            }
+            if (isSubCancelled(parentCancelled, subCancelled)) {
+                boolean byParent = parentCancelled != null && parentCancelled.get();
+                if (traceCollector != null && span != null) {
+                    traceCollector.finishSpanIfRunning(span, byParent ? "CANCELLED" : "ERROR",
+                            byParent ? "任务已由用户主动取消" : "任务已超时中断");
+                }
+                return new SubTaskResult(subAgent.getId(), displayTitle,
+                        byParent ? "[任务已终止] 用户主动终止生成。" : "[子智能体执行异常] 任务已超时中断",
+                        System.currentTimeMillis() - startTime, false, byParent);
             }
             String contextualQuestion = ragTool.buildContextualQuestion(task, subReferences);
 
@@ -637,27 +681,32 @@ public class SubAgentTool implements DisposableBean {
                     null,
                     null,
                     traceCollector,
-                    null
+                    null,
+                    subCancelled
             );
 
             long elapsed = System.currentTimeMillis() - startTime;
             String reply = chatText != null && chatText.getContent() != null ? chatText.getContent().trim() : "";
             if (traceCollector != null && span != null) {
-                traceCollector.finishSpan(span, "SUCCESS", "耗时 " + elapsed + "ms，产出 " + reply.length() + " 字符");
+                traceCollector.finishSpanIfRunning(span, "SUCCESS", "耗时 " + elapsed + "ms，产出 " + reply.length() + " 字符");
                 traceCollector.addLog("INFO", "subagent",
                         "子智能体 [" + roleName + "] 执行完成 (" + elapsed + "ms)");
             }
-            return new SubTaskResult(subAgent.getId(), roleName, reply, elapsed, true);
+            return new SubTaskResult(subAgent.getId(), displayTitle, reply, elapsed, true);
         } catch (Exception e) {
             long elapsed = System.currentTimeMillis() - startTime;
-            logger.warn("子智能体执行异常, parentAgentId={}, subAgentId={}, err={}",
-                    parentAgent.getId(), subAgent.getId(), e.getMessage());
+            boolean byParent = parentCancelled != null && parentCancelled.get();
+            boolean aborted = byParent || isSubCancelled(parentCancelled, subCancelled) || hasCause(e, CancellationException.class) || hasCause(e, InterruptedException.class);
+            String msg = byParent ? "任务已由用户主动取消" : (aborted ? "任务已超时中断" : extractRootMessage(e));
+            logger.warn("子智能体执行异常, parentAgentId={}, subAgentId={}, aborted={}, err={}",
+                    parentAgent.getId(), subAgent.getId(), aborted, msg);
             if (traceCollector != null && span != null) {
-                traceCollector.finishSpan(span, "ERROR", e.getMessage());
-                traceCollector.addLog("ERROR", "subagent",
-                        "子智能体 [" + roleName + "] 执行失败：" + e.getMessage());
+                traceCollector.finishSpanIfRunning(span, byParent ? "CANCELLED" : "ERROR", msg);
+                traceCollector.addLog(byParent ? "WARN" : "ERROR", "subagent",
+                        "子智能体 [" + roleName + "] " + (byParent ? "已终止：" : "执行失败：") + msg);
             }
-            return new SubTaskResult(subAgent.getId(), roleName, "[子智能体处理失败] " + e.getMessage(), elapsed, false);
+            return new SubTaskResult(subAgent.getId(), displayTitle,
+                    (byParent ? "[任务已终止] " : "[子智能体处理失败] ") + msg, elapsed, false, byParent);
         }
     }
 
@@ -711,20 +760,22 @@ public class SubAgentTool implements DisposableBean {
                     "主 Agent 自适应裂变出 " + boundedTasks.size() + " 个瞬态专家并行分析");
         }
 
-        List<CompletableFuture<SubTaskResult>> futures = new ArrayList<>();
+        List<SubTaskSpec> specs = new ArrayList<>();
         for (DecomposeTaskInput taskInput : boundedTasks) {
-            futures.add(CompletableFuture.supplyAsync(() -> {
-                if (cancelled != null && cancelled.get()) {
-                    return new SubTaskResult(0L, taskInput.getRoleName(), "[任务已终止] 用户主动终止生成。", 0L, false);
-                }
-                return executeSingleDecompose(parentAgent, taskInput, traceCollector, cancelled, eventConsumer);
-            }, subAgentExecutor).orTimeout(SUBTASK_TIMEOUT_SECONDS, TimeUnit.SECONDS).exceptionally(ex -> {
-                String errorMsg = ex instanceof TimeoutException ? "任务执行超时（" + SUBTASK_TIMEOUT_SECONDS + "s）" : ex.getMessage();
-                return new SubTaskResult(0L, taskInput.getRoleName(), "[瞬态专家执行异常] " + errorMsg, 0L, false);
-            }));
+            String roleName = StringTool.isNotBlank(taskInput.getRoleName())
+                    ? taskInput.getRoleName().trim() : "动态业务专家";
+            specs.add(new SubTaskSpec(
+                    0L,
+                    roleName,
+                    roleName,
+                    "DECOMPOSE",
+                    "[瞬态专家执行异常] ",
+                    (subCancelled, spanRef) -> executeSingleDecompose(
+                            parentAgent, taskInput, traceCollector, cancelled, subCancelled, spanRef, eventConsumer)
+            ));
         }
 
-        return awaitAndFormatResults(futures, traceCollector);
+        return dispatchSubTaskBatch(specs, traceCollector, cancelled, eventConsumer);
     }
 
     /**
@@ -733,7 +784,9 @@ public class SubAgentTool implements DisposableBean {
     private SubTaskResult executeSingleDecompose(Agent parentAgent,
                                                  DecomposeTaskInput taskInput,
                                                  TraceCollector traceCollector,
-                                                 AtomicBoolean cancelled,
+                                                 AtomicBoolean parentCancelled,
+                                                 BooleanSupplier subCancelled,
+                                                 AtomicReference<TraceCollector.TraceSpan> spanRef,
                                                  BiConsumer<String, String> eventConsumer) {
         long startTime = System.currentTimeMillis();
         String roleName = StringTool.isNotBlank(taskInput.getRoleName()) ? taskInput.getRoleName().trim() : "动态业务专家";
@@ -741,6 +794,9 @@ public class SubAgentTool implements DisposableBean {
         TraceCollector.TraceSpan span = traceCollector != null
                 ? traceCollector.startSpan("subagent", "瞬态专家 [" + roleName + "] 分析")
                 : null;
+        if (spanRef != null) {
+            spanRef.set(span);
+        }
 
         if (traceCollector != null) {
             traceCollector.addLog("INFO", "subagent",
@@ -749,11 +805,15 @@ public class SubAgentTool implements DisposableBean {
         }
 
         try {
-            if (cancelled != null && cancelled.get()) {
+            if (isSubCancelled(parentCancelled, subCancelled)) {
+                boolean byParent = parentCancelled != null && parentCancelled.get();
                 if (traceCollector != null && span != null) {
-                    traceCollector.finishSpan(span, "CANCELLED", "任务已由用户主动取消");
+                    traceCollector.finishSpanIfRunning(span, byParent ? "CANCELLED" : "ERROR",
+                            byParent ? "任务已由用户主动取消" : "任务已超时中断");
                 }
-                return new SubTaskResult(0L, roleName, "[任务已终止] 用户主动终止生成。", System.currentTimeMillis() - startTime, false);
+                return new SubTaskResult(0L, roleName,
+                        byParent ? "[任务已终止] 用户主动终止生成。" : "[瞬态专家执行异常] 任务已超时中断",
+                        System.currentTimeMillis() - startTime, false, byParent);
             }
 
             // 1、继承主 Agent 的模型运行时
@@ -762,7 +822,7 @@ public class SubAgentTool implements DisposableBean {
             if (!runtimeResp.isSuccess() || runtimeResp.getData() == null) {
                 String err = "无法继承主智能体对话模型：" + runtimeResp.getMsg();
                 if (traceCollector != null && span != null) {
-                    traceCollector.finishSpan(span, "ERROR", err);
+                    traceCollector.finishSpanIfRunning(span, "ERROR", err);
                 }
                 return new SubTaskResult(0L, roleName, "[拆解执行失败] " + err, System.currentTimeMillis() - startTime, false);
             }
@@ -795,6 +855,16 @@ public class SubAgentTool implements DisposableBean {
                         eventConsumer.accept(ChatStreamTool.EVENT_REFERENCE, traceCollector.toReferencesJson());
                     }
                 }
+            }
+            if (isSubCancelled(parentCancelled, subCancelled)) {
+                boolean byParent = parentCancelled != null && parentCancelled.get();
+                if (traceCollector != null && span != null) {
+                    traceCollector.finishSpanIfRunning(span, byParent ? "CANCELLED" : "ERROR",
+                            byParent ? "任务已由用户主动取消" : "任务已超时中断");
+                }
+                return new SubTaskResult(0L, roleName,
+                        byParent ? "[任务已终止] 用户主动终止生成。" : "[瞬态专家执行异常] 任务已超时中断",
+                        System.currentTimeMillis() - startTime, false, byParent);
             }
             String contextualQuestion = ragTool.buildContextualQuestion(taskInput.getTaskPrompt(), subReferences);
 
@@ -829,68 +899,321 @@ public class SubAgentTool implements DisposableBean {
                     null,
                     null,
                     traceCollector,
-                    null
+                    null,
+                    subCancelled
             );
 
             long elapsed = System.currentTimeMillis() - startTime;
             String reply = chatText != null && chatText.getContent() != null ? chatText.getContent().trim() : "";
             if (traceCollector != null && span != null) {
-                traceCollector.finishSpan(span, "SUCCESS", "耗时 " + elapsed + "ms，产出 " + reply.length() + " 字符");
+                traceCollector.finishSpanIfRunning(span, "SUCCESS", "耗时 " + elapsed + "ms，产出 " + reply.length() + " 字符");
                 traceCollector.addLog("INFO", "subagent",
                         "瞬态专家 [" + roleName + "] 分析完成 (" + elapsed + "ms)");
             }
             return new SubTaskResult(0L, roleName, reply, elapsed, true);
         } catch (Exception e) {
             long elapsed = System.currentTimeMillis() - startTime;
-            logger.warn("瞬态专家执行异常, roleName={}, err={}", roleName, e.getMessage());
+            boolean byParent = parentCancelled != null && parentCancelled.get();
+            boolean aborted = byParent || isSubCancelled(parentCancelled, subCancelled) || hasCause(e, CancellationException.class) || hasCause(e, InterruptedException.class);
+            String msg = byParent ? "任务已由用户主动取消" : (aborted ? "任务已超时中断" : extractRootMessage(e));
+            logger.warn("瞬态专家执行异常, roleName={}, aborted={}, err={}", roleName, aborted, msg);
             if (traceCollector != null && span != null) {
-                traceCollector.finishSpan(span, "ERROR", e.getMessage());
-                traceCollector.addLog("ERROR", "subagent",
-                        "瞬态专家 [" + roleName + "] 分析失败：" + e.getMessage());
+                traceCollector.finishSpanIfRunning(span, byParent ? "CANCELLED" : "ERROR", msg);
+                traceCollector.addLog(byParent ? "WARN" : "ERROR", "subagent",
+                        "瞬态专家 [" + roleName + "] " + (byParent ? "已终止：" : "分析失败：") + msg);
             }
-            return new SubTaskResult(0L, roleName, "[瞬态专家分析失败] " + e.getMessage(), elapsed, false);
+            return new SubTaskResult(0L, roleName,
+                    (byParent ? "[任务已终止] " : "[瞬态专家分析失败] ") + msg, elapsed, false, byParent);
         }
     }
 
-    // ==================== 统一结果等待与格式化 ====================
+    // ==================== 统一并发调度、超时中断与结果格式化 ====================
+
+    /**
+     * 统一并发调度子任务批次（含线程真实中断、Span 闭合保护、ToolTrace 子专家明细实时推送）
+     */
+    private String dispatchSubTaskBatch(List<SubTaskSpec> specs,
+                                        TraceCollector traceCollector,
+                                        AtomicBoolean parentCancelled,
+                                        BiConsumer<String, String> eventConsumer) {
+        int timeoutSeconds = getSubtaskTimeoutSeconds();
+        long batchStartTime = System.currentTimeMillis();
+        TraceCollector.ToolTrace currentToolTrace = ObservableToolCallback.currentToolTrace();
+
+        List<TraceCollector.SubTaskTrace> subTaskTraces = new ArrayList<>(specs.size());
+        for (SubTaskSpec spec : specs) {
+            TraceCollector.SubTaskTrace subTrace = new TraceCollector.SubTaskTrace();
+            subTrace.setAgentId(spec.agentId());
+            subTrace.setRoleName(spec.roleName());
+            subTrace.setMode(spec.mode());
+            subTrace.setStatus("RUNNING");
+            subTaskTraces.add(subTrace);
+        }
+        if (currentToolTrace != null) {
+            synchronized (currentToolTrace) {
+                currentToolTrace.setSubTasks(subTaskTraces);
+            }
+            emitToolTraceUpdate(currentToolTrace, eventConsumer);
+        }
+
+        List<CompletableFuture<SubTaskResult>> futures = new ArrayList<>(specs.size());
+        List<Runnable> cancelHandles = new ArrayList<>(specs.size());
+
+        for (int i = 0; i < specs.size(); i++) {
+            final SubTaskSpec spec = specs.get(i);
+            final TraceCollector.SubTaskTrace subTrace = subTaskTraces.get(i);
+            final AtomicBoolean taskCancelled = new AtomicBoolean(false);
+            final AtomicReference<Thread> workerThreadRef = new AtomicReference<>();
+            final AtomicReference<TraceCollector.TraceSpan> spanRef = new AtomicReference<>();
+            final BooleanSupplier subCancelled = () -> taskCancelled.get() || (parentCancelled != null && parentCancelled.get());
+
+            final Runnable cancelHandle = () -> {
+                taskCancelled.set(true);
+                Thread workerThread = workerThreadRef.get();
+                if (workerThread != null) {
+                    workerThread.interrupt();
+                }
+                if (traceCollector != null) {
+                    boolean byParent = parentCancelled != null && parentCancelled.get();
+                    traceCollector.finishSpanIfRunning(spanRef.get(),
+                            byParent ? "CANCELLED" : "ERROR",
+                            byParent ? "用户主动终止" : "任务执行超时（" + timeoutSeconds + "s）");
+                }
+            };
+            cancelHandles.add(cancelHandle);
+
+            CompletableFuture<SubTaskResult> future = CompletableFuture.supplyAsync(() -> {
+                workerThreadRef.set(Thread.currentThread());
+                try {
+                    if (subCancelled.getAsBoolean()) {
+                        boolean byParent = parentCancelled != null && parentCancelled.get();
+                        return new SubTaskResult(spec.agentId(), spec.displayTitle(),
+                                byParent ? "[任务已终止] 用户已终止对话生成。" : spec.errorPrefix() + "任务已取消",
+                                0L, false, byParent);
+                    }
+                    return spec.runner().run(subCancelled, spanRef);
+                } finally {
+                    workerThreadRef.set(null);
+                    // 清理中断标记，避免影响线程池复用后的后续任务
+                    Thread.interrupted();
+                }
+            }, subAgentExecutor).orTimeout(timeoutSeconds, TimeUnit.SECONDS).whenComplete((res, ex) -> {
+                if (ex != null) {
+                    cancelHandle.run();
+                }
+            }).exceptionally(ex -> {
+                boolean timeout = hasCause(ex, TimeoutException.class);
+                boolean byParent = parentCancelled != null && parentCancelled.get();
+                long elapsed = Math.max(0L, System.currentTimeMillis() - batchStartTime);
+                String errorMsg = timeout
+                        ? "任务执行超时（" + timeoutSeconds + "s）"
+                        : extractRootMessage(ex);
+                if (traceCollector != null && timeout) {
+                    traceCollector.addLog("ERROR", "subagent",
+                            "子智能体 [" + spec.roleName() + "] 执行超时（" + timeoutSeconds + "s），已触发中断");
+                }
+                return new SubTaskResult(spec.agentId(), spec.displayTitle(),
+                        spec.errorPrefix() + errorMsg, elapsed, false, byParent);
+            }).thenApply(res -> {
+                updateSubTaskTrace(currentToolTrace, subTrace, res, eventConsumer);
+                return res;
+            });
+
+            futures.add(future);
+        }
+
+        return awaitAndFormatResults(specs, futures, cancelHandles, subTaskTraces,
+                currentToolTrace, parentCancelled, eventConsumer, timeoutSeconds, batchStartTime);
+    }
 
     /**
      * 等待所有子任务 Future 并格式化为 Markdown 报告供主 Agent 综合提炼
      */
-    private String awaitAndFormatResults(List<CompletableFuture<SubTaskResult>> futures, TraceCollector traceCollector) {
+    private String awaitAndFormatResults(List<SubTaskSpec> specs,
+                                         List<CompletableFuture<SubTaskResult>> futures,
+                                         List<Runnable> cancelHandles,
+                                         List<TraceCollector.SubTaskTrace> subTaskTraces,
+                                         TraceCollector.ToolTrace currentToolTrace,
+                                         AtomicBoolean parentCancelled,
+                                         BiConsumer<String, String> eventConsumer,
+                                         int timeoutSeconds,
+                                         long batchStartTime) {
         try {
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-                    .get(SUBTASK_TIMEOUT_SECONDS + 5, TimeUnit.SECONDS);
+                    .get(timeoutSeconds + 5L, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            cancelHandles.forEach(Runnable::run);
             futures.forEach(f -> f.cancel(true));
+            markPendingSubTasksCancelled(currentToolTrace, subTaskTraces, batchStartTime, eventConsumer);
+            if (currentToolTrace != null) {
+                boolean byUser = parentCancelled != null && parentCancelled.get();
+                currentToolTrace.setStatus(byUser ? "CANCELLED" : "ERROR");
+                if (StringTool.isBlank(currentToolTrace.getErrorMsg())) {
+                    currentToolTrace.setErrorMsg(byUser ? "任务已由用户主动终止" : "子任务执行被中断");
+                }
+            }
             return "[SubAgent 委派中断] 子任务执行已被中断。";
         } catch (Exception ignored) {
+            cancelHandles.forEach(Runnable::run);
         }
 
         List<SubTaskResult> results = new ArrayList<>();
-        for (CompletableFuture<SubTaskResult> future : futures) {
+        int successCount = 0;
+        for (int i = 0; i < futures.size(); i++) {
+            CompletableFuture<SubTaskResult> future = futures.get(i);
+            SubTaskSpec spec = specs.get(i);
             try {
                 if (future.isDone() && !future.isCancelled()) {
-                    results.add(future.getNow(null));
-                } else {
-                    results.add(new SubTaskResult(0L, "子智能体", "[执行超时或被取消]", 0L, false));
+                    SubTaskResult res = future.getNow(null);
+                    if (res != null) {
+                        results.add(res);
+                        if (res.isSuccess()) {
+                            successCount++;
+                        }
+                        continue;
+                    }
                 }
+                SubTaskResult fallback = new SubTaskResult(spec.agentId(), spec.displayTitle(),
+                        "[执行超时或被取消]", Math.max(0L, System.currentTimeMillis() - batchStartTime),
+                        false, parentCancelled != null && parentCancelled.get());
+                results.add(fallback);
+                updateSubTaskTrace(currentToolTrace, subTaskTraces.get(i), fallback, null);
             } catch (Exception e) {
-                results.add(new SubTaskResult(0L, "子智能体", "[执行异常] " + e.getMessage(), 0L, false));
+                SubTaskResult fallback = new SubTaskResult(spec.agentId(), spec.displayTitle(),
+                        "[执行异常] " + extractRootMessage(e),
+                        Math.max(0L, System.currentTimeMillis() - batchStartTime), false);
+                results.add(fallback);
+                updateSubTaskTrace(currentToolTrace, subTaskTraces.get(i), fallback, null);
+            }
+        }
+
+        if (currentToolTrace != null && successCount == 0 && !results.isEmpty()) {
+            boolean byUser = parentCancelled != null && parentCancelled.get();
+            currentToolTrace.setStatus(byUser ? "CANCELLED" : "ERROR");
+            if (StringTool.isBlank(currentToolTrace.getErrorMsg())) {
+                currentToolTrace.setErrorMsg(byUser
+                        ? "任务已由用户主动终止"
+                        : "所有委派子任务均执行失败或超时（共 " + results.size() + " 项）");
             }
         }
 
         StringBuilder output = new StringBuilder();
-        output.append("### 子智能体并行委派执行报告（共 ").append(results.size()).append(" 项子任务）\n\n");
+        output.append("### 子智能体并行委派执行报告（共 ").append(results.size())
+                .append(" 项子任务，成功 ").append(successCount).append(" 项）\n");
+        output.append("- 调度总览：");
+        for (int i = 0; i < results.size(); i++) {
+            SubTaskResult res = results.get(i);
+            if (i > 0) {
+                output.append(" | ");
+            }
+            String statusText = res.isCancelled() ? "已终止" : (res.isSuccess() ? "成功" : "异常");
+            output.append(res.getRoleName()).append(" [").append(statusText)
+                    .append(" ").append(res.getElapsedMs()).append("ms]");
+        }
+        output.append("\n\n");
+
         for (SubTaskResult res : results) {
-            if (res == null) continue;
             output.append("#### 【").append(res.getRoleName()).append("】\n");
-            output.append("- 执行状态: ").append(res.isSuccess() ? "成功" : "异常")
+            output.append("- 执行状态: ").append(res.isCancelled() ? "已终止" : (res.isSuccess() ? "成功" : "异常"))
                     .append(" (耗时: ").append(res.getElapsedMs()).append("ms)\n");
             output.append("- 专向分析内容:\n").append(res.getContent()).append("\n\n");
         }
         return output.toString();
+    }
+
+    private void updateSubTaskTrace(TraceCollector.ToolTrace toolTrace,
+                                    TraceCollector.SubTaskTrace subTrace,
+                                    SubTaskResult res,
+                                    BiConsumer<String, String> eventConsumer) {
+        if (subTrace == null || res == null) {
+            return;
+        }
+        Runnable updater = () -> {
+            subTrace.setStatus(res.isCancelled() ? "CANCELLED" : (res.isSuccess() ? "SUCCESS" : "ERROR"));
+            subTrace.setElapsedMs(res.getElapsedMs());
+            subTrace.setDetail(TraceCollector.truncate(res.getContent(), 120));
+        };
+        if (toolTrace != null) {
+            synchronized (toolTrace) {
+                updater.run();
+            }
+            emitToolTraceUpdate(toolTrace, eventConsumer);
+        } else {
+            updater.run();
+        }
+    }
+
+    private void markPendingSubTasksCancelled(TraceCollector.ToolTrace toolTrace,
+                                              List<TraceCollector.SubTaskTrace> subTaskTraces,
+                                              long batchStartTime,
+                                              BiConsumer<String, String> eventConsumer) {
+        long elapsed = Math.max(0L, System.currentTimeMillis() - batchStartTime);
+        if (toolTrace != null) {
+            synchronized (toolTrace) {
+                for (TraceCollector.SubTaskTrace subTrace : subTaskTraces) {
+                    if ("RUNNING".equals(subTrace.getStatus())) {
+                        subTrace.setStatus("CANCELLED");
+                        subTrace.setElapsedMs(elapsed);
+                        subTrace.setDetail("任务已由用户中断");
+                    }
+                }
+            }
+            emitToolTraceUpdate(toolTrace, eventConsumer);
+        }
+    }
+
+    private void emitToolTraceUpdate(TraceCollector.ToolTrace toolTrace, BiConsumer<String, String> eventConsumer) {
+        if (toolTrace == null || eventConsumer == null) {
+            return;
+        }
+        try {
+            String json;
+            synchronized (toolTrace) {
+                json = GSON.toJson(toolTrace);
+            }
+            eventConsumer.accept(ChatStreamTool.EVENT_TOOL, json);
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static String formatSpecialistTitle(Agent subAgent, long fallbackId) {
+        if (subAgent == null || StringTool.isBlank(subAgent.getName())) {
+            return "子智能体 (ID=" + fallbackId + ")";
+        }
+        return subAgent.getName().trim() + " (ID=" + subAgent.getId() + ")";
+    }
+
+    private static boolean isSubCancelled(AtomicBoolean parentCancelled, BooleanSupplier subCancelled) {
+        return (parentCancelled != null && parentCancelled.get())
+                || (subCancelled != null && subCancelled.getAsBoolean())
+                || Thread.currentThread().isInterrupted();
+    }
+
+    private static boolean hasCause(Throwable ex, Class<? extends Throwable> targetType) {
+        Throwable cur = ex;
+        int depth = 0;
+        while (cur != null && depth < 16) {
+            if (targetType.isInstance(cur)) {
+                return true;
+            }
+            cur = cur.getCause();
+            depth++;
+        }
+        return false;
+    }
+
+    private static String extractRootMessage(Throwable ex) {
+        if (ex == null) {
+            return "未知异常";
+        }
+        Throwable cur = ex;
+        int depth = 0;
+        while (cur.getCause() != null && depth < 16) {
+            cur = cur.getCause();
+            depth++;
+        }
+        return StringTool.isNotBlank(cur.getMessage()) ? cur.getMessage() : cur.getClass().getSimpleName();
     }
 
     // ==================== 入参解析与辅助类 ====================
@@ -1157,19 +1480,55 @@ public class SubAgentTool implements DisposableBean {
         }
     }
 
-    public static class SubTaskResult {
-        private final long agentId;
-        private final String roleName;
-        private final String content;
-        private final long elapsedMs;
-        private final boolean success;
+    /**
+     * 子任务编排规格
+     */
+    private record SubTaskSpec(
+            long agentId,
+            String roleName,
+            String displayTitle,
+            String mode,
+            String errorPrefix,
+            SubTaskRunner runner) {
+    }
 
+    /**
+     * 子任务执行函数接口（支持透传取消信号与 Span 引用）
+     */
+    @FunctionalInterface
+    private interface SubTaskRunner {
+        SubTaskResult run(BooleanSupplier subCancelled, AtomicReference<TraceCollector.TraceSpan> spanRef);
+    }
+
+    /**
+     * 子任务执行结果模型
+     */
+    public static class SubTaskResult {
+        private final long agentId;          /* 子智能体 ID（动态派生为 0） */
+        private final String roleName;       /* 子智能体或角色名称 */
+        private final String content;        /* 子任务输出或异常说明 */
+        private final long elapsedMs;        /* 耗时（毫秒） */
+        private final boolean success;       /* 是否执行成功 */
+        private final boolean cancelled;     /* 是否被取消/超时中止 */
+
+        /* 兼容五参构造（默认未取消） */
         public SubTaskResult(long agentId, String roleName, String content, long elapsedMs, boolean success) {
+            this(agentId, roleName, content, elapsedMs, success, false);
+        }
+
+        /* 完整六参构造 */
+        public SubTaskResult(long agentId,
+                             String roleName,
+                             String content,
+                             long elapsedMs,
+                             boolean success,
+                             boolean cancelled) {
             this.agentId = agentId;
             this.roleName = roleName;
             this.content = content;
             this.elapsedMs = elapsedMs;
             this.success = success;
+            this.cancelled = cancelled;
         }
 
         public long getAgentId() {
@@ -1190,6 +1549,10 @@ public class SubAgentTool implements DisposableBean {
 
         public boolean isSuccess() {
             return success;
+        }
+
+        public boolean isCancelled() {
+            return cancelled;
         }
     }
 

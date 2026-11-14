@@ -149,7 +149,11 @@
                 >
                   <span class="pill-type">{{ tool.toolType }}</span>
                   <span class="pill-name">{{ tool.toolName }}</span>
-                  <span class="pill-ms" v-if="tool.elapsedMs != null">{{ formatMs(tool.elapsedMs) }}</span>
+                  <span v-if="tool.subTasks && tool.subTasks.length > 0" class="pill-targets">
+                    ({{ formatSubTaskNames(tool.subTasks) }})
+                  </span>
+                  <span v-if="tool.status === 'CANCELLED'" class="pill-ms">{{ t('business.chat.subTaskStatusCancelled') }}</span>
+                  <span class="pill-ms" v-else-if="tool.elapsedMs != null">{{ formatMs(tool.elapsedMs) }}</span>
                 </div>
               </div>
 
@@ -238,7 +242,7 @@ import ArtifactPreviewDialog from '@/modules/business/chat/components/ArtifactPr
 import { useAgentOptions } from '@/modules/business/agent/composables/useAgentOptions'
 import MarkdownView from '@/modules/business/chat/components/MarkdownView.vue'
 import TraceInspectorDrawer from '@/modules/business/chat/components/TraceInspectorDrawer.vue'
-import { parseSessionMsgExt, type SessionDTO, type SessionMsg, type SessionMsgExt, type SessionQuery } from '../types'
+import { parseSessionMsgExt, type SessionDTO, type SessionMsg, type SessionMsgExt, type SessionQuery, type SubTaskTraceItem } from '../types'
 import { useFormReset } from '@/composables/useFormReset'
 import { usePageParams } from '@/composables/usePageParams'
 import { Pagination } from '@/components'
@@ -397,6 +401,21 @@ function formatMs(ms?: number): string {
   if (ms == null || ms < 0) return ''
   if (ms < 1000) return `${ms}ms`
   return `${(ms / 1000).toFixed(2)}s`
+}
+
+/** 提炼 SubAgent 并行委派的专家名称列表 */
+function formatSubTaskNames(subTasks?: SubTaskTraceItem[]): string {
+  if (!subTasks || subTasks.length === 0) return ''
+  const seen = new Set<string>()
+  const names: string[] = []
+  for (const sub of subTasks) {
+    const name = sub.roleName?.trim()
+    if (name && !seen.has(name)) {
+      seen.add(name)
+      names.push(name)
+    }
+  }
+  return names.join(' / ')
 }
 
 // --------------------------------- page init ---------------------------------
@@ -632,6 +651,8 @@ getList()
 
 .detail-tool-pill {
   display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   align-items: center;
   gap: 6px;
   padding: 2px 9px;
@@ -652,6 +673,12 @@ getList()
   color: #dc2626;
 }
 
+.detail-tool-pill.status-cancelled {
+  border-color: var(--el-border-color);
+  background: var(--el-fill-color);
+  color: var(--el-text-color-secondary);
+}
+
 .pill-type {
   font-size: 10px;
   font-weight: 700;
@@ -662,6 +689,12 @@ getList()
 
 .pill-name {
   font-weight: 600;
+}
+
+.pill-targets {
+  font-size: 11.5px;
+  font-weight: 500;
+  opacity: 0.9;
 }
 
 .pill-ms {

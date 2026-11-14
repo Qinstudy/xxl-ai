@@ -43,11 +43,21 @@ export interface RagReference {
   content: string
 }
 
+/** SubAgent 并行子任务追踪明细（[FEAT-013]） */
+export interface SubTaskTraceItem {
+  agentId: number
+  roleName: string
+  mode?: 'SPECIALIST' | 'DECOMPOSE' | string
+  status: 'RUNNING' | 'SUCCESS' | 'ERROR' | 'CANCELLED' | string
+  elapsedMs?: number
+  detail?: string
+}
+
 /** 工具调用证据链记录 */
 export interface ToolTraceItem {
   callId: string
   toolName: string
-  toolType: 'MCP' | 'SKILL' | 'EXEC' | string
+  toolType: 'MCP' | 'SKILL' | 'EXEC' | 'SUBAGENT' | 'SUBAGENT_MCP' | string
   arguments?: string
   resultSummary?: string
   status: 'RUNNING' | 'SUCCESS' | 'ERROR' | string
@@ -55,6 +65,7 @@ export interface ToolTraceItem {
   startTime: number
   endTime?: number
   elapsedMs?: number
+  subTasks?: SubTaskTraceItem[]
 }
 
 /** 时延瀑布图阶段 Span */

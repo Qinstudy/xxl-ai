@@ -30,11 +30,20 @@ public class ObservableToolCallback implements ToolCallback {
 
     /** 工具输出返回给大模型上下文的最大字符数（防超大输出撑爆上下文窗口） */
     private static final int MAX_MODEL_TOOL_OUTPUT_CHARS = 16000;
+    /** 当前线程正在执行的工具追踪上下文（供复合门面工具如 SubAgentTool 补充子任务明细与状态） */
+    private static final ThreadLocal<TraceCollector.ToolTrace> CURRENT_TOOL_TRACE = new ThreadLocal<>();
 
     private final ToolCallback delegate;
     private final String toolType;
     private final TraceCollector traceCollector;
     private final Consumer<String> onToolEvent;
+
+    /**
+     * 获取当前线程绑定的 ToolTrace（仅在工具调用执行期间有效）
+     */
+    static TraceCollector.ToolTrace currentToolTrace() {
+        return CURRENT_TOOL_TRACE.get();
+    }
 
     public ObservableToolCallback(ToolCallback delegate,
                                   String toolType,
@@ -107,13 +116,21 @@ public class ObservableToolCallback implements ToolCallback {
         traceCollector.addLog("INFO", "tool", "开始调用工具 [" + toolType + "] " + toolName);
         emitToolEvent(toolTrace);
 
+        CURRENT_TOOL_TRACE.set(toolTrace);
         try {
             String rawResult = invoker.get();
             String safeResult = truncateForModel(rawResult);
-            traceCollector.finishToolTrace(toolTrace, "SUCCESS", safeResult, null);
-            traceCollector.finishSpan(span, "SUCCESS", "耗时 " + toolTrace.getElapsedMs() + "ms");
-            traceCollector.addLog("INFO", "tool",
-                    "工具调用完成 [" + toolType + "] " + toolName + " (" + toolTrace.getElapsedMs() + "ms)");
+            String currentStatus = toolTrace.getStatus();
+            String finalStatus = ("ERROR".equals(currentStatus) || "CANCELLED".equals(currentStatus))
+                    ? currentStatus : "SUCCESS";
+            traceCollector.finishToolTrace(toolTrace, finalStatus, safeResult, toolTrace.getErrorMsg());
+            traceCollector.finishSpan(span, finalStatus, "耗时 " + toolTrace.getElapsedMs() + "ms");
+            String logLevel = "SUCCESS".equals(finalStatus) ? "INFO" : "WARN";
+            String logPrefix = "ERROR".equals(finalStatus)
+                    ? "工具调用异常结束 ["
+                    : ("CANCELLED".equals(finalStatus) ? "工具调用已终止 [" : "工具调用完成 [");
+            traceCollector.addLog(logLevel, "tool",
+                    logPrefix + toolType + "] " + toolName + " (" + toolTrace.getElapsedMs() + "ms)");
             emitToolEvent(toolTrace);
             return safeResult;
         } catch (Throwable e) {
@@ -125,6 +142,8 @@ public class ObservableToolCallback implements ToolCallback {
                     "工具调用失败 [" + toolType + "] " + toolName + "：" + errMsg);
             emitToolEvent(toolTrace);
             throw e;
+        } finally {
+            CURRENT_TOOL_TRACE.remove();
         }
     }
 

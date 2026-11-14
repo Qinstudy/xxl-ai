@@ -938,7 +938,8 @@ public class ChatStreamTool implements SmartLifecycle {
                 onThinking,
                 onContent,
                 traceCollector,
-                usageJson -> appendResult(msgId, EVENT_USAGE, usageJson)
+                usageJson -> appendResult(msgId, EVENT_USAGE, usageJson),
+                cancelled != null ? cancelled::get : null
         );
         if (!noticeText.isEmpty()) {
             chatText = new LlmChatTool.ChatText(chatText.getContent(), noticeText + chatText.getThinking());

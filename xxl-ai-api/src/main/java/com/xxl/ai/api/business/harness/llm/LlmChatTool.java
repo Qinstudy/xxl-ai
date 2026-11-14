@@ -21,6 +21,8 @@ import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 /**
@@ -108,6 +110,27 @@ public class LlmChatTool {
                          Consumer<String> onContent,
                          TraceCollector traceCollector,
                          Consumer<String> onUsageEvent) {
+        return chat(runtime, systemPrompt, roleList, contentList, content, tools, advisorObjects,
+                sessionId, chatOptions, onThinking, onContent, traceCollector, onUsageEvent, null);
+    }
+
+    /**
+     * 流式对话（支持取消信号：超时或用户主动终止时快速打断流式迭代并闭合 Span）
+     */
+    public ChatText chat(SupplierRuntime runtime,
+                         String systemPrompt,
+                         List<String> roleList,
+                         List<String> contentList,
+                         String content,
+                         Object[] tools,
+                         List<Object> advisorObjects,
+                         String sessionId,
+                         ChatOptions chatOptions,
+                         Consumer<String> onThinking,
+                         Consumer<String> onContent,
+                         TraceCollector traceCollector,
+                         Consumer<String> onUsageEvent,
+                         BooleanSupplier cancelled) {
 
         // 创建 ChatClient（spring-ai）
         ChatClient chatClient = llmModelFactory.chatClient(runtime, sessionId);
@@ -145,7 +168,7 @@ public class LlmChatTool {
         }
 
         // 流式对话并经回调输出：思考过程增量 / 回复内容增量 / Token Usage 采集
-        return stream(spec, onThinking, onContent, traceCollector, onUsageEvent);
+        return stream(spec, onThinking, onContent, traceCollector, onUsageEvent, cancelled);
     }
 
     /**
@@ -183,7 +206,8 @@ public class LlmChatTool {
                             Consumer<String> onThinking,
                             Consumer<String> onContent,
                             TraceCollector traceCollector,
-                            Consumer<String> onUsageEvent) {
+                            Consumer<String> onUsageEvent,
+                            BooleanSupplier cancelled) {
 
         // 开启 LLM 流式推理阶段 Span
         TraceCollector.TraceSpan llmSpan = traceCollector != null
@@ -207,8 +231,10 @@ public class LlmChatTool {
         int lastTotalTokens = -1;
 
         try {
+            checkCancelled(cancelled);
             // 逐条消费流式响应
             for (ChatResponse chatResponse : chatResponses.toIterable()) {
+                checkCancelled(cancelled);
                 if (chatResponse == null) {
                     continue;
                 }
@@ -274,16 +300,31 @@ public class LlmChatTool {
                 traceCollector.incrementRoundIfNoUsage(usageRecorded);
                 int rounds = traceCollector.getTokenUsage().getRounds();
                 int totalTokens = traceCollector.getTokenUsage().getTotalTokens();
-                traceCollector.finishSpan(llmSpan, "SUCCESS",
+                traceCollector.finishSpanIfRunning(llmSpan, "SUCCESS",
                         "推理 " + rounds + " 轮，Token " + totalTokens + "，生成字符 " + fullText.length());
             }
             return new ChatText(fullText.toString(), thinkText.toString());
         } catch (Throwable e) {
             if (traceCollector != null) {
-                traceCollector.finishSpan(llmSpan, "ERROR", e.getMessage());
+                boolean cancelledFlag = isCancelled(cancelled) || e instanceof CancellationException;
+                traceCollector.finishSpanIfRunning(llmSpan, "ERROR",
+                        cancelledFlag ? "流式推理已取消或超时中断" : e.getMessage());
             }
             throw e;
         }
+    }
+
+    /**
+     * 检查取消或线程中断状态：触发时抛出 CancellationException 终止上游流消费
+     */
+    private void checkCancelled(BooleanSupplier cancelled) {
+        if (isCancelled(cancelled)) {
+            throw new CancellationException("对话生成已取消或超时");
+        }
+    }
+
+    private boolean isCancelled(BooleanSupplier cancelled) {
+        return (cancelled != null && cancelled.getAsBoolean()) || Thread.currentThread().isInterrupted();
     }
 
     /**

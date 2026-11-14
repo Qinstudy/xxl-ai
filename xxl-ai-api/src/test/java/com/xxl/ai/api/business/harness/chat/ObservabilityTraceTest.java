@@ -333,4 +333,105 @@ public class ObservabilityTraceTest {
         Assertions.assertTrue(llmSpan.getDetail().contains("Token 244"));
     }
 
+    @Test
+    @DisplayName("6. [FEAT-013] 验证 finishSpanIfRunning 与 completeRun 自动闭合遗留 RUNNING Span")
+    public void testFinishSpanIfRunningAndCompleteRunClosesLeftoverSpans() {
+        TraceCollector collector = new TraceCollector(1006L, 88L, 8L, "worker-node-0");
+        TraceCollector.TraceSpan doneSpan = collector.startSpan("subagent", "子智能体 [SQL性能专家] 执行");
+        TraceCollector.TraceSpan orphanSpan = collector.startSpan("subagent", "子智能体 [代码安全审计专家] 执行");
+
+        collector.finishSpan(doneSpan, "SUCCESS", "正常结束");
+        // 已完成 Span 不应被 finishSpanIfRunning 覆盖
+        collector.finishSpanIfRunning(doneSpan, "ERROR", "不应覆盖");
+        Assertions.assertEquals("SUCCESS", doneSpan.getStatus());
+        Assertions.assertEquals("正常结束", doneSpan.getDetail());
+
+        // completeRun("SUCCESS", ...) 应自动兜底闭合仍处于 RUNNING 的异步 Span
+        collector.completeRun("SUCCESS", null);
+        Assertions.assertEquals("SUCCESS", doneSpan.getStatus());
+        Assertions.assertEquals("ERROR", orphanSpan.getStatus());
+        Assertions.assertEquals("任务未在结束前完成", orphanSpan.getDetail());
+
+        // 取消终态应把未闭合 Span、ToolTrace 与 SubTaskTrace 均标记为 CANCELLED
+        TraceCollector cancelCollector = new TraceCollector(1007L, 89L, 8L, "worker-node-0");
+        TraceCollector.TraceSpan cancelledOrphan = cancelCollector.startSpan("llm", "第 1 轮模型推理");
+        TraceCollector.ToolTrace runningTool = cancelCollector.startToolTrace("dispatch_subagents", "SUBAGENT", "{}");
+        TraceCollector.SubTaskTrace doneSub = new TraceCollector.SubTaskTrace();
+        doneSub.setAgentId(7L);
+        doneSub.setRoleName("代码安全审计专家");
+        doneSub.setStatus("SUCCESS");
+        doneSub.setElapsedMs(500L);
+        TraceCollector.SubTaskTrace runningSub = new TraceCollector.SubTaskTrace();
+        runningSub.setAgentId(6L);
+        runningSub.setRoleName("SQL性能专家");
+        runningSub.setStatus("RUNNING");
+        runningTool.setSubTasks(List.of(doneSub, runningSub));
+
+        cancelCollector.completeRun("CANCELLED", "用户主动停止");
+        Assertions.assertEquals("CANCELLED", cancelCollector.getRunMeta().getState());
+        Assertions.assertEquals("CANCELLED", cancelledOrphan.getStatus());
+        Assertions.assertEquals("会话已终止", cancelledOrphan.getDetail());
+        Assertions.assertEquals("CANCELLED", runningTool.getStatus());
+        Assertions.assertEquals("会话已终止", runningTool.getErrorMsg());
+        Assertions.assertEquals("SUCCESS", doneSub.getStatus());
+        Assertions.assertEquals("CANCELLED", runningSub.getStatus());
+        Assertions.assertEquals("会话已终止", runningSub.getDetail());
+    }
+
+    @Test
+    @DisplayName("7. [FEAT-013] 验证 ObservableToolCallback 透传内部 ToolTrace 失败状态与 subTasks")
+    public void testObservableToolCallbackHonorsInnerToolErrorAndSubTasks() {
+        TraceCollector collector = new TraceCollector(1008L, 90L, 8L, "worker-node-0");
+        List<String> emittedEvents = new ArrayList<>();
+
+        ToolCallback facadeCallback = FunctionToolCallback
+                .builder("delegate_specialist", (Map<String, Object> args) -> {
+                    TraceCollector.ToolTrace activeTrace = ObservableToolCallback.currentToolTrace();
+                    Assertions.assertNotNull(activeTrace, "执行期间必须可读取当前 ThreadLocal ToolTrace");
+
+                    TraceCollector.SubTaskTrace sub = new TraceCollector.SubTaskTrace();
+                    sub.setAgentId(6L);
+                    sub.setRoleName("SQL性能专家");
+                    sub.setMode("SPECIALIST");
+                    sub.setStatus("ERROR");
+                    sub.setElapsedMs(1000L);
+                    sub.setDetail("任务执行超时");
+                    activeTrace.setSubTasks(List.of(sub));
+                    activeTrace.setStatus("ERROR");
+                    activeTrace.setErrorMsg("所有委派子任务均执行失败或超时");
+                    return "### 子智能体并行委派执行报告\n全部失败";
+                })
+                .description("Delegate to specialist")
+                .inputType(Map.class)
+                .inputSchema("{\"type\":\"object\"}")
+                .build();
+
+        ToolCallback[] wrapped = ObservableToolCallback.wrapAll(
+                List.of(new ObservableToolCallback.TaggedTool("SUBAGENT", facadeCallback)),
+                collector,
+                emittedEvents::add
+        );
+
+        String out = wrapped[0].call("{\"tasks\":[]}");
+        Assertions.assertTrue(out.contains("全部失败"));
+        Assertions.assertNull(ObservableToolCallback.currentToolTrace(), "调用结束后必须清理 ThreadLocal 防止内存泄漏");
+
+        Assertions.assertEquals(1, collector.getToolTraces().size());
+        TraceCollector.ToolTrace trace = collector.getToolTraces().get(0);
+        Assertions.assertEquals("SUBAGENT", trace.getToolType());
+        Assertions.assertEquals("ERROR", trace.getStatus());
+        Assertions.assertEquals("所有委派子任务均执行失败或超时", trace.getErrorMsg());
+        Assertions.assertNotNull(trace.getSubTasks());
+        Assertions.assertEquals(1, trace.getSubTasks().size());
+        Assertions.assertEquals("SQL性能专家", trace.getSubTasks().get(0).getRoleName());
+
+        Assertions.assertEquals(1, collector.getSpans().size());
+        Assertions.assertEquals("ERROR", collector.getSpans().get(0).getStatus());
+        Assertions.assertEquals(2, emittedEvents.size());
+        JsonObject finalEvent = GSON.fromJson(emittedEvents.get(1), JsonObject.class);
+        Assertions.assertEquals("ERROR", finalEvent.get("status").getAsString());
+        Assertions.assertEquals("SQL性能专家",
+                finalEvent.getAsJsonArray("subTasks").get(0).getAsJsonObject().get("roleName").getAsString());
+    }
+
 }

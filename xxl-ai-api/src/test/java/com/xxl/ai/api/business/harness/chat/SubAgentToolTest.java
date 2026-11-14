@@ -4,12 +4,26 @@ import com.xxl.ai.api.business.agent.mapper.AgentMapper;
 import com.xxl.ai.api.business.agent.model.adaptor.AgentAdaptor;
 import com.xxl.ai.api.business.agent.model.dto.AgentDTO;
 import com.xxl.ai.api.business.agent.model.entity.Agent;
+import com.xxl.ai.api.business.harness.llm.LlmChatTool;
+import com.xxl.ai.api.business.harness.mcp.McpToolFactory;
+import com.xxl.ai.api.business.harness.rag.RagTool;
+import com.xxl.ai.api.business.supplier.model.SupplierRuntime;
+import com.xxl.ai.api.business.supplier.service.SupplierService;
+import com.xxl.tool.response.Response;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.tool.ToolCallback;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -297,6 +311,164 @@ public class SubAgentToolTest {
         // 验证重叠度检测
         assertTrue(SubAgentTool.isRoleOverlapped("sql优化", "sql优化", "任务", "介绍"));
         assertFalse(SubAgentTool.isRoleOverlapped("kafka削峰", "sql优化", "任务", "介绍"));
+    }
+
+    @Test
+    void testSubtaskTimeoutConfigFallbackAndOverride() {
+        SubAgentTool tool = new SubAgentTool();
+        assertEquals(180, tool.getSubtaskTimeoutSeconds(), "默认子任务超时应放宽至 180 秒");
+
+        ReflectionTestUtils.setField(tool, "subtaskTimeoutSeconds", 0);
+        assertEquals(180, tool.getSubtaskTimeoutSeconds(), "非正数配置应回退默认 180 秒");
+
+        ReflectionTestUtils.setField(tool, "subtaskTimeoutSeconds", 240);
+        assertEquals(240, tool.getSubtaskTimeoutSeconds());
+    }
+
+    @Test
+    void testDelegateSpecialistTimeoutInterruptsWorkersAndPreservesNames() throws Exception {
+        SubAgentTool subAgentTool = new SubAgentTool();
+        ReflectionTestUtils.setField(subAgentTool, "subtaskTimeoutSeconds", 1);
+
+        Agent sqlExpert = new Agent();
+        sqlExpert.setId(6L);
+        sqlExpert.setSpaceId(10L);
+        sqlExpert.setName("SQL性能专家");
+        sqlExpert.setPublishStatus(1);
+        sqlExpert.setModelSupplierId(4L);
+        sqlExpert.setModelId(9L);
+
+        Agent secExpert = new Agent();
+        secExpert.setId(7L);
+        secExpert.setSpaceId(10L);
+        secExpert.setName("代码安全审计专家");
+        secExpert.setPublishStatus(1);
+        secExpert.setModelSupplierId(4L);
+        secExpert.setModelId(9L);
+
+        Map<Long, Agent> agentDb = Map.of(6L, sqlExpert, 7L, secExpert);
+        AgentMapper mockAgentMapper = (AgentMapper) java.lang.reflect.Proxy.newProxyInstance(
+                AgentMapper.class.getClassLoader(),
+                new Class<?>[]{AgentMapper.class},
+                (proxy, method, args) -> "load".equals(method.getName()) && args != null && args.length > 0
+                        ? agentDb.get((Long) args[0]) : null
+        );
+
+        SupplierRuntime runtime = new SupplierRuntime();
+        runtime.setSupplierId(4L);
+        runtime.setModelId(9L);
+        runtime.setModelName("glm-5.3-flash");
+        SupplierService mockSupplierService = (SupplierService) java.lang.reflect.Proxy.newProxyInstance(
+                SupplierService.class.getClassLoader(),
+                new Class<?>[]{SupplierService.class},
+                (proxy, method, args) -> "loadRuntime".equals(method.getName()) ? Response.ofSuccess(runtime) : null
+        );
+
+        McpToolFactory stubMcpFactory = new McpToolFactory() {
+            @Override
+            public List<Object> buildTools(Agent agent) {
+                return Collections.emptyList();
+            }
+        };
+
+        CountDownLatch workerInterruptedLatch = new CountDownLatch(2);
+        AtomicInteger sawCancelledSignal = new AtomicInteger(0);
+        LlmChatTool slowCancelledLlm = new LlmChatTool() {
+            @Override
+            public ChatText chat(SupplierRuntime rt,
+                                 String systemPrompt,
+                                 List<String> roleList,
+                                 List<String> contentList,
+                                 String content,
+                                 Object[] tools,
+                                 List<Object> advisorObjects,
+                                 String sessionId,
+                                 ChatOptions chatOptions,
+                                 Consumer<String> onThinking,
+                                 Consumer<String> onContent,
+                                 TraceCollector traceCollector,
+                                 Consumer<String> onUsageEvent,
+                                 BooleanSupplier cancelled) {
+                try {
+                    long deadline = System.currentTimeMillis() + 5000L;
+                    while (System.currentTimeMillis() < deadline) {
+                        if (cancelled != null && cancelled.getAsBoolean()) {
+                            sawCancelledSignal.incrementAndGet();
+                            break;
+                        }
+                        Thread.sleep(50L);
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    if (cancelled != null && cancelled.getAsBoolean()) {
+                        sawCancelledSignal.incrementAndGet();
+                        workerInterruptedLatch.countDown();
+                    }
+                }
+                throw new IllegalStateException("任务已超时中断");
+            }
+        };
+
+        ReflectionTestUtils.setField(subAgentTool, "agentMapper", mockAgentMapper);
+        ReflectionTestUtils.setField(subAgentTool, "supplierService", mockSupplierService);
+        ReflectionTestUtils.setField(subAgentTool, "mcpToolFactory", stubMcpFactory);
+        ReflectionTestUtils.setField(subAgentTool, "ragTool", new RagTool());
+        ReflectionTestUtils.setField(subAgentTool, "llmChatTool", slowCancelledLlm);
+
+        Agent parent = new Agent();
+        parent.setId(8L);
+        parent.setSpaceId(10L);
+        parent.setName("架构总控调度员");
+        parent.setSubAgentIds("6,7");
+        parent.setAutoDecomposeStatus(0);
+
+        TraceCollector collector = new TraceCollector(2001L, 74L, 8L, "worker-node-0");
+        List<String> emittedEvents = Collections.synchronizedList(new ArrayList<>());
+        List<Object> rawTools = subAgentTool.buildTools(
+                parent,
+                collector,
+                new AtomicBoolean(false),
+                (ev, data) -> {
+                    if (ChatStreamTool.EVENT_TOOL.equals(ev)) {
+                        emittedEvents.add(data);
+                    }
+                }
+        );
+        ToolCallback[] wrapped = ObservableToolCallback.wrapAll(
+                List.of(new ObservableToolCallback.TaggedTool("SUBAGENT", rawTools.get(0))),
+                collector,
+                emittedEvents::add
+        );
+
+        String report = wrapped[0].call(
+                "{\"tasks\":[{\"agentId\":6,\"task\":\"分析慢SQL\"},{\"agentId\":7,\"task\":\"审计SQL注入\"}]}"
+        );
+
+        // 1、确认后台子任务线程均收到超时取消/中断信号并退出，而非继续空跑
+        assertTrue(workerInterruptedLatch.await(3, TimeUnit.SECONDS), "超时后子智能体工作线程必须被及时中断");
+        assertTrue(sawCancelledSignal.get() >= 1);
+
+        // 2、确认报告保留中文专家名（非缺失名字的“子智能体 (ID=6)”）且无漏写
+        assertTrue(report.contains("【SQL性能专家 (ID=6)】"), "超时报告应保留专家名 SQL性能专家");
+        assertTrue(report.contains("【代码安全审计专家 (ID=7)】"), "超时报告应保留专家名 代码安全审计专家");
+        assertTrue(report.contains("超时"), "超时报告应包含超时提示");
+
+        // 3、确认外层 ToolTrace 标为 ERROR 且携带 subTasks 明细，同时没有任何 RUNNING 残留 Span
+        assertEquals(1, collector.getToolTraces().size());
+        TraceCollector.ToolTrace trace = collector.getToolTraces().get(0);
+        assertEquals("ERROR", trace.getStatus());
+        assertNotNull(trace.getSubTasks());
+        assertEquals(2, trace.getSubTasks().size());
+        assertEquals("SQL性能专家", trace.getSubTasks().get(0).getRoleName());
+        assertEquals("ERROR", trace.getSubTasks().get(0).getStatus());
+        assertEquals("代码安全审计专家", trace.getSubTasks().get(1).getRoleName());
+        assertEquals("ERROR", trace.getSubTasks().get(1).getStatus());
+
+        assertTrue(collector.getSpans().stream().noneMatch(s -> "RUNNING".equals(s.getStatus())),
+                "超时结束后不应存在仍处于 RUNNING 状态的 Span");
+        assertFalse(emittedEvents.isEmpty());
+        assertTrue(emittedEvents.get(emittedEvents.size() - 1).contains("ERROR"));
     }
 
     public static void main(String[] args) throws Exception {

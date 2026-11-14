@@ -133,9 +133,13 @@
                     >
                       <span class="tool-pill-type">{{ tool.toolType }}</span>
                       <span class="tool-pill-name">{{ tool.toolName }}</span>
+                      <span v-if="tool.subTasks && tool.subTasks.length > 0" class="tool-pill-targets">
+                        ({{ formatSubTaskNames(tool.subTasks) }})
+                      </span>
                       <span class="tool-pill-state">
                         <template v-if="tool.status === 'RUNNING'">{{ t('business.chat.toolCalling') }}...</template>
                         <template v-else-if="tool.status === 'ERROR'">{{ t('business.chat.toolError') }}</template>
+                        <template v-else-if="tool.status === 'CANCELLED'">{{ t('business.chat.subTaskStatusCancelled') }}</template>
                         <template v-else>{{ formatMs(tool.elapsedMs) }}</template>
                       </span>
                     </div>
@@ -352,6 +356,7 @@ import {
   type Session,
   type SessionMsg,
   type SessionMsgExt,
+  type SubTaskTraceItem,
   type TokenUsage,
   type ToolTraceItem
 } from '@/modules/business/session/types'
@@ -662,18 +667,22 @@ function buildStreamCallbacks(idx: number) {
       if (!m) return
       const prevTools = [...(m.extData?.toolTraces || [])]
       const existIdx = prevTools.findIndex((item) => item.callId === tool.callId)
+      const prevStatus = existIdx >= 0 ? prevTools[existIdx].status : undefined
       if (existIdx >= 0) {
         prevTools[existIdx] = tool
       } else {
         prevTools.push(tool)
       }
       m.extData = { ...(m.extData || {}), toolTraces: prevTools }
-      appendLiveLog(
-        m,
-        tool.status === 'ERROR' ? 'ERROR' : 'INFO',
-        'tool',
-        `[${tool.toolType}] ${tool.toolName} -> ${tool.status}${tool.elapsedMs != null ? ` (${tool.elapsedMs}ms)` : ''}`
-      )
+      // 仅在首次触发或状态跃迁时写入实时日志，避免子任务增量同步刷屏
+      if (existIdx < 0 || prevStatus !== tool.status) {
+        appendLiveLog(
+          m,
+          tool.status === 'ERROR' ? 'ERROR' : 'INFO',
+          'tool',
+          `[${tool.toolType}] ${tool.toolName} -> ${tool.status}${tool.elapsedMs != null ? ` (${tool.elapsedMs}ms)` : ''}`
+        )
+      }
       syncLiveDrawer(m)
       void followBottom()
     },
@@ -983,6 +992,21 @@ function formatMs(ms?: number): string {
   if (ms == null || ms < 0) return ''
   if (ms < 1000) return `${ms}ms`
   return `${(ms / 1000).toFixed(2)}s`
+}
+
+/** 提炼 SubAgent 并行委派的专家名称列表 */
+function formatSubTaskNames(subTasks?: SubTaskTraceItem[]): string {
+  if (!subTasks || subTasks.length === 0) return ''
+  const seen = new Set<string>()
+  const names: string[] = []
+  for (const sub of subTasks) {
+    const name = sub.roleName?.trim()
+    if (name && !seen.has(name)) {
+      seen.add(name)
+      names.push(name)
+    }
+  }
+  return names.join(' / ')
 }
 
 // --------------------------------- 访客信息 ---------------------------------
@@ -1740,6 +1764,8 @@ onMounted(() => {
 
 .tool-pill {
   display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   align-items: center;
   gap: 6px;
   padding: 3px 9px;
@@ -1768,6 +1794,12 @@ onMounted(() => {
   color: #dc2626;
 }
 
+.tool-pill.status-cancelled {
+  border-color: var(--el-border-color);
+  background: var(--el-fill-color);
+  color: var(--el-text-color-secondary);
+}
+
 .tool-pill-type {
   font-size: 10px;
   font-weight: 700;
@@ -1778,6 +1810,12 @@ onMounted(() => {
 
 .tool-pill-name {
   font-weight: 600;
+}
+
+.tool-pill-targets {
+  font-size: 11.5px;
+  font-weight: 500;
+  opacity: 0.9;
 }
 
 .tool-pill-state {
