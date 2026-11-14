@@ -13,11 +13,14 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * 包装底层 ExecBackend，登记本次生成启动的后台 Shell 进程；会话终止或生成结束时统一 kill，
  * 避免 ShellTools 实例丢弃后后台进程无人回收。终止后拒绝再启动。
- * 同步命令自带超时、会自行结束，无需跟踪。
+ * 同步命令增加最大超时兜底，防止挂起任务耗尽系统资源。
  *
  * @author xxl-ai 2026-10-17
  */
 public class SkillShellTracker implements ExecBackend {
+
+    /** 单条命令最大允许超时时间（120秒，防止死循环/挂起命令耗尽 Worker 线程） */
+    public static final long MAX_COMMAND_TIMEOUT_MILLIS = 120_000L;
 
     private final ExecBackend delegate;                             /* 底层执行后端 */
     private final Set<ExecHandle> handles = ConcurrentHashMap.newKeySet();  /* 在册后台进程 */
@@ -29,7 +32,10 @@ public class SkillShellTracker implements ExecBackend {
 
     @Override
     public ExecResult run(ExecSpec spec) {
-        return delegate.run(spec);
+        if (cancelled) {
+            throw new IllegalStateException("会话已终止");
+        }
+        return delegate.run(boundSpec(spec));
     }
 
     @Override
@@ -37,7 +43,7 @@ public class SkillShellTracker implements ExecBackend {
         if (cancelled) {
             throw new IllegalStateException("会话已终止");
         }
-        ExecHandle handle = delegate.start(spec);
+        ExecHandle handle = delegate.start(boundSpec(spec));
         handles.add(handle);
         // 竞争兜底：登记后已被终止，立即回收
         if (cancelled) {
@@ -45,6 +51,20 @@ public class SkillShellTracker implements ExecBackend {
             handle.kill();
         }
         return handle;
+    }
+
+    /**
+     * 规范化并约束命令超时时间，防止未设超时或超长超时
+     */
+    public static ExecSpec boundSpec(ExecSpec spec) {
+        if (spec == null) {
+            return null;
+        }
+        long timeout = spec.timeoutMillis();
+        if (timeout <= 0 || timeout > MAX_COMMAND_TIMEOUT_MILLIS) {
+            return new ExecSpec(spec.command(), MAX_COMMAND_TIMEOUT_MILLIS, spec.env());
+        }
+        return spec;
     }
 
     /**
@@ -59,6 +79,10 @@ public class SkillShellTracker implements ExecBackend {
             }
         }
         handles.clear();
+    }
+
+    public boolean isCancelled() {
+        return cancelled;
     }
 
 }

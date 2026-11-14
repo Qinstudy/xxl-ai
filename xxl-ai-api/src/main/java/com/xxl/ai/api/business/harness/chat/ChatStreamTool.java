@@ -869,7 +869,11 @@ public class ChatStreamTool implements SmartLifecycle {
         if (skillTool != null) {
             tools.add(skillTool);
         }
-        tools.addAll(skillToolFactory.buildExecutorTools(agent, tracker));
+        boolean includeShell = agent != null && agent.getPublishStatus() == 0;
+        if (!includeShell && agent != null && StringTool.isNotBlank(agent.getSkillIds())) {
+            logger.warn("Agent 已处于公网发布状态，遵循 [SEC-002] 规范剥离宿主 ShellTools 执行特权, agentId={}", agent.getId());
+        }
+        tools.addAll(skillToolFactory.buildExecutorTools(agent, tracker, includeShell));
         return tools.toArray();
     }
 

@@ -31,6 +31,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -120,14 +121,34 @@ public class SkillToolFactory {
      * 与 buildTool 配套：提供 SKILL.md 依赖的执行能力（Shell / FileSystem / Glob / Grep / ListDirectory），
      * 全部限定于 Agent 物化根。Shell 命令经 tracker 执行，会话终止或生成结束时统一回收，避免进程泄露。
      */
+    /**
+     * 构建 Agent 装配的终端/文件执行工具集（无技能时返回空列表表示不注册）
+     * 默认策略：仅未发布（内部调试态）Agent 挂载 ShellTools，已发布到公网的 Agent 默认关闭 Shell，仅允许安全沙箱文件工具
+     */
     public List<Object> buildExecutorTools(Agent agent, SkillShellTracker tracker) {
+        return buildExecutorTools(agent, tracker, agent != null && agent.getPublishStatus() == 0);
+    }
+
+    /**
+     * 构建 Agent 装配的终端/文件执行工具集（无技能时返回空列表表示不注册）
+     *
+     * 与 buildTool 配套：提供 SKILL.md 依赖的执行能力（Shell / FileSystem / Glob / Grep / ListDirectory），
+     * 全部限定于 Agent 物化根。Shell 命令经 tracker 执行，会话终止或生成结束时统一回收，避免进程泄露。
+     *
+     * @param agent Agent 实例
+     * @param tracker Shell 进程跟踪器
+     * @param includeShell 是否允许挂载 ShellTools（发布到公网的 Agent 默认关闭 Shell，仅允许安全沙箱文件工具）
+     */
+    public List<Object> buildExecutorTools(Agent agent, SkillShellTracker tracker, boolean includeShell) {
         SkillSnapshot snapshot = sync(agent);
         if (snapshot == null) {
             return new ArrayList<>();
         }
         Path agentRoot = snapshot.root();
         List<Object> tools = new ArrayList<>();
-        tools.add(ShellTools.builder().execBackend(tracker).build());
+        if (includeShell) {
+            tools.add(ShellTools.builder().execBackend(tracker).build());
+        }
         tools.add(FileSystemTools.builder().allowedDirectory(agentRoot).build());
         tools.add(GlobTool.builder().workingDirectory(agentRoot).allowedDirectory(agentRoot).build());
         tools.add(GrepTool.builder().workingDirectory(agentRoot).allowedDirectory(agentRoot).build());
@@ -136,12 +157,50 @@ public class SkillToolFactory {
     }
 
     /**
-     * 构建 Agent 的 Shell 进程跟踪器：工作目录限定于 Agent 物化根，进程经其登记以便回收
+     * 构建 Agent 的 Shell 进程跟踪器：工作目录限定于 Agent 物化根，进程经其登记以便回收；
+     * 清理脱敏敏感环境变量，阻断通过 env 导出数据库或缓存秘钥。
      *
      * @param agentId Agent ID
      */
     public SkillShellTracker newShellTracker(long agentId) {
-        return new SkillShellTracker(LocalExecBackend.builder().workingDirectory(agentRoot(agentId)).build());
+        Map<String, String> safeEnv = buildSafeEnvironment();
+        LocalExecBackend backend = LocalExecBackend.builder()
+                .workingDirectory(agentRoot(agentId))
+                .cleanEnvironment(true)
+                .environment(safeEnv)
+                .build();
+        return new SkillShellTracker(backend);
+    }
+
+    /** 允许透传给 Skill 子进程的最小环境变量白名单 */
+    private static final Set<String> SAFE_ENV_ALLOWLIST = Set.of(
+            "PATH", "HOME", "USER", "LOGNAME", "SHELL",
+            "LANG", "LC_ALL", "LC_CTYPE",
+            "TZ", "TMPDIR", "TEMP", "TMP", "TERM",
+            "PYTHONIOENCODING", "PYTHONUNBUFFERED", "VIRTUAL_ENV", "CONDA_PREFIX", "NODE_ENV"
+    );
+
+    /**
+     * 构建安全子进程环境变量（最小权限白名单模式，阻断宿主机数据库、Redis、云凭证等隐式泄露）
+     */
+    public static Map<String, String> buildSafeEnvironment() {
+        return filterSafeEnvironment(System.getenv());
+    }
+
+    /**
+     * 基于白名单过滤给定环境变量映射
+     */
+    public static Map<String, String> filterSafeEnvironment(Map<String, String> sourceEnv) {
+        Map<String, String> safeEnv = new HashMap<>();
+        if (sourceEnv == null || sourceEnv.isEmpty()) {
+            return safeEnv;
+        }
+        for (Map.Entry<String, String> entry : sourceEnv.entrySet()) {
+            if (entry.getKey() != null && SAFE_ENV_ALLOWLIST.contains(entry.getKey().toUpperCase())) {
+                safeEnv.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return safeEnv;
     }
 
     /**
@@ -235,9 +294,17 @@ public class SkillToolFactory {
         }
         // 组件节点路径：根级节点名即路径，子节点逐级拼接父目录
         Map<Long, String> pathCache = new HashMap<>();
+        Path normalizedRoot = skillDir.toAbsolutePath().normalize();
         boolean hasMain = false;
         for (SkillFile file : fileList) {
-            Path target = skillDir.resolve(resolvePath(file, fileMap, pathCache));
+            String relPath = resolvePath(file, fileMap, pathCache);
+            Path target = normalizedRoot.resolve(relPath).normalize();
+            if (!target.startsWith(normalizedRoot)) {
+                throw new SecurityException("非法 Skill 文件路径穿越，拒绝物化: " + file.getName());
+            }
+            if (Files.isSymbolicLink(target)) {
+                throw new SecurityException("检测到软链接目标文件，拒绝物化: " + file.getName());
+            }
             if (file.getType() == 1) {
                 if (SKILL_FILE_NAME.equals(file.getName())) {
                     hasMain = true;
@@ -332,14 +399,21 @@ public class SkillToolFactory {
     }
 
     /**
-     * 路径净化：屏蔽路径分隔符与穿越片段
+     * 路径净化：屏蔽路径分隔符、NUL 字符与独立 "." / ".." 穿越片段（保留合法文件名内双点号）
      */
     private String sanitize(String name) {
         if (StringTool.isBlank(name)) {
             return "_";
         }
-        String cleaned = name.replace('\\', '_').replace('/', '_').replace("..", "_");
-        return cleaned.isEmpty() ? "_" : cleaned;
+        String trimmed = name.trim();
+        if (".".equals(trimmed) || "..".equals(trimmed)) {
+            return "_";
+        }
+        String cleaned = trimmed.replace('\\', '_').replace('/', '_').replace('\0', '_');
+        if (".".equals(cleaned) || "..".equals(cleaned) || cleaned.isEmpty()) {
+            return "_";
+        }
+        return cleaned;
     }
 
     /**
