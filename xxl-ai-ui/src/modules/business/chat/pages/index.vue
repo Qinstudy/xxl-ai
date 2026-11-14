@@ -197,10 +197,10 @@
                     <span v-if="msg.extData?.toolTraces?.length" class="trace-metric">
                       {{ t('business.chat.toolCount', [msg.extData.toolTraces.length]) }}
                     </span>
-                    <span class="trace-open-link" @click="openTraceDrawer(msg, 'waterfall')">
+                    <button type="button" class="trace-open-link" @click="openTraceDrawer(msg, 'waterfall')">
                       <el-icon><DataAnalysis /></el-icon>
                       <span>{{ t('business.chat.viewTrace') }}</span>
-                    </span>
+                    </button>
                   </div>
                 </div>
                 <!-- 发送时间：鼠标悬浮展示 -->
@@ -221,9 +221,10 @@
                   <span>{{ t('business.chat.promptVariablesTitle') }}</span>
                 </div>
                 <div class="vars-grid">
-                  <div v-for="item in agentPromptVariables" :key="item.name" class="var-item">
-                    <label class="var-name" :title="item.name">{{ item.name }}</label>
+                  <div v-for="(item, idx) in agentPromptVariables" :key="item.name" class="var-item">
+                    <label class="var-name" :for="`prompt-var-new-${idx}`" :title="item.name">{{ item.name }}</label>
                     <el-input
+                      :id="`prompt-var-new-${idx}`"
                       v-model="currentSessionVariables[item.name]"
                       size="small"
                       :placeholder="item.defaultValue || t('business.chat.promptVariablePlaceholder')"
@@ -281,14 +282,17 @@
             </div>
             <div v-show="varsExpanded" class="chat-vars-bar-body">
               <div class="vars-grid">
-                <div v-for="item in agentPromptVariables" :key="item.name" class="var-item">
-                  <label class="var-name" :title="item.name">{{ item.name }}</label>
+                <div v-for="(item, idx) in agentPromptVariables" :key="item.name" class="var-item">
+                  <label class="var-name" :for="`prompt-var-bar-${idx}`" :title="item.name">{{ item.name }}</label>
                   <el-input
+                    :id="`prompt-var-bar-${idx}`"
                     v-model="currentSessionVariables[item.name]"
                     size="small"
                     :placeholder="item.defaultValue || t('business.chat.promptVariablePlaceholder')"
                     clearable
+                    @input="handleSessionVarChange"
                     @change="handleSessionVarChange"
+                    @clear="handleSessionVarChange"
                   />
                 </div>
               </div>
@@ -412,12 +416,20 @@ function getSessionVarsStorageKey(sessionId: number): string {
   return `xxl_ai_vars_${uuid.value}_${sessionId}`
 }
 
-function initVariablesForNewChat() {
-  const vars: Record<string, string> = {}
+function mergePromptVariables(snapshot?: Record<string, string>): Record<string, string> {
+  const merged: Record<string, string> = {}
   for (const item of agentPromptVariables.value) {
-    vars[item.name] = item.defaultValue ?? ''
+    if (snapshot && Object.prototype.hasOwnProperty.call(snapshot, item.name)) {
+      merged[item.name] = snapshot[item.name] ?? ''
+    } else {
+      merged[item.name] = item.defaultValue ?? ''
+    }
   }
-  currentSessionVariables.value = vars
+  return merged
+}
+
+function initVariablesForNewChat() {
+  currentSessionVariables.value = mergePromptVariables()
 }
 
 function loadSessionVariables(sessionId: number) {
@@ -425,16 +437,20 @@ function loadSessionVariables(sessionId: number) {
   const stored = sessionStorage.getItem(key)
   if (stored) {
     try {
-      currentSessionVariables.value = JSON.parse(stored)
-      return
+      const parsed = JSON.parse(stored)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        currentSessionVariables.value = mergePromptVariables(parsed as Record<string, string>)
+        return
+      }
     } catch (e) {
       // ignore
     }
   }
-  // 从已有助手消息快照恢复
-  for (const msg of messages.value) {
+  // 从最近一条已有助手消息快照恢复（倒序扫描，避免取到首轮过期变量）
+  for (let i = messages.value.length - 1; i >= 0; i--) {
+    const msg = messages.value[i]
     if (msg.role === 'assistant' && msg.extData?.runMeta?.promptVariables) {
-      currentSessionVariables.value = { ...msg.extData.runMeta.promptVariables }
+      currentSessionVariables.value = mergePromptVariables(msg.extData.runMeta.promptVariables)
       sessionStorage.setItem(key, JSON.stringify(currentSessionVariables.value))
       return
     }
@@ -1898,10 +1914,17 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  padding: 2px 6px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-size: inherit;
+  line-height: inherit;
   color: var(--el-color-primary);
   font-weight: 500;
   cursor: pointer;
   &:hover {
+    background: rgba(64, 158, 255, 0.08);
     text-decoration: underline;
   }
 }
