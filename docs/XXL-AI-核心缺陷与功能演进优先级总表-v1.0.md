@@ -1,7 +1,7 @@
-# XXL-AI 核心缺陷与功能演进优先级总表 v1.4
+# XXL-AI 核心缺陷与功能演进优先级总表 v1.5
 
-> **状态**：持续演进定稿（已融合用户 8 处评审意见、源码深度审计纠偏、Harness 4 项微创手术，并于 2026-11-08 完成源码现状对账与 `[FEAT-005]` 落地验收）  
-> **评估基准**：基于 XXL-AI 当前主干源码、5 卷沉淀文档及对标参考项目（LightBot / AiAgentDemo）实测比对  
+> **状态**：持续演进中（已融合用户 8 处评审意见、源码深度审计纠偏、Harness 4 项微创手术，并于 **2026-11-14** 完成最近核心特性页面 E2E 测试、跨访客 IDOR API 补测及 `[FEAT-009]`/`[FEAT-010]` 前端修复提交后对账更新）
+> **评估基准**：基于 XXL-AI `dev-cloud` 分支源码、`docs/` 沉淀文档、22 个后端单元/安全测试类及浏览器页面实测结果
 > **归档位置**：`docs/XXL-AI-核心缺陷与功能演进优先级总表-v1.0.md`  
 
 ---
@@ -46,10 +46,10 @@ flowchart TD
         D10["Workflow 轻量 DAG 拓扑执行引擎与基础节点 (FEAT-009 阶段一)"]
     end
 
-    subgraph StillGaps["当前依然待办的缺陷与功能缺口"]
-        G1["【P2 运行时容灾】Stream任务超限熔断 (DATA-001) & PEL防重锁 (RUN-001) & 【P4】集群停止广播 (RUN-002)"]
-        G2["【P2/P3 工具治理】多工具中间迷失治理 (TOOL-002) & 动态工具检索与路由 (FEAT-008)"]
-        G3["【P3 体系演进】Workflow可视化画布高级节点 (FEAT-009 阶段二) & 知识图谱 (FEAT-015)"]
+    subgraph StillGaps["当前依然待办或完成一半的缺陷与功能缺口"]
+        G1["【完成一半】Workflow 阶段二 18 节点/拖拽画布 (FEAT-009 & OPEN-005) · 自动化测试 CI 化 (TEST-001) · Eval 工具链挂载取舍 (OPEN-001)"]
+        G2["【P2/P4 未开始】Stream 任务超限熔断 (DATA-001) · PEL 防重锁 (RUN-001) · 集群停止广播 (RUN-002)"]
+        G3["【P2/P3 未开始】多工具中间迷失治理 (TOOL-002) · 动态工具检索与路由 (FEAT-008) · 知识图谱 (FEAT-015)"]
     end
 
     Done -.-> StillGaps
@@ -94,20 +94,20 @@ flowchart TD
 | **P0** | **[RAG-CORE-002]** | 算法精度 | **检索无相似度阈值（硬取 Top-K 垃圾注入）**<br>`RagTool.java#L209-212`<br>`KnowledgeBase.java` | `SearchRequest` 未配置 `similarityThreshold`。用户问无关闲聊也会强行将低相关切片喂给大模型，**诱发严重幻觉**。 | **【已完成】** 知识库配置增加 `similarity_threshold`（默认 0.40），底座向量检索与多路融合后置均已实现阈值过滤拦截。 |
 | **P0** | **[SPACE-CORE-001]** | 租户安全 | **首页看板统计跨租户全量泄露**<br>`DashboardController.java#L48-98`<br>`SessionMsgMapper.xml#L143-164` | 早期图表与统计 SQL 缺少 `space_id` 过滤，可透视全平台消息量与他租户 Agent 名称。 | **【已完成】** `/stats`、`/sessionMsgTrend`、`/sessionMsgShare` 均已校验 `spaceService.checkSpace` 并隔离至 `countBySpaceId`、`trendListBySpace`、`agentShareBySpace`。 |
 | **P1** | **[RAG-CORE-001]** | 算法精度 | **字符暴力截断导致的破词与断句**<br>`RagTool.java#L530-548` | `split()` 纯按字符长度 `substring` 截断，长单词与代码行被腰斩，破坏语义原子性导致召回率骤降。 | **【已完成】** 引入 `RagTextSplitter` 递归语义分块器（段落 -> 句子 -> 空格逐级切分），并保护 QA 问答对原子切分。 |
-| **P1** | **[CTX-001]** | 上下文治理 | **历史上下文按固定条数截断易爆 Token**<br>`ChatStreamTool.java#L151,L795` | 历史消息固定取最近 `historyLimit` 条（默认 50 条）。遇到长代码或长文档总结易打穿模型 Context Window 触发 HTTP 400。 | **【已完成】** 引入 `ChatContextWindowTool`（基于 JTokkit `cl100k_base` 编码），按 Token 预算倒序滑动窗口裁剪，确保 user 起始轮次完整。 |
-| **P1** | **[CTX-002]** | 上下文治理 | **动态 RAG 切片拼入 `SystemMessage` 击穿多轮前缀缓存**<br>`RagTool.java#L358-381`<br>`ChatStreamTool.java#L838` | `RagTool#injectContextPrompt` 仍将每轮动态检索到的切片直接拼入头部 `SystemMessage`，导致多轮追问时历史消息的 Prefix KV Cache 全量失效，推高 TTFT 与输入成本。 | **【已完成】** 遵循“静态前置、动态后置”原则：采用 `RagTool#buildContextualQuestion` 将动态检索上下文拼在队尾**当前 `UserMessage`** 上（保住前缀缓存，且不污染数据库用户原话）。 |
-| **P2** | **[SEC-001]** | 安全越权 | **公开端免登录接口越权遍历 (IDOR)**<br>`ChatController.java`<br>`ChatSessionController.java`<br>`VisitorSecurityTool.java` | 接口免登录，仅凭客户端入参遍历或伪造 `visitorId`/`sessionId`，存在越权读取或删除其他访客会话风险。 | **【已完成】** 签发基于 HMAC-SHA256 签名的 `X-Visitor-Token`，前后端双向刷新流转；Session/Chat 接口对会话归属做 DB 强校验与阻断。 |
-| **P2** | **[SEC-002]** | 安全隔离 | **Skill 执行器宿主机公网 RCE**<br>`SkillToolFactory.java`<br>`SkillShellTracker.java`<br>`ChatStreamTool.java` | 仅限定 `workingDirectory`/`allowedDirectory`，公网免登录端通过 Prompt 注入直接调用 `ShellTools` 执行系统级 Bash 命令。 | **【已完成】** 公网发布态自动剥离 `ShellTools` 执行特权（保留安全文件工具与知识库）；环境变量全面脱敏（剔除密码/秘钥）；物化阶段增加规范路径强防穿越校验；命令执行施加 120s 强制超时熔断。 |
-| **P2** | **[DATA-001]** | 运行时容灾 | **任务流堆积超限导致静默丢弃任务**<br>`ChatStreamTool.java#L105,L366` | 积压超过 5000 条时 Redis `approximateTrimming` 会静默丢弃旧任务，用户端可能无异常反馈。 | 入队前执行 `XLEN` 预检，超限时主动熔断并返回友好错误。 |
-| **P2** | **[RUN-001]** | 资产损耗 | **PEL 故障接管无幂等导致重复计费**<br>`ChatStreamTool.java#L400-451` | Worker 故障认领未确认任务后直接重新执行，若前节点已部分调用模型，可能引发二次计费。 | 基于 `SETNX xxl:ai:run:lock:{msgId}` 建立分布式防重执行锁。 |
-| **P4** | **[RUN-002]** | 运行时容灾 | **多实例集群部署下 `/stop` 跨节点终止失效**<br>`ChatStreamTool.java#L158,L333` | `runContexts` 保存在单机 JVM 内存中，集群节点 `/stop` 路由到非执行节点时无法中断流。 | 引入 Redis Pub/Sub 广播终止事件，或基于 Redis 取消标记位驱动 Worker 退出。（已降级至 P4 远期支持） |
+| **P1** | **[CTX-001]** | 上下文治理 | **历史上下文按固定条数截断易爆 Token**<br>`ChatStreamTool.java#L151,L914`<br>`ChatContextWindowTool.java` | 历史消息固定取最近 `historyLimit` 条（默认 50 条）。遇到长代码或长文档总结易打穿模型 Context Window 触发 HTTP 400。 | **【已完成（261114 页面实测通过）】** 引入 `ChatContextWindowTool`（基于 JTokkit `cl100k_base` 编码），按 Token 预算倒序滑动窗口裁剪，确保 user 起始轮次完整并在 Trace 记录裁剪日志（注：单轮 `content` 数据库字段为 `TEXT` 约 64KB 上限）。 |
+| **P1** | **[CTX-002]** | 上下文治理 | **动态 RAG 切片拼入 `SystemMessage` 击穿多轮前缀缓存**<br>`RagTool.java#L496-520`<br>`ChatStreamTool.java#L911` | `RagTool#injectContextPrompt` 仍将每轮动态检索到的切片直接拼入头部 `SystemMessage`，导致多轮追问时历史消息的 Prefix KV Cache 全量失效，推高 TTFT 与输入成本。 | **【已完成（261114 页面实测通过）】** 遵循“静态前置、动态后置”原则：采用 `RagTool#buildContextualQuestion` 将动态检索上下文拼在队尾**当前 `UserMessage`** 上（保住前缀缓存，且不污染数据库用户原话与前端提问气泡）。 |
+| **P2** | **[SEC-001]** | 安全越权 | **公开端免登录接口越权遍历 (IDOR)**<br>`ChatController.java`<br>`ChatSessionController.java`<br>`VisitorSecurityTool.java` | 接口免登录，仅凭客户端入参遍历或伪造 `visitorId`/`sessionId`，存在越权读取或删除其他访客会话风险。 | **【已完成（261114 页面+跨访客 IDOR API 实测通过）】** 签发基于 HMAC-SHA256 签名的 `X-Visitor-Token`，前后端双向刷新流转；Session/Chat 接口对会话归属做 DB 强校验与阻断（多实例密钥一致性见 `OPEN-003`）。 |
+| **P2** | **[SEC-002]** | 安全隔离 | **Skill 执行器宿主机公网 RCE**<br>`SkillToolFactory.java`<br>`SkillShellTracker.java`<br>`ChatStreamTool.java` | 仅限定 `workingDirectory`/`allowedDirectory`，公网免登录端通过 Prompt 注入直接调用 `ShellTools` 执行系统级 Bash 命令。 | **【已完成（页面已测公网剥离 ShellTools；底层隔离由 `SkillSecurityTest` 覆盖）】** 公网发布态自动剥离 `ShellTools` 执行特权；环境变量收敛为最小权限白名单（见 `OPEN-004`）；物化阶段强防路径穿越校验；命令执行 120s 强制超时熔断。 |
+| **P2** | **[DATA-001]** | 运行时容灾 | **任务流堆积超限导致静默丢弃任务**<br>`ChatStreamTool.java#L103,L383` | 积压超过 5000 条时 Redis `approximateTrimming` 会静默丢弃旧任务，用户端可能无异常反馈。 | **【未开始】** 入队前尚无 `XLEN` 预检，仍依赖 `.maxlen(5000)` 裁剪；待补齐超限主动熔断与友好错误返回。 |
+| **P2** | **[RUN-001]** | 资产损耗 | **PEL 故障接管无幂等导致重复计费**<br>`ChatStreamTool.java#L400-451` | Worker 故障认领未确认任务后直接重新执行，若前节点已部分调用模型，可能引发二次计费。 | **【未开始】** 尚无 `xxl:ai:run:lock:{msgId}` 分布式防重执行锁。 |
+| **P4** | **[RUN-002]** | 运行时容灾 | **多实例集群部署下 `/stop` 跨节点终止失效**<br>`ChatStreamTool.java#L158,L333` | `runContexts` 保存在单机 JVM 内存中，集群节点 `/stop` 路由到非执行节点时无法中断流。 | **【未开始（已降级至 P4 远期支持）】** 待多实例集群时引入 Redis Pub/Sub 广播终止事件或 Redis 取消标记位。 |
 | **P2** | **[LLM-001]** | 运行时故障 | **模型底层调用受限于 OkHttp 60s 隐式超时**<br>`LlmModelFactory.java#L48-50,L94` | 推理模型长思考或长文输出超过 60s 被默认 Socket 超时强制掐断。 | **【已完成-261107】** 工厂构建 `OpenAiChatOptions` 时显式设置 `.timeout(Duration.ofMillis(streamTimeout))` 对齐 180s。 |
-| **P2** | **[LLM-002]** | 可观测盲区 | **流式中断/异常终止时 Token 账单漏记（归零缺失）**<br>`LlmChatTool.java#L184-203`<br>`ChatStreamTool.java#L540-570` | 流式协议仅在尾帧下发 `usage`。当流中途异常断流（`FAILED`）或主动停止（`CANCELLED`）时未收到尾帧，导致 `tokenUsage` 落库为 `0`。 | **【已完成-261110】** 尾帧精确值优先 + 中断/异常或未收到尾帧时采用 JTokkit 本地分词器按已输入与已生成文本估算兜底并打标 `estimated: true`。 |
+| **P2** | **[LLM-002]** | 可观测盲区 | **流式中断/异常终止时 Token 账单漏记（归零缺失）**<br>`LlmChatTool.java#L184-203`<br>`ChatStreamTool.java#L540-570` | 流式协议仅在尾帧下发 `usage`。当流中途异常断流（`FAILED`）或主动停止（`CANCELLED`）时未收到尾帧，导致 `tokenUsage` 落库为 `0`。 | **【已完成-261110（含 `TokenEstimationFallbackTest`，待补页面 Stop/断流专项验收）】** 尾帧精确值优先 + 中断/异常或未收到尾帧时采用 JTokkit 本地分词器估算兜底并打标 `estimated: true`。 |
 | **P2** | **[TOOL-001]** | 运行时故障 | **超长 ToolCall 输出导致 SSE 转发通道超时**<br>`ObservableToolCallback.java`<br>`ChatStreamTool.java#L824,L914` | 超大工具调用期间无事件写入，易使流式通道静默超时断开。 | **【已完成-261103】** 通过 `ObservableToolCallback` 装饰器实时下发 `RUNNING/SUCCESS/ERROR` `tool` 帧保活结果流并截断保护（模型侧 16000 字符、Trace 侧 1000 字符）。 |
 | **P2** | **[RAG-003]** | 交互体验 | **RAG 静默黑盒模式（分块与来源元数据丢失）**<br>`RagTool.java#L282-353`<br>`ChatStreamTool.java#L834-840` | 早期依赖默认 Advisor 吞噬切片来源，前端无法感知命中哪篇文档及相似度得分。 | **【已完成-261103】** 已改造为 `RagTool#retrieveForChat` 显式前置检索管线，随 SSE 推送 `reference` 帧并在前端折叠展示来源卡片。 |
-| **P2** | **[TOOL-002]** | 提示词工程 | **单 Agent 挂载多工具导致的“中间迷失”踩踏**<br>*(来源: 实战排雷卷)* | 绑定大量 MCP/Skill 工具后全量注入 Schema，消耗大量上下文且易引发工具选择退化。 | 引入动态工具路由（Tool Retrieval），按用户意图检索最相关工具注入上下文。 |
-| **P2** | **[PROT-001]** | 协议判定 | **MCP 服务 `/sse` 判定采用粗暴字符串包含**<br>`McpClientTool.java#L197` | `config.url.contains("/sse")` 易将包含 `sse` 子串的非 SSE 地址误判为 SSE 传输模式。 | **【已完成-261110】** 新增 `isSseEndpoint(url)`，使用 `URI.create(url).getRawPath()` 精确判定路径是否以 `/sse` 结尾（去除末尾斜杠）。 |
-| **P2** | **[TEST-001]** | 工程质量 | **默认跳过自动化测试且核心覆盖不足**<br>`pom.xml#L26` | `pom.xml` 仍声明 `<maven.test.skip>true</maven.test.skip>`；目前已补齐 `ObservabilityTraceTest` 与 `ArtifactSandboxTest` 单元测试，仍缺切片/多租户/集成测试防线。 | 移除或收敛默认跳过配置，持续补全 RAG 分块、断点续传与空间越权测试网。 |
+| **P2** | **[TOOL-002]** | 提示词工程 | **单 Agent 挂载多工具导致的“中间迷失”踩踏**<br>*(来源: 实战排雷卷)* | 绑定大量 MCP/Skill 工具后全量注入 Schema，消耗大量上下文且易引发工具选择退化。 | **【未开始】** 拟随 `[FEAT-008]` 引入动态工具路由（Tool Retrieval），按用户意图检索最相关工具注入上下文。 |
+| **P2** | **[PROT-001]** | 协议判定 | **MCP 服务 `/sse` 判定采用粗暴字符串包含**<br>`McpClientTool.java#L197` | `config.url.contains("/sse")` 易将包含 `sse` 子串的非 SSE 地址误判为 SSE 传输模式。 | **【已完成-261110（含 `McpClientTransportTest`）】** 新增 `isSseEndpoint(url)`，使用 `URI.create(url).getRawPath()` 精确判定路径是否以 `/sse` 结尾（去除末尾斜杠）。 |
+| **P2** | **[TEST-001]** | 工程质量 | **默认跳过自动化测试且核心覆盖不足**<br>`pom.xml#L26` | `pom.xml#L26` 仍声明 `<maven.test.skip>true</maven.test.skip>`；默认构建不会执行测试。 | **【完成一半 / 进行中】** `xxl-ai-api/src/test` 已补齐 22 个单元/安全测试类（含 RAG 分块、RRF、HMAC 鉴权、Skill 隔离、DAG 引擎、Eval 安全、SubAgent、Prompt 变量等）；但仍需评估放开默认跳过配置、并补齐真实中间件/SSE 端到端集成测试。 |
 
 ---
 
@@ -120,17 +120,17 @@ flowchart TD
 | **-** | **[FEAT-002]** | Agent 引擎 | **大模型生成的主动终止 (Stop)** | 对齐主流体验 | 前端 Stop 按钮 ➔ 后端 `/chat/stop` ➔ 标记 `cancelled` ➔ 线程 `interrupt()` ➔ 强杀 Skill 子进程 ➔ 回填终止正文。 | **已完成（单机闭环）**<br>*(仅保留集群缺陷 RUN-002)* |
 | **P1** | **[FEAT-001]** | 全链路可观测 | **内聚式 Run 运行实例与 Trace 机制** | 借鉴 `LightBot` 核心理念 | **无需新建 `chat_run` 表**！直接复用 `xxl_ai_session_msg` 助手占位行作为 Run 实体，扩充 `ext_json` 字段沉淀 `runMeta` / `tokenUsage` / `spans` / `references` / `toolTraces` / `logs`。 | **已完成。高（B 级轻量化方案）** |
 | **P2** | **[FEAT-003]** | RAG 知识库 | **RAG 引用来源卡片与元数据可视化** | 借鉴 `LightBot` 的 `QueryKnowledgeResult` | 1. `RagTool#retrieveForChat` 显式检索捕获切片，前置推送 `event: reference`；<br>2. `ext_json` 存储切片快照；<br>3. 前端在气泡上方展示折叠引用卡片与相似度得分。 | **已完成。高（B 级）** |
-| **P2** | **[FEAT-004]** | RAG 知识库 | **向量+BM25多路召回与 RRF 融合** | 借鉴 `AiAgentDemo` 算法漏斗 | **零新增中间件**：基于轻量内存 BM25 倒排索引 + Milvus 向量双路召回，通过加权 RRF（倒数排名融合，QA 享受 1.15x 加成）合并，解决专有名词搜不到问题。 | **已完成 (2026-11-10)。高（B 级克制方案）** |
+| **P2** | **[FEAT-004]** | RAG 知识库 | **向量+BM25多路召回与 RRF 融合** | 借鉴 `AiAgentDemo` 算法漏斗 | **零新增中间件**：基于轻量内存 BM25 倒排索引 + Milvus 向量双路召回，通过加权 RRF（倒数排名融合，QA 享受 1.15x 加成）合并，解决专有名词搜不到问题。 | **已完成 (2026-11-10，261114 页面实测通过)。高（B 级克制方案）** |
 | **P2** | **[FEAT-005]** | AI 扩展体系 | **Agent 交付物产物沙箱 (Artifacts)** | 增强 Agent 生产力形态 | 1. Run 前对启用 Skill 的 `agent_{agentId}` 工作目录采集文件基线（含大小/mtime/CRC32）；Run 收尾通过 `SkillArtifactTool` 差异提取 `.sql`/`.html`/`.csv`/`.md` 复制归档至隔离产物区（`session_{sessionId}/run_{msgId}`，支持同目录重名去重与防穿越校验；显式排除 `SKILL.md` 元定义文件）；<br>2. 经 SSE `event: artifact` 与 `ext_json.artifacts` 同步前后端；<br>3. C 端对话页与 B 端对话管理均支持高亮卡片、HTML 沙箱隔离预览 / CSV 结构化表格 / MD 净化渲染 / SQL 源码查看及一键下载，并随会话/Agent 删除级联清理。 | **已完成 (2026-11-08，支持扩展至 .md)。中高（B 级）** |
-| **P2** | **[FEAT-006]** | Agent 引擎 | **大模型推理超参数动态配置 (Options)** | 精准控制生成稳定性 | 在 Agent 编辑页开放 `Temperature`、`Top_P`、`Max_Tokens`，在 `LlmModelFactory` / `ChatStreamTool` 动态注入对应的 `OpenAiChatOptions`。 | **已完成 (2026-11-10)。极高（B 级）** |
+| **P2** | **[FEAT-006]** | Agent 引擎 | **大模型推理超参数动态配置 (Options)** | 精准控制生成稳定性 | 在 Agent 编辑页开放 `Temperature`、`Top_P`、`Max_Tokens`，在 `LlmModelFactory` / `ChatStreamTool` 动态注入对应的 `OpenAiChatOptions`。 | **已完成 (2026-11-10，261113 页面实测通过)。极高（B 级）** |
 | **P2** | **[FEAT-007]** | 全链路可观测 | **工具调用证据链与 Trace 回放** | 解决模型决策路径黑盒问题 | 基于 `ObservableToolCallback` 装饰器记录 Tool 类型、名字、入参摘要、结果摘要与耗时，前端以状态胶囊与抽屉时间线展开回放。 | **已完成。极高（B 级）** |
-| **P2** | **[FEAT-010]** | Agent 引擎 | **Prompt 动态变量注入与表单槽位** | 增强 Prompt 动态适应能力 | 支持在系统提示词中定义 `{{input}}`、`{{user_role:default}}` 槽位，C 端会话进入与开始前渲染槽位表单，支持 session 级持久化与 Trace 注入快照。 | **已完成 (2026-11-10)。极高（B 级）** |
-| **P2** | **[FEAT-011]** | RAG 知识库 | **检索测试台增强 (Playground) 与问答对 (FAQ)** | 对标 LightBot 检索测试 | 1. **测试台多维透视**：在 `doc.vue` 检索测试台中回显文档名 `docName`，支持 HYBRID / VECTOR / BM25 检索模式切换与临时阈值调优；<br>2. **QA 问答对管理**：支持手动录入精细化问答对，自动原子分块，享 1.15x 融合权重。 | **已完成 (2026-11-10)。高（B 级）** |
+| **P2** | **[FEAT-010]** | Agent 引擎 | **Prompt 动态变量注入与表单槽位** | 增强 Prompt 动态适应能力 | 支持在系统提示词中定义 `{{input}}`、`{{user_role:default}}` 槽位，C 端会话进入与开始前渲染槽位表单，支持 session 级持久化与 Trace 注入快照。 | **已完成 (2026-11-10，261114 UI 修复并页面回归通过)。极高（B 级）** |
+| **P2** | **[FEAT-011]** | RAG 知识库 | **检索测试台增强 (Playground) 与问答对 (FAQ)** | 对标 LightBot 检索测试 | 1. **测试台多维透视**：在 `doc.vue` 检索测试台中回显文档名 `docName`，支持 HYBRID / VECTOR / BM25 检索模式切换与临时阈值调优；<br>2. **QA 问答对管理**：支持手动录入精细化问答对，自动原子分块，享 1.15x 融合权重。 | **已完成 (2026-11-10，261114 页面实测通过)。高（B 级）** |
 | **P2** | **[FEAT-012]** | 全链路可观测 | **全链路 LLM Trace 监控与实时日志流** | 对标 Langfuse / LightBot Trace | 基于 `TraceCollector` 捕获 `runMeta`（状态机/TTFT/总耗时/Worker 节点）、多轮累加 `tokenUsage`、阶段 `spans` 时延瀑布图、`toolTraces`（入出参 1000 字符摘要）、`references` 与 `logs` 实时日志流；前端提供 `TraceInspectorDrawer` 抽屉式回放（注：当前记录结构化指标与入出参摘要，暂未存储模型原始 HTTP Request/Response 全报文）。 | **已完成。中高（B 级）** |
 | **P3** | **[FEAT-008]** | AI 扩展体系 | **动态工具路由与检索 (Tool Retrieval)** | 解决 `[TOOL-002]` 61 工具踩踏 | 根据用户提问，先检索出最相关的 3~5 个工具 Schema 喂给模型，避免塞爆 Prompt 并降低幻觉。 | **未开始。中（C 级）** |
-| **P3** | **[FEAT-009]** | Workflow 编排 | **Workflow 可视化工作流编排 (DAG 画布)** | 借鉴 `LightBot` 18 节点工作流 | **分阶段演进**：<br>- 阶段一：6 类核心基础节点（开始、LLM、知识检索、工具调用、条件分支、结束）轻量 DAG 执行引擎与试跑调试抽屉；<br>- 阶段二：支持分类器、代码执行、嵌套子工作流、人工确认等 18 种节点类型与 Vue Flow 拖拽式画布。 | **阶段一已完成 (2026-11-12)。中（C 级微创 2 表方案）** |
-| **P3** | **[FEAT-013]** | AI 扩展体系 | **SubAgents 多智能体协作体系** | 借鉴 LightBot SubAgent 协作 | **Agent-as-a-Tool 模式**：将子 Agent 包装为标准 Spring AI `ToolCallback`，主 Agent 自主规划拆解并将子任务委派给 SubAgent 执行后汇总。 | **已完成 (2026-11-10)。高（C 级微创方案）** |
-| **P3** | **[FEAT-014]** | 评测体系 | **AI 应用与 RAG 质量量化评测体系** | 对标 LightBot 评测集与实验 | 上传 Benchmark 评测集（Question + Ground Truth），内置 RAG 评估器（HitRate@K/MRR/忠实度/相关性）与 Agent 任务达成率评估，输出批量对比实验报告。 | **已完成 (2026-11-12)。中（C 级微创独立模块）** |
+| **P3** | **[FEAT-009]** | Workflow 编排 | **Workflow 可视化工作流编排 (DAG 画布)** | 借鉴 `LightBot` 18 节点工作流 | **分阶段演进**：<br>- 阶段一：6 类核心基础节点（开始、LLM、知识检索、工具调用、条件分支、结束）轻量 DAG 执行引擎与试跑调试抽屉；<br>- 阶段二：支持分类器、代码执行、嵌套子工作流、人工确认等 18 种节点类型与 Vue Flow 拖拽式画布（含 `OPEN-005` 生产态 `allowMock=false` 收敛）。 | **完成一半（阶段一 2026-11-12 完成并 261114 修复页面回归通过；阶段二未开始）。中（C 级）** |
+| **P3** | **[FEAT-013]** | AI 扩展体系 | **SubAgents 多智能体协作体系** | 借鉴 LightBot SubAgent 协作 | **Agent-as-a-Tool 模式**：将子 Agent 包装为标准 Spring AI `ToolCallback`，主 Agent 自主规划拆解并将子任务委派给 SubAgent 执行后汇总。 | **已完成 (2026-11-10，261113/14 含超时/取消修复并页面回归通过)。高（C 级）** |
+| **P3** | **[FEAT-014]** | 评测体系 | **AI 应用与 RAG 质量量化评测体系** | 对标 LightBot 评测集与实验 | 上传 Benchmark 评测集（Question + Ground Truth），内置 RAG 评估器（HitRate@K/MRR/忠实度/相关性）与 Agent 任务达成率评估，输出批量对比实验报告。 | **已完成 (2026-11-12，261114 页面实测通过；工具链挂载取舍见 `OPEN-001`)。中（C 级）** |
 | **P3** | **[FEAT-015]** | RAG 知识库 | **知识图谱与 GraphRAG 增强** | 借鉴 LightBot 图谱检索 | 结合轻量图存储，实现文档实体与关系三元组抽取、图谱可视化与全局图检索，解决跨多文档关联推理难题。（**克制引入，不作核心依赖**） | **未开始。低（视资源选配）** |
 
 ---
@@ -156,23 +156,23 @@ flowchart TD
 
 【阶段三：工业级中台与前沿算法演进】（P2 容灾/安全缺陷 + P3 体系功能）
   1. [已完成-261110] 架构落地【手术 4】：以 Agent-as-a-Tool 模式上线 [FEAT-013] SubAgents 多智能体委派体系（单层委派、同空间隔离、Trace/Token 并入主会话、多选关联）；
-  2. 落地 [FEAT-009]：打造轻量 Workflow DAG 执行引擎；
+  2. [完成一半] 落地 [FEAT-009]：阶段一轻量 Workflow DAG 执行引擎（6 类节点 + 调试试跑）已于 261112 落地并完成 261114 页面回归；阶段二（Vue Flow 拖拽画布、18 节点及 OPEN-005 收敛）待后续推进；
   3. [已完成-261112] 落地 [FEAT-014]：构建 AI 应用与 RAG 质量量化评测体系（HitRate@K / MRR / LLM 忠实度与相关性 / 目标达成率，内聚 2 表闭环）；
-  4. 加固 P2 级容灾并发与公网安全（[已完成-SEC-001] IDOR 鉴权、[已完成-SEC-002] Skill 深度防御、[DATA-001] 队列超限熔断、[RUN-001] 防重锁；[RUN-002] 集群停止广播降至 P4 远期支持）。
+  4. [部分完成] 加固 P2 级容灾并发与公网安全：[已完成-SEC-001] IDOR 鉴权、[已完成-SEC-002] Skill 深度防御、[未开始-DATA-001] 队列超限熔断、[未开始-RUN-001] 防重锁、[完成一半-TEST-001] 自动化测试网；[RUN-002] 集群停止广播降至 P4 远期支持。
 ```
 
 ---
 
 ## 六、 工业级 Java AI Agent 平台（对标 LightBot 体系）6 大核心能力覆盖核对总表
 
-| 核心能力域 | 期望核心指标与能力范围 | XXL-AI 当前源码现状（2026-11-10） | 当前总表覆盖情况与编号 | 判定结论与演进对齐方案 |
+| 核心能力域 | 期望核心指标与能力范围 | XXL-AI 当前源码现状（2026-11-14） | 当前总表覆盖情况与编号 | 判定结论与演进对齐方案 |
 |---|---|---|---|---|
 | **1. Agent 引擎** | 支持系统提示词、变量注入、多模型切换、海量模型自定义参数配置 | • 提示词：静态已有<br>• 模型切换：已有（指纹自失效缓存已闭环）<br>• 自定义参数：已有（`[FEAT-006]` 已完成）<br>• 变量注入：已有（`[FEAT-010]` 已完成） | • `[FEAT-006]` (P2) 大模型推理超参数动态配置（已完成）<br>• `[FEAT-010]` (P2) Prompt 动态变量注入与表单槽位（已完成） | **已全面闭环**。<br>超参数与动态变量模板槽位均已完成闭环支持。 |
-| **2. Workflow 可视化编排** | 基于 DAG 的工作流引擎，18 种节点类型，拖拽式编排 | 仅有基于 Redis Stream 的单对话流，尚无 DAG 工作流引擎 | • `[FEAT-009]` (P3) Workflow 工作流编排 (DAG 画布) | **已纳入路线**。<br>阶段一实现 6 节点轻量 DAG 引擎，阶段二扩展为 18 节点与 Vue Flow 拖拽画布。 |
+| **2. Workflow 可视化编排** | 基于 DAG 的工作流引擎，18 种节点类型，拖拽式编排 | 阶段一轻量 DAG 引擎（`START`/`LLM`/`KB_RETRIEVAL`/`TOOL`/`CONDITION`/`END`）、JSON 拓扑编排、调试抽屉与执行记录已落地并页面通过；阶段二可视化画布与扩展节点待建 | • `[FEAT-009]` (P3) Workflow 工作流编排（阶段一已完成 / 阶段二未开始） | **完成一半（阶段一闭环）**。<br>阶段二扩展为 18 节点、Vue Flow 拖拽画布，并按 `OPEN-005` 在发布态强制关闭 `allowMock`。 |
 | **3. RAG 知识库** | 文档上传 → 分块 → 向量化 → 检索 → 生成，完整 Pipeline，并支持高级检索测试、知识图谱、问答对等 | • 基础 Pipeline + 引用卡片：已有（`[FEAT-003]` 已完成）<br>• 嵌入模型缓存指纹失效：已修复（`[CACHE-001]`）<br>• 语义断句、相似度拦截、上下文后置：已完成（`[RAG-CORE-001]`、`[RAG-CORE-002]`、`[CTX-002]`）<br>• 向量+BM25多路召回与加权RRF重排：已完成（`[FEAT-004]`）<br>• 检索测试台增强与QA问答对：已完成（`[FEAT-011]`） | • `[CACHE-001]` (P0) 嵌入模型指纹自失效（已完成）<br>• `[RAG-CORE-002]` (P0) 检索相似度阈值拦截（已完成）<br>• `[RAG-CORE-001]` (P1) 递归语义分块断句（已完成）<br>• `[CTX-002]` (P1) 动态 RAG 后置拼入当前 `UserMessage` 保前缀缓存（已完成）<br>• `[FEAT-003]` (P2) 引用来源卡片（已完成）<br>• `[FEAT-004]` (P2) 向量+BM25多路召回与 RRF 融合（**已完成-261110**）<br>• `[FEAT-011]` (P2) 检索测试台增强与 QA 问答对（**已完成-261110**）<br>• `[FEAT-015]` (P3) 知识图谱与 GraphRAG 增强 | **高优精度、多路召回与测试台全面闭环**。<br>已落地 BM25 稀疏索引与加权 RRF 融合重排、QA 问答对原子切分与录入、Playground 多模式/临时阈值多维打分透视。下一步关注图谱增强。 |
 | **4. AI 扩展体系** | 工具 、 MCP、Skill、SubAgents 等 | • 内置执行工具 & Skill：已有<br>• MCP：已有客户端<br>• Agent 交付物产物沙箱：已完成（`[FEAT-005]`）<br>• SubAgents 多智能体协作：已完成（`[FEAT-013]`）<br>• 工具路由：尚无 | • `[FEAT-005]` (P2) Agent 交付物产物沙箱（**已完成-261108**）<br>• `[SEC-002]` (P2) Skill 宿主机深度防御（**已完成-261111**）<br>• `[TOOL-002]` (P2) 61 工具中间迷失治理<br>• `[FEAT-008]` (P3) 动态工具检索与路由<br>• `[FEAT-013]` (P3) SubAgents 多智能体协作体系（**已完成-261110**） | **多智能体与安全防线全面落地**。<br>已完成基于 Agent-as-a-Tool 模式的 SubAgents 委派、公网发布剥离 Shell 执行器、环境脱敏及物化防穿越，下一步关注 `[TOOL-002]` 与 `[FEAT-008]` 工具路由。 |
 | **5. 评测体系** | 数据集 + 评估器 + 实验，量化 AI 应用质量 | • 已落地微创 2 表架构（`xxl_ai_eval_dataset` + `xxl_ai_eval_experiment`），支持 HitRate@K/MRR 检索指标、LLM Judge 忠实度与答案相关性、Agent 达成率评估及抽屉式明细报告 | • `[FEAT-014]` (P3) AI 应用与 RAG 质量量化评测体系（**已完成-261112**） | **已全面闭环**。<br>吸收 LightBot 指标解耦与对照实验思想，舍弃 12 表重型包袱，以 2 张内聚表在业务与 Harness 支撑层实现全流程闭环。 |
-| **6. 全链路可观测** | LLM Trace、工具调用日志、实时日志流 | • 已基于 `xxl_ai_session_msg.ext_json` 完整落地 Run 状态机、TTFT/总耗时、多轮 Token 统计、时延瀑布图、工具入出参摘要证据链及实时 SSE 日志流抽屉（流式异常断流时的 Token 估算兜底纳入规划） | • `[FEAT-001]` (P1) 内聚式 Run 实体与状态机（已完成）<br>• `[FEAT-007]` (P2) 工具证据链与 Trace 回放（已完成）<br>• `[FEAT-012]` (P2) 全链路 LLM Trace 监控与实时日志流（已完成）<br>• `[LLM-002]` (P2) 流式中断 Token 估算兜底（后续规划） | **主体已完成**。<br>已全面打通前后端 Trace 观测体系，后续补齐断流/终止场景本地 Token 估算兜底。 |
+| **6. 全链路可观测** | LLM Trace、工具调用日志、实时日志流 | • 已基于 `xxl_ai_session_msg.ext_json` 完整落地 Run 状态机、TTFT/总耗时、多轮 Token 统计、时延瀑布图、工具入出参摘要证据链、实时 SSE 日志流抽屉，以及流式中断/异常本地 Token 估算兜底（`[LLM-002]` 已于 261110 完成） | • `[FEAT-001]` (P1) 内聚式 Run 实体与状态机（已完成）<br>• `[FEAT-007]` (P2) 工具证据链与 Trace 回放（已完成）<br>• `[FEAT-012]` (P2) 全链路 LLM Trace 监控与实时日志流（已完成）<br>• `[LLM-002]` (P2) 流式中断 Token 估算兜底（已完成-261110） | **已全面闭环**。<br>后续可按需补充 `[LLM-002]` 异常断流/主动终止时的页面专项回归验证。 |
 
 ---
 
@@ -245,11 +245,52 @@ flowchart TD
 
 > 记录近期代码审查与缺陷修复过程中识别出的架构分叉与产品取舍事项；以下各项涉及策略选择或跨阶段演进，暂保持现状并在本表沉淀结论后按排期推进。
 
-| 编号 | 关联能力/缺陷 | 待定事项描述 | 当前暂定策略与已落实兜底 | 可选演进路线（利弊权衡） |
+| 优先级 | 编号 | 关联能力/缺陷 | 待定事项描述 | 当前暂定策略与已落实兜底 | 可选演进路线（利弊权衡） |
+|---|---|---|---|---|---|
+| **P3** | **OPEN-001** | `[FEAT-014]` Eval 评测 | **Eval Agent 模式是否挂载真实 MCP / Skill / RAG 工具链** | 当前 `EvalEngineTool#runAgentCase` 仅装配 `systemPrompt` + 单轮 `LLM` 生成（传入空工具数组），只验证基础指令遵循与直接问答能力。 | **路线 A（保持轻量）**：零工具执行风险，并发压测成本低；缺陷是无法真实衡量 Skill / MCP / RAG / SubAgent 工具调用链指标。<br>**路线 B（完整引擎接入）**：从 `ChatStreamTool#buildObservableTools` 抽离公共装配器，但必须同步配套只读工具白名单、逐 Case 临时沙箱清理与步骤/超时上限，防止批量异步评测打爆线程池或触发宿主机危险操作。 |
+| **P3** | **OPEN-002** | `[FEAT-014]` Eval 评测 | **平台级“空间默认模型”概念缺失 vs 裁判模型必填取舍** | `xxl_ai_supplier_model` 表与模型管理暂无 `is_default` 或空间默认模型配置；当前创建实验前先校验前端指定 `judgeModelId`（强制归属当前空间）或自动回退至同空间首个可用聊天模型（并结合 Agent 目标自带模型），无任何可用模型时快速失败提示。 | **路线 A（显式选择 + 启用兜底）**：零表结构改动，行为可预期。<br>**路线 B（引入空间默认模型）**：在 `xxl_ai_space` / `xxl_ai_supplier_model` 新增默认 Chat / Embedding 模型配置，可同时简化 Eval 裁判模型、Workflow LLM 节点与检索测试台选择交互。 |
+| **P2** | **OPEN-003** | `[SEC-001]` 访客鉴权 | **存量旧浏览器无 Token 兼容取舍 & 多实例分布式签名密钥一致性** | 修复“无 Token 时免验签放行”与“硬编码缺省密钥”高危漏洞：`/chat/load` 作为唯一握手入口，当客户端未携带有效签名 `X-Visitor-Token` 时**忽略不可信的客户端 `visitorId`** 并由服务端重发全新 UUID 与签名；未配置 `xxl-ai.chat.visitor.secret` 时改为启动生成 `SecureRandom` 32 字节密钥并输出 `WARN` 日志。 | **权衡影响**：<br>1. 升级前仅缓存了旧 `visitorId` 且无 Token 的存量浏览器首次打开会生成全新访客身份（无法在 C 端继承升级前无凭证的历史会话，管理后台仍可审计保留）；<br>2. 多实例/集群或重启需保持访客会话连续性时，运维**必须**显式在各节点统一配置 `xxl-ai.chat.visitor.secret`，或后续升级为 Redis 集中存储访客令牌。 |
+| **P2** | **OPEN-004** | `[SEC-002]` Skill 安全 | **Skill 环境变量严格白名单对三方脚本运行时变量的扩展诉求** | `SkillToolFactory#buildSafeEnvironment` 由黑名单模式（仅屏蔽 `PASS/SECRET/...`）收紧为最小权限白名单模式（仅保留 `PATH/HOME/USER/LOGNAME/SHELL/LANG/LC_ALL/LC_CTYPE/TZ/TMPDIR/TEMP/TMP/TERM/PYTHONIOENCODING/PYTHONUNBUFFERED/VIRTUAL_ENV/CONDA_PREFIX/NODE_ENV`），阻断 `DATABASE_URL`、`AWS_*`、`REDIS_*` 等任意命名凭据泄露。 | **权衡影响**：第三方自定义 Skill 脚本若依赖特定环境变量（如 `HTTP_PROXY`、`JAVA_HOME`、自定义 `PYTHONPATH`）将无法直接读取；后续可按需增加配置项 `xxl-ai.skill.env.allowlist` 或在技能元数据中声明允许透传的变量白名单。 |
+| **P3** | **OPEN-005** | `[FEAT-009]` Workflow | **阶段二发布态 Mock 开关收敛、人工节点及权限边界** | 阶段一调试试跑（`WorkflowServiceImpl#run`）默认启用 `allowMock=true`，方便未接入全部外部依赖时验证拓扑编排与变量传递逻辑。 | **阶段二强制收敛**：面向公网 API / 定时触发 / 已发布态执行必须强制关闭 `allowMock=false`；同时需补齐节点输入 Schema 校验、外部工具/HTTP SSRF 防护、单节点/全图超时与 Token 预算控制，以及分类器/代码沙箱/嵌套子流/人工审批挂起恢复能力。 |
+
+---
+
+## 九、 截至 2026-11-14 完成度盘点与未完成明细清单
+
+> 基于第 3、4 节全量 **18 项缺陷** + **15 项功能**（合计 33 项）与当前 `dev-cloud` 源码、页面 E2E 测试实况核对：
+
+### 9.1 已完成（25 项，含 13 项缺陷 + 12 项功能）
+
+- **已完成缺陷（13 项）**：
+  - **P0（3/3）**：`[CACHE-001]`、`[RAG-CORE-002]`、`[SPACE-CORE-001]`
+  - **P1（3/3）**：`[RAG-CORE-001]`、`[CTX-001]` *(261114 页面实测)*、`[CTX-002]` *(261114 页面实测)*
+  - **P2（7 项）**：`[SEC-001]` *(261114 页面+跨访客 IDOR API 实测)*、`[SEC-002]` *(261114 页面实测公网剥离 ShellTools + 单测覆盖)*、`[LLM-001]`、`[LLM-002]`、`[TOOL-001]`、`[RAG-003]`、`[PROT-001]`
+- **已完成功能（12 项）**：
+  - `[FEAT-001]`、`[FEAT-002]` *(单机闭环)*、`[FEAT-003]`、`[FEAT-004]` *(261114 页面实测)*、`[FEAT-005]`、`[FEAT-006]` *(261113 页面实测)*、`[FEAT-007]`、`[FEAT-010]` *(261114 修复+回归实测)*、`[FEAT-011]` *(261114 页面实测)*、`[FEAT-012]`、`[FEAT-013]` *(261113/14 修复+回归实测)*、`[FEAT-014]` *(261114 页面实测；工具链评测边界见 `OPEN-001`)*。
+
+### 9.2 完成一半 / 阶段性推进 & 关联待决策架构取舍（按优先级排序）
+
+| 优先级 | 编号 | 类型 | 已完成 / 已兜底部分 | 未完成 / 待决策核心项 |
 |---|---|---|---|---|
-| **OPEN-001** | `[FEAT-014]` Eval 评测 | **Eval Agent 模式是否挂载真实 MCP / Skill / RAG 工具链** | 当前 `EvalEngineTool#runAgentCase` 仅装配 `systemPrompt` + 单轮 `LLM` 生成（传入空工具数组），只验证基础指令遵循与直接问答能力。 | **路线 A（保持轻量）**：零工具执行风险，并发压测成本低；缺陷是无法真实衡量 Skill / MCP / RAG / SubAgent 工具调用链指标。<br>**路线 B（完整引擎接入）**：从 `ChatStreamTool#buildObservableTools` 抽离公共装配器，但必须同步配套只读工具白名单、逐 Case 临时沙箱清理与步骤/超时上限，防止批量异步评测打爆线程池或触发宿主机危险操作。 |
-| **OPEN-002** | `[FEAT-014]` Eval 评测 | **平台级“空间默认模型”概念缺失 vs 裁判模型必填取舍** | `xxl_ai_supplier_model` 表与模型管理暂无 `is_default` 或空间默认模型配置；当前创建实验前先校验前端指定 `judgeModelId`（强制归属当前空间）或自动回退至同空间首个可用聊天模型（并结合 Agent 目标自带模型），无任何可用模型时快速失败提示。 | **路线 A（显式选择 + 启用兜底）**：零表结构改动，行为可预期。<br>**路线 B（引入空间默认模型）**：在 `xxl_ai_space` / `xxl_ai_supplier_model` 新增默认 Chat / Embedding 模型配置，可同时简化 Eval 裁判模型、Workflow LLM 节点与检索测试台选择交互。 |
-| **OPEN-003** | `[SEC-001]` 访客鉴权 | **存量旧浏览器无 Token 兼容取舍 & 多实例分布式签名密钥一致性** | 修复“无 Token 时免验签放行”与“硬编码缺省密钥”高危漏洞：`/chat/load` 作为唯一握手入口，当客户端未携带有效签名 `X-Visitor-Token` 时**忽略不可信的客户端 `visitorId`** 并由服务端重发全新 UUID 与签名；未配置 `xxl-ai.chat.visitor.secret` 时改为启动生成 `SecureRandom` 32 字节密钥并输出 `WARN` 日志。 | **权衡影响**：<br>1. 升级前仅缓存了旧 `visitorId` 且无 Token 的存量浏览器首次打开会生成全新访客身份（无法在 C 端继承升级前无凭证的历史会话，管理后台仍可审计保留）；<br>2. 多实例/集群或重启需保持访客会话连续性时，运维**必须**显式在各节点统一配置 `xxl-ai.chat.visitor.secret`，或后续升级为 Redis 集中存储访客令牌。 |
-| **OPEN-004** | `[SEC-002]` Skill 安全 | **Skill 环境变量严格白名单对三方脚本运行时变量的扩展诉求** | `SkillToolFactory#buildSafeEnvironment` 由黑名单模式（仅屏蔽 `PASS/SECRET/...`）收紧为最小权限白名单模式（仅保留 `PATH/HOME/USER/LOGNAME/SHELL/LANG/LC_ALL/LC_CTYPE/TZ/TMPDIR/TEMP/TMP/TERM/PYTHONIOENCODING/PYTHONUNBUFFERED/VIRTUAL_ENV/CONDA_PREFIX/NODE_ENV`），阻断 `DATABASE_URL`、`AWS_*`、`REDIS_*` 等任意命名凭据泄露。 | **权衡影响**：第三方自定义 Skill 脚本若依赖特定环境变量（如 `HTTP_PROXY`、`JAVA_HOME`、自定义 `PYTHONPATH`）将无法直接读取；后续可按需增加配置项 `xxl-ai.skill.env.allowlist` 或在技能元数据中声明允许透传的变量白名单。 |
-| **OPEN-005** | `[FEAT-009]` Workflow | **阶段二发布态 Mock 开关收敛、人工节点及权限边界** | 阶段一调试试跑（`WorkflowServiceImpl#run`）默认启用 `allowMock=true`，方便未接入全部外部依赖时验证拓扑编排与变量传递逻辑。 | **阶段二强制收敛**：面向公网 API / 定时触发 / 已发布态执行必须强制关闭 `allowMock=false`；同时需补齐节点输入 Schema 校验、外部工具/HTTP SSRF 防护、单节点/全图超时与 Token 预算控制，以及分类器/代码沙箱/嵌套子流/人工审批挂起恢复能力。 |
+| **P2** | **`[TEST-001]`** | 工程质量（完成一半） | `xxl-ai-api/src/test` 已补齐 **22 个单元/安全测试类**（覆盖 RAG/RRF/QA、VisitorToken、Skill 隔离、DAG、Eval、SubAgent、Prompt 变量、推理超参数、流式 Token 兜底、MCP `/sse`） | `pom.xml#L26` 仍声明 `<maven.test.skip>true</maven.test.skip>`；需放开默认跳过配置并补全真实中间件/SSE 全链路集成测试 |
+| **P2** | **`OPEN-003`** | 架构取舍（`[SEC-001]`） | 单机已彻底移除无 Token 放行与硬编码密钥，改为 `SecureRandom` 生成 | 生产多实例/集群或重启延续访客会话前，决定统一配置 `xxl-ai.chat.visitor.secret` 或改为 Redis 集中态存储 |
+| **P2** | **`OPEN-004`** | 架构取舍（`[SEC-002]`） | 已从环境变量黑名单收紧为最小权限白名单，阻断凭据泄露 | 按三方自定义 Skill 依赖诉求，决定是否开放 `xxl-ai.skill.env.allowlist` 或技能级变量白名单声明 |
+| **P3** | **`[FEAT-009]`** | 体系演进（完成一半） | **阶段一已完成（261114 页面回归通过）**：6 类基础节点 DAG 引擎、拓扑/租户校验、JSON 编辑、调试抽屉与执行记录 | **阶段二未开始**：Vue Flow 拖拽画布、扩展 18 种节点（分类器、代码沙箱、嵌套子流、人工确认挂起恢复） |
+| **P3** | **`OPEN-005`** | 架构取舍（`[FEAT-009]`） | 阶段一调试试跑默认启用 `allowMock=true` 验证拓扑编排 | 进入阶段二发布态/公网 API/定时触发前，强制收敛 `allowMock=false` 并补全 Schema、SSRF 与超时/Token 预算防护 |
+| **P3** | **`OPEN-001`** | 架构取舍（`[FEAT-014]`） | `EvalEngineTool#runAgentCase` 当前仅单轮 Prompt 推理，安全零副作用 | 决定保持轻量或接入完整工具链（若接入需配套只读白名单、逐 Case 临时沙箱清理与超时上限） |
+| **P3** | **`OPEN-002`** | 架构取舍（`[FEAT-014]`） | 裁判模型未传时校验同空间归属并回退至目标 Agent / 空间首个启用聊天模型 | 决定维持显式选择+回退策略，还是在表结构引入平台级“空间默认 Chat/Embedding 模型”配置 |
+
+### 9.3 尚未开始（6 项：4 项缺陷 + 2 项功能）
+
+1. **`[DATA-001]`（P2 缺陷）**：Redis Stream 任务流堆积超过 5000 条时入队前 `XLEN` 预检与主动熔断（当前仍直接 `.maxlen(5000)` 静默裁剪）。
+2. **`[RUN-001]`（P2 缺陷）**：PEL 故障接管分布式防重执行锁（`SETNX xxl:ai:run:lock:{msgId}`），防 Worker 崩溃重启重复调用大模型计费。
+3. **`[TOOL-002]`（P2 缺陷）& `[FEAT-008]`（P3 功能）**：多工具场景“中间迷失”治理与动态工具检索路由（Tool Retrieval，按意图筛选 Top-K 工具 Schema）。
+4. **`[FEAT-015]`（P3 功能）**：知识图谱与 GraphRAG 增强（三元组抽取、图谱可视化与全局图检索，克制引入、按资源选配）。
+5. **`[RUN-002]`（P4 缺陷）**：多实例集群部署下 `/stop` 跨节点终止广播（单机已闭环，已降级 P4 远期支持）。
+
+### 9.4 近期页面测试覆盖边界备忘（避免误判“全仓均已 UI 回归”）
+
+- **2026-11-13 ~ 2026-11-14 已完成完整浏览器实测的模块**：`[FEAT-006]`、`[FEAT-013]`、`[FEAT-010]`、`[FEAT-011]`、`[FEAT-004]`、`[FEAT-014]`、`[FEAT-009 阶段一]`、`[SEC-001]`（含跨访客 API 实测）、`[SEC-002]`（公网剥离 `ShellTools`）、`[CTX-001]`（含 32KB×2 轮超预算裁剪）、`[CTX-002]`（多轮后置 RAG 与防污染校验）。
+- **本轮未逐项跑页面专项回归的历史基线项**（依赖早先验证与单元测试）：`[CACHE-001]`（运行期热改 API Key 失效）、`[SPACE-CORE-001]`（跨空间切换看板校验）、`[FEAT-005]`（产物沙箱 `.sql/.html/.csv/.md` 预览/下载/删除级联）、`[LLM-002]`（主动 Stop/断流估算 Token）、`[PROT-001]`（MCP `/sse` 边界配置）、`[SEC-002]` 底层路径穿越/白名单极端攻击面。
+- **补充实测边界说明**：当前 `xxl_ai_session_msg.content` 为 MySQL `TEXT`（上限 65,535 字节，`ext_json` 已为 `MEDIUMTEXT`）；常规及 32KB 长文本对话正常，若未来需直接粘贴超 65KB 原文输入，需评估将 `content` 同步升级为 `MEDIUMTEXT`。
 
