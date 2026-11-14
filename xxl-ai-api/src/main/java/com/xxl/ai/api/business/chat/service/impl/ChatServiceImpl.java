@@ -4,7 +4,10 @@ import com.xxl.ai.api.business.agent.mapper.AgentMapper;
 import com.xxl.ai.api.business.agent.model.entity.Agent;
 import com.xxl.ai.api.business.chat.service.ChatService;
 import com.xxl.ai.api.business.harness.chat.ChatStreamTool;
+import com.xxl.ai.api.business.session.mapper.SessionMapper;
+import com.xxl.ai.api.business.session.mapper.SessionMsgMapper;
 import com.xxl.ai.api.business.session.model.entity.Session;
+import com.xxl.ai.api.business.session.model.entity.SessionMsg;
 import com.xxl.ai.api.business.session.service.SessionService;
 import com.xxl.tool.core.StringTool;
 import com.xxl.tool.response.Response;
@@ -31,6 +34,10 @@ public class ChatServiceImpl implements ChatService {
     private AgentMapper agentMapper;
     @Resource
     private SessionService sessionService;
+    @Resource
+    private SessionMapper sessionMapper;
+    @Resource
+    private SessionMsgMapper sessionMsgMapper;
     @Resource
     private ChatStreamTool chatStreamTool;
 
@@ -89,6 +96,11 @@ public class ChatServiceImpl implements ChatService {
             }
             Agent agent = requireReadyAgent(uuid);
             Session session = sessionService.require(agent.getId(), sessionId);
+            if (StringTool.isBlank(visitorId)
+                    || StringTool.isBlank(session.getVisitorId())
+                    || !session.getVisitorId().equals(visitorId.trim())) {
+                throw new IllegalArgumentException("无权访问该对话");
+            }
             long msgId = sessionService.openRound(session, content);
             try {
                 // 任务队列属系统内部流转，使用 agent_id（uuid 仅用于 C 端投放入口）
@@ -106,23 +118,46 @@ public class ChatServiceImpl implements ChatService {
     }
 
     /**
-     * 断线/刷新续传：从既有结果流的 {@code lastEventId} 之后继续转发，不重新生成
+     * 断线/刷新续传：校验访客归属，从既有结果流的 {@code lastEventId} 之后继续转发，不重新生成
      */
     @Override
-    public SseEmitter resume(long msgId, String lastEventId) {
+    public SseEmitter resume(long msgId, String visitorId, String lastEventId) {
         if (msgId <= 0) {
             return chatStreamTool.error("无效的会话流标识");
+        }
+        if (StringTool.isBlank(visitorId)) {
+            return chatStreamTool.error("访客标识不能为空");
+        }
+        SessionMsg msg = sessionMsgMapper.load(msgId);
+        if (msg == null) {
+            return chatStreamTool.error("会话消息不存在");
+        }
+        Session session = sessionMapper.load(msg.getSessionId());
+        if (session == null || StringTool.isBlank(session.getVisitorId())
+                || !visitorId.trim().equals(session.getVisitorId())) {
+            return chatStreamTool.error("无权访问该会话流");
         }
         return chatStreamTool.open(msgId, lastEventId);
     }
 
     /**
-     * 主动终止本节点会话进行中的生成：标记终止 → 中断生成 → 回收工具调用进程（幂等，无进行中生成亦成功）
+     * 主动终止本节点会话进行中的生成：校验访客归属 → 标记终止 → 中断生成 → 回收工具调用进程
      */
     @Override
-    public Response<String> stop(long sessionId) {
+    public Response<String> stop(long sessionId, String visitorId) {
         if (sessionId <= 0) {
             return Response.ofFail("无效的会话标识");
+        }
+        if (StringTool.isBlank(visitorId)) {
+            return Response.ofFail("访客标识不能为空");
+        }
+        Session session = sessionMapper.load(sessionId);
+        if (session == null) {
+            return Response.ofFail("会话不存在");
+        }
+        if (StringTool.isBlank(session.getVisitorId())
+                || !visitorId.trim().equals(session.getVisitorId())) {
+            return Response.ofFail("无权操作该会话");
         }
         chatStreamTool.cancel(sessionId);
         return Response.ofSuccess();

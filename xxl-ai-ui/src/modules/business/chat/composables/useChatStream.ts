@@ -14,6 +14,7 @@ export type ChatStreamHandler = (text: string) => void
 /** 流状态：msgId 由 stream 事件回填，lastEventId 为已处理的结果流条目 */
 interface ChatStreamState {
   msgId?: number
+  visitorId?: string
   lastEventId?: string
 }
 
@@ -38,7 +39,7 @@ export function useChatStream() {
     if (!reader) {
       throw new Error('empty stream')
     }
-    await streamWithResume(reader, {}, onThinking, onContent, onError, () => stopped, controller.signal)
+    await streamWithResume(reader, { visitorId: payload.visitorId }, onThinking, onContent, onError, () => stopped, controller.signal)
   }
 
   /**
@@ -46,6 +47,7 @@ export function useChatStream() {
    */
   async function resumeMessage(
     msgId: number,
+    visitorId: string | undefined,
     onThinking: ChatStreamHandler,
     onContent: ChatStreamHandler,
     onError?: (message: string) => void
@@ -53,9 +55,9 @@ export function useChatStream() {
     if (!msgId) return
     stopped = false
     controller = new AbortController()
-    const reader = await resumeStream(msgId, undefined, controller.signal)
+    const reader = await resumeStream(msgId, visitorId, undefined, controller.signal)
     if (!reader) return
-    await streamWithResume(reader, { msgId }, onThinking, onContent, onError, () => stopped, controller.signal)
+    await streamWithResume(reader, { msgId, visitorId }, onThinking, onContent, onError, () => stopped, controller.signal)
   }
 
   /**
@@ -105,7 +107,7 @@ async function streamWithResume(
     await new Promise((resolve) => setTimeout(resolve, 500 * attempts))
     if (isStopped()) return
     try {
-      const resumed = await resumeStream(state.msgId, state.lastEventId, signal)
+      const resumed = await resumeStream(state.msgId, state.visitorId, state.lastEventId, signal)
       if (!resumed) return
       reader = resumed
     } catch (e) {

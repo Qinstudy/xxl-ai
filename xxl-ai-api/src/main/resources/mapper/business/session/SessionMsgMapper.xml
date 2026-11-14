@@ -63,6 +63,12 @@
 		WHERE c.agent_id = #{agentId}
 	</delete>
 
+	<select id="load" parameterType="java.util.HashMap" resultMap="SessionMsg">
+		SELECT <include refid="Base_Column_List" />
+		FROM xxl_ai_session_msg AS t
+		WHERE t.id = #{id}
+	</select>
+
 	<select id="listBySessionId" parameterType="java.util.HashMap" resultMap="SessionMsg">
 		SELECT <include refid="Base_Column_List" />
 		FROM xxl_ai_session_msg AS t

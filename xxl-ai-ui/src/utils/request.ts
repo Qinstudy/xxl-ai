@@ -67,7 +67,7 @@ export const errorCode: Record<string, string> = {
 
 const service = axios.create({
   baseURL: import.meta.env.VITE_APP_BASE_API,
-  timeout: 10000,
+  timeout: 60000,
   paramsSerializer: (params) => tansParams(params).replace(/&$/, '')
 })
 
@@ -101,6 +101,12 @@ service.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const currentSpaceId = useSpaceStore().currentSpaceId
   if (getToken() && currentSpaceId != null) {
     config.headers['xxl-space-id'] = currentSpaceId
+  }
+
+  // 3. 访客令牌注入：若本地存有访客凭证，自动注入 X-Visitor-Token（[SEC-001] IDOR 防护）
+  const visitorToken = localStorage.getItem('xxl-ai-visitor-token')
+  if (visitorToken) {
+    config.headers['X-Visitor-Token'] = visitorToken
   }
 
   // POST / PUT 防重复提交
@@ -155,6 +161,16 @@ service.interceptors.response.use(
   (res) => {
     const data = res.data as Response
     const code = data.code || 200
+
+    // 捕获并存储服务端下发/刷新的 X-Visitor-Id 与 X-Visitor-Token（[SEC-001] IDOR 防护）
+    const vId = res.headers ? (res.headers['x-visitor-id'] || res.headers['X-Visitor-Id']) : null
+    if (vId && typeof vId === 'string') {
+      localStorage.setItem('xxl-ai-agent-visitor', vId)
+    }
+    const vToken = res.headers ? (res.headers['x-visitor-token'] || res.headers['X-Visitor-Token']) : null
+    if (vToken && typeof vToken === 'string') {
+      localStorage.setItem('xxl-ai-visitor-token', vToken)
+    }
 
     // 1. blob / arraybuffer 透传
     if (res.request.responseType === 'blob' || res.request.responseType === 'arraybuffer') {

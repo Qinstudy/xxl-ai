@@ -18,6 +18,8 @@ public interface SessionMsgMapper {
 
     int insert(SessionMsg sessionMsg);
 
+    SessionMsg load(@Param("id") long id);
+
     /** 回填助手消息生成结果（内容、思考、状态） */
     int updateAssistant(@Param("id") long id,
                         @Param("content") String content,
